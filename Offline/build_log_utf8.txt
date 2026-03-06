@@ -1,0 +1,85 @@
+﻿info Installing the app...
+> Task :gradle-plugin:settings-plugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle-plugin:shared:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:shared:compileJava NO-SOURCE
+> Task :gradle-plugin:shared:processResources NO-SOURCE
+> Task :gradle-plugin:shared:classes UP-TO-DATE
+> Task :gradle-plugin:shared:jar UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileKotlin UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:compileJava NO-SOURCE
+> Task :gradle-plugin:settings-plugin:pluginDescriptors UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:processResources UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:classes UP-TO-DATE
+> Task :gradle-plugin:settings-plugin:jar UP-TO-DATE
+
+[Incubating] Problems report is available at: file:///C:/Users/Administrator/Documents/AppwithRN/Offline/android/build/reports/problems/problems-report.html
+6 actionable tasks: 6 up-to-date
+
+info ≡ƒÆí Tip: Make sure that you have set up your development environment correctly, by running npx react-native doctor. To read more about doctor command visit: https://github.com/react-native-community/cli/blob/main/packages/cli-doctor/README.md#doctor 
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Configuring project ':react-native-safe-area-context' without an existing directory is not allowed. The configured projectDirectory 'F:\AppwithRN\Offline\node_modules\react-native-safe-area-context\android' does not exist, can't be written to or is not a directory.
+
+* Try:
+> Make sure the project directory exists and is writable.
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+BUILD FAILED in 4s
+node.exe : error 
+Failed to install the 
+app. Command failed 
+with exit code 1: 
+gradlew.bat 
+app:installDebug -Prea
+ctNativeDevServerPort=
+8081 FAILURE: Build 
+failed with an 
+exception. * What 
+went wrong: 
+Configuring project ':
+react-native-safe-area
+-context' without an 
+existing directory is 
+not allowed. The 
+configured 
+projectDirectory 'F:\A
+ppwithRN\Offline\node_
+modules\react-native-s
+afe-area-context\andro
+id' does not exist, 
+can't be written to 
+or is not a 
+directory. * Try: > 
+Make sure the project 
+directory exists and 
+is writable. > Run 
+with --scan to 
+generate a Build Scan 
+(Powered by 
+Develocity). BUILD 
+FAILED in 4s.
+At line:1 char:1
++ & "C:\Program Files\
+nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (error Fail   
+ ed to...D FAILED     
+in 4s.:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+info Run CLI with --verbose flag for more details.
