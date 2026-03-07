@@ -27,7 +27,6 @@ class LlamaService {
     const exists = await ReactNativeFS.exists(localPath);
     if (!exists) return false;
 
-    // Optional: Basic integrity check - if file is too small, it's likely corrupt
     const stats = await ReactNativeFS.stat(localPath);
     if (stats.size < 100 * 1024 * 1024) { // Qwen 0.5B q4 is >300MB
       console.log("Model file too small, considering it missing/corrupt");
@@ -41,7 +40,6 @@ class LlamaService {
     const localPath = this.getLocalPath();
     const tempPath = this.getTempPath();
 
-    // Clean up any existing partial download
     if (await ReactNativeFS.exists(tempPath)) {
       await ReactNativeFS.unlink(tempPath);
     }
@@ -98,7 +96,6 @@ class LlamaService {
       console.log("Model context loaded successfully.");
     } catch (err) {
       console.error("Llama context initialization failed:", err);
-      // If load fails, the file might be corrupt. Force redownload next time.
       await ReactNativeFS.unlink(localPath).catch(() => { });
       throw err;
     }

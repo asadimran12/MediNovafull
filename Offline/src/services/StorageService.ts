@@ -55,15 +55,14 @@ export interface StructuredDietPlan {
 }
 
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
 const DAY_FOOD_HINTS: Record<string, { breakfast: string; lunch: string; dinner: string; snack: string }> = {
-  Monday: { breakfast: "Oatmeal with blueberries", lunch: "Grilled chicken salad", dinner: "Baked salmon with brown rice", snack: "Greek yogurt" },
-  Tuesday: { breakfast: "Scrambled eggs with spinach", lunch: "Lentil soup with whole bread", dinner: "Chicken stir fry with vegetables", snack: "Apple with almond butter" },
-  Wednesday: { breakfast: "Whole grain toast with avocado", lunch: "Tuna wrap with lettuce", dinner: "Beef stew with sweet potato", snack: "Handful of mixed nuts" },
-  Thursday: { breakfast: "Greek yogurt with granola", lunch: "Chickpea and vegetable curry", dinner: "Grilled turkey with quinoa", snack: "Banana with peanut butter" },
-  Friday: { breakfast: "Banana smoothie with oats", lunch: "Grilled fish with salad", dinner: "Pasta with tomato and lean beef", snack: "Cottage cheese with fruit" },
-  Saturday: { breakfast: "Vegetable omelette", lunch: "Brown rice with black beans", dinner: "Baked chicken with roasted veg", snack: "Carrot sticks with hummus" },
-  Sunday: { breakfast: "Whole grain pancakes", lunch: "Quinoa salad with chickpeas", dinner: "Grilled shrimp with couscous", snack: "Orange and walnuts" },
+  Monday: { breakfast: "oats, berries, honey", lunch: "chicken, leafy greens, olive oil", dinner: "salmon, brown rice, lemon", snack: "yogurt, nuts" },
+  Tuesday: { breakfast: "eggs, spinach, cheese", lunch: "lentils, whole grain bread, tomato", dinner: "chicken, bell peppers, soy sauce", snack: "apple, almond butter" },
+  Wednesday: { breakfast: "whole grain bread, avocado, egg", lunch: "tuna, lettuce, whole wheat wrap", dinner: "beef, sweet potato, herbs", snack: "mixed nuts, dried fruit" },
+  Thursday: { breakfast: "yogurt, granola, banana", lunch: "chickpeas, cauliflower, curry spices", dinner: "turkey, quinoa, roasted garlic", snack: "banana, peanut butter" },
+  Friday: { breakfast: "oats, banana, milk, chia seeds", lunch: "white fish, cucumber, lemon salad", dinner: "lean beef, pasta, tomato sauce", snack: "cottage cheese, berries" },
+  Saturday: { breakfast: "eggs, zucchini, bell pepper", lunch: "black beans, brown rice, salsa", dinner: "chicken breast, broccoli, olive oil", snack: "hummus, carrot, celery" },
+  Sunday: { breakfast: "whole grain flour, eggs, maple", lunch: "chickpeas, quinoa, cucumber, feta", dinner: "shrimp, couscous, garlic, parsley", snack: "orange, walnuts, dark chocolate" },
 };
 
 
@@ -95,23 +94,29 @@ Do NOT repeat foods from previous days in this conversation.
 
 Patient: ${age} ${gender}. Conditions: ${conditions}. Rules: ${guidelines}.
 
-For ${dayName}, use THESE foods (be creative with preparation and portions):
-- Breakfast: ${hints.breakfast}
-- Lunch: ${hints.lunch}  
-- Dinner: ${hints.dinner}
-- Snacks: ${hints.snack}
+For ${dayName}, create meals using ONLY these ingredients as inspiration:
+- Breakfast ingredients: ${hints.breakfast}
+- Lunch ingredients: ${hints.lunch}
+- Dinner ingredients: ${hints.dinner}
+- Snack ingredients: ${hints.snack}
 
-Return ONLY a JSON object. No markdown, no explanation. Start with { end with }.
+IMPORTANT rules for macros:
+- Protein must be realistic: chicken=25-35g, eggs=6g each, fish=20-30g, legumes=10-15g
+- Calories must match macros: (protein*4) + (carbs*4) + (fat*9) = total calories
+- Fat should be 10-25g per meal, NOT 50g
+- Carbs should be 30-60g per meal
+- Do NOT copy ingredient names directly — create a proper meal name like "Pan-seared salmon with steamed brown rice"
 
-JSON structure (replace angle-bracket values with real data):
+Return ONLY a JSON object. No markdown. Start with { end with }.
+
 {
   "day": "${dayName}",
-  "summary": {"calories": <total number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"},
+  "summary": {"calories": <sum of all meals>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"},
   "meals": [
-    {"type": "Breakfast", "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
-    {"type": "Lunch",     "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
-    {"type": "Dinner",    "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
-    {"type": "Snacks",    "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]}
+    {"type": "Breakfast", "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
+    {"type": "Lunch",     "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
+    {"type": "Dinner",    "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
+    {"type": "Snacks",    "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]}
   ]
 }`;
 }
@@ -226,12 +231,17 @@ function getFallbackMeals(dayName: string): Meal[] {
 }
 
 function normaliseMealItem(raw: any): MealItem {
+  const toGramString = (val: any): string => {
+    if (val === undefined || val === null) return "0g";
+    const str = String(val);
+    return str.endsWith("g") ? str : `${Math.round(Number(str) || 0)}g`;
+  };
   return {
     name: raw.name ?? "Food item",
     calories: Number(raw.calories) || 0,
-    protein: String(raw.protein ?? "0g"),
-    carbs: String(raw.carbs ?? "0g"),
-    fat: String(raw.fat ?? "0g"),
+    protein: toGramString(raw.protein),
+    carbs: toGramString(raw.carbs),
+    fat: toGramString(raw.fat),
   };
 }
 
