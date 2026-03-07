@@ -1,9 +1,4 @@
 import ReactNativeFS from "react-native-fs";
-
-// ─────────────────────────────────────────────────────────────
-//  Interfaces
-// ─────────────────────────────────────────────────────────────
-
 export interface LocalMessage {
   id: string;
   role: "user" | "assistant";
@@ -59,13 +54,8 @@ export interface StructuredDietPlan {
   days: DayPlan[];
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Day-specific food pools — LLM picks from these, ensuring variety
-// ─────────────────────────────────────────────────────────────
-
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-// Each day has different suggested foods so the LLM cannot just copy the example
 const DAY_FOOD_HINTS: Record<string, { breakfast: string; lunch: string; dinner: string; snack: string }> = {
   Monday: { breakfast: "Oatmeal with blueberries", lunch: "Grilled chicken salad", dinner: "Baked salmon with brown rice", snack: "Greek yogurt" },
   Tuesday: { breakfast: "Scrambled eggs with spinach", lunch: "Lentil soup with whole bread", dinner: "Chicken stir fry with vegetables", snack: "Apple with almond butter" },
@@ -76,9 +66,6 @@ const DAY_FOOD_HINTS: Record<string, { breakfast: string; lunch: string; dinner:
   Sunday: { breakfast: "Whole grain pancakes", lunch: "Quinoa salad with chickpeas", dinner: "Grilled shrimp with couscous", snack: "Orange and walnuts" },
 };
 
-// ─────────────────────────────────────────────────────────────
-//  Condition Guidelines
-// ─────────────────────────────────────────────────────────────
 
 function buildConditionGuidelines(conditions: string): string {
   const lower = conditions.toLowerCase();
@@ -96,12 +83,6 @@ function buildConditionGuidelines(conditions: string): string {
   return rules.length > 0 ? rules.join(", ") : "balanced healthy diet";
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Prompt — NO full example (that's why LLM was copying it)
-//  Instead: show only the JSON SHAPE with placeholders,
-//  and tell the LLM exactly what foods to use for this day.
-// ─────────────────────────────────────────────────────────────
-
 function buildSingleDayPrompt(profile: UserProfile, dayName: string): string {
   const age = profile.age ? `${profile.age}yo` : "adult";
   const gender = profile.gender || "unspecified";
@@ -109,28 +90,107 @@ function buildSingleDayPrompt(profile: UserProfile, dayName: string): string {
   const guidelines = buildConditionGuidelines(conditions);
   const hints = DAY_FOOD_HINTS[dayName];
 
-  return `Output ONLY a JSON object. No explanation. No markdown. No extra text.
+  return `You are generating day ${DAY_NAMES.indexOf(dayName) + 1} of 7 in a meal plan.
+Do NOT repeat foods from previous days in this conversation.
 
-Patient: ${age} ${gender}. Medical conditions: ${conditions}. Dietary rules: ${guidelines}.
+Patient: ${age} ${gender}. Conditions: ${conditions}. Rules: ${guidelines}.
 
-Create a UNIQUE meal plan for ${dayName} using THESE specific foods:
+For ${dayName}, use THESE foods (be creative with preparation and portions):
 - Breakfast: ${hints.breakfast}
-- Lunch: ${hints.lunch}
+- Lunch: ${hints.lunch}  
 - Dinner: ${hints.dinner}
 - Snacks: ${hints.snack}
 
-Use realistic calorie and macro values. Calories must be a NUMBER (not a string).
-Protein, carbs, fat must be strings ending in "g" like "10g".
+Return ONLY a JSON object. No markdown, no explanation. Start with { end with }.
 
-Required JSON shape (fill in real values, do NOT copy these numbers):
-{"day":"${dayName}","summary":{"calories":0,"protein":"0g","carbs":"0g","fat":"0g"},"meals":[{"type":"Breakfast","items":[{"name":"FOOD NAME HERE","calories":0,"protein":"0g","carbs":"0g","fat":"0g"}]},{"type":"Lunch","items":[{"name":"FOOD NAME HERE","calories":0,"protein":"0g","carbs":"0g","fat":"0g"}]},{"type":"Dinner","items":[{"name":"FOOD NAME HERE","calories":0,"protein":"0g","carbs":"0g","fat":"0g"}]},{"type":"Snacks","items":[{"name":"FOOD NAME HERE","calories":0,"protein":"0g","carbs":"0g","fat":"0g"}]}]}
-
-Start your response with { and end with }. Return JSON only.`;
+JSON structure (replace angle-bracket values with real data):
+{
+  "day": "${dayName}",
+  "summary": {"calories": <total number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"},
+  "meals": [
+    {"type": "Breakfast", "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
+    {"type": "Lunch",     "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
+    {"type": "Dinner",    "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
+    {"type": "Snacks",    "items": [{"name": "<food name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]}
+  ]
+}`;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  JSON Utilities
-// ─────────────────────────────────────────────────────────────
+export async function generateDietPlan(
+  onProgress?: (dayName: string, index: number) => void
+): Promise<void> {
+  const profile = await storageService.getProfile();
+  const LlamaService = (await import("./LlamaService")).default;
+  await LlamaService.loadModel();
+
+  const collectedDays: DayPlan[] = [];
+  const systemPrompt =
+    "You are a clinical nutritionist creating a 7-day meal plan. Each day MUST use different foods. Return ONLY valid JSON. No explanation. No markdown.";
+
+  const conversationHistory: { role: "user" | "assistant"; content: string }[] = [];
+
+  for (let i = 0; i < DAY_NAMES.length; i++) {
+    const dayName = DAY_NAMES[i];
+    onProgress?.(dayName, i);
+    console.log(`🔄 Generating ${dayName} (${i + 1}/7)...`);
+
+    const prompt = buildSingleDayPrompt(profile, dayName);
+
+    conversationHistory.push({ role: "user", content: prompt });
+
+    try {
+      const response = await LlamaService.chat(
+        [...conversationHistory],
+        systemPrompt
+      );
+
+      console.log(`📝 Raw LLM for ${dayName} (first 300):`, response.substring(0, 300));
+
+      conversationHistory.push({ role: "assistant", content: response });
+
+      const dayPlan = parseSingleDay(response, dayName);
+      if (dayPlan) {
+        dayPlan.day = dayName;
+        collectedDays.push(dayPlan);
+        console.log(
+          `✅ ${dayName} — foods: ${dayPlan.meals.map((m) => m.items[0]?.name).join(" | ")}`
+        );
+      } else {
+        console.warn(`⚠️ ${dayName} parse failed — using fallback`);
+        const fallback = {
+          day: dayName,
+          summary: { calories: 1470, protein: "93g", carbs: "155g", fat: "41g" },
+          meals: getFallbackMeals(dayName),
+        };
+        collectedDays.push(fallback);
+        conversationHistory.push({
+          role: "assistant",
+          content: JSON.stringify(fallback),
+        });
+      }
+    } catch (err) {
+      console.error(`❌ ${dayName} error:`, err);
+      collectedDays.push({
+        day: dayName,
+        summary: { calories: 1470, protein: "93g", carbs: "155g", fat: "41g" },
+        meals: getFallbackMeals(dayName),
+      });
+    }
+  }
+
+  const fullPlan: StructuredDietPlan = {
+    title: "7-Day Personalised Diet Plan",
+    days: collectedDays,
+  };
+
+  await storageService.savePlan({
+    id: Date.now().toString(),
+    type: "diet",
+    title: fullPlan.title,
+    content: JSON.stringify(fullPlan),
+    createdAt: new Date().toISOString(),
+  });
+}
 
 function extractJson(raw: string): string {
   let cleaned = raw.replace(/```json|```/gi, "").trim();
@@ -153,10 +213,6 @@ function closeJson(s: string): string {
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Fallback meals per day — used when LLM fails completely
-// ─────────────────────────────────────────────────────────────
-
 const REQUIRED_MEALS: Meal["type"][] = ["Breakfast", "Lunch", "Dinner", "Snacks"];
 
 function getFallbackMeals(dayName: string): Meal[] {
@@ -168,10 +224,6 @@ function getFallbackMeals(dayName: string): Meal[] {
     { type: "Snacks", items: [{ name: hints.snack, calories: 180, protein: "6g", carbs: "20g", fat: "7g" }] },
   ];
 }
-
-// ─────────────────────────────────────────────────────────────
-//  Normalisers
-// ─────────────────────────────────────────────────────────────
 
 function normaliseMealItem(raw: any): MealItem {
   return {
@@ -189,7 +241,6 @@ function normaliseMeal(raw: any, dayName: string): Meal {
     (t) => t.toLowerCase() === rawType.toLowerCase()
   ) ?? "Breakfast";
 
-  // ✅ Proper items[] array
   if (Array.isArray(raw.items) && raw.items.length > 0) {
     const validItems = raw.items.filter(
       (i: any) => i.name && i.name !== "FOOD NAME HERE"
@@ -199,15 +250,12 @@ function normaliseMeal(raw: any, dayName: string): Meal {
     }
   }
 
-  // ⚠️ LLM put macros flat on meal object
   if (raw.calories !== undefined && raw.name && raw.name !== "FOOD NAME HERE") {
     return {
       type: mealType,
       items: [normaliseMealItem({ name: raw.name, calories: raw.calories, protein: raw.protein, carbs: raw.carbs, fat: raw.fat })],
     };
   }
-
-  // ❌ Completely empty or placeholder — use day-specific fallback
   const fallback = getFallbackMeals(dayName).find((m) => m.type === mealType);
   return fallback ?? { type: mealType, items: [] };
 }
@@ -217,7 +265,6 @@ function normaliseDay(raw: any, dayName?: string): DayPlan {
   const existingMeals: Meal[] = (raw.meals ?? []).map((m: any) => normaliseMeal(m, name));
   const mealMap = new Map(existingMeals.map((m) => [m.type, m]));
 
-  // Guarantee all 4 meals always present
   const fallbacks = getFallbackMeals(name);
   const meals: Meal[] = REQUIRED_MEALS.map(
     (t) => mealMap.get(t) ?? fallbacks.find((f) => f.type === t) ?? { type: t, items: [] }
@@ -230,21 +277,15 @@ function normaliseDay(raw: any, dayName?: string): DayPlan {
   };
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Single-day parser
-// ─────────────────────────────────────────────────────────────
-
 function parseSingleDay(raw: string, expectedDay: string): DayPlan | null {
   const cleaned = extractJson(raw);
 
-  // 1. Direct parse
   try {
     const parsed = JSON.parse(cleaned);
     if (parsed?.day && Array.isArray(parsed?.meals)) return normaliseDay(parsed, expectedDay);
     if (parsed?.days?.[0]) return normaliseDay(parsed.days[0], expectedDay);
   } catch (_) { }
 
-  // 2. Close truncated JSON and retry
   try {
     const parsed = JSON.parse(closeJson(cleaned));
     if (parsed?.day && Array.isArray(parsed?.meals)) return normaliseDay(parsed, expectedDay);
@@ -253,10 +294,6 @@ function parseSingleDay(raw: string, expectedDay: string): DayPlan | null {
   console.warn(`⚠️ Could not parse day: ${expectedDay}, raw: ${raw.substring(0, 200)}`);
   return null;
 }
-
-// ─────────────────────────────────────────────────────────────
-//  safeParseDietPlan — exported for PlansScreen
-// ─────────────────────────────────────────────────────────────
 
 export function safeParseDietPlan(raw: string): StructuredDietPlan | null {
   if (!raw || raw.trim().length < 10) return null;
@@ -287,10 +324,6 @@ export function safeParseDietPlan(raw: string): StructuredDietPlan | null {
 
   return null;
 }
-
-// ─────────────────────────────────────────────────────────────
-//  StorageService
-// ─────────────────────────────────────────────────────────────
 
 class StorageService {
   private userId: string | null = null;
@@ -392,73 +425,6 @@ class StorageService {
 
 const storageService = new StorageService();
 
-// ─────────────────────────────────────────────────────────────
-//  Exported helpers
-// ─────────────────────────────────────────────────────────────
-
-export async function generateDietPlan(
-  onProgress?: (dayName: string, index: number) => void
-): Promise<void> {
-  const profile = await storageService.getProfile();
-  const LlamaService = (await import("./LlamaService")).default;
-  await LlamaService.loadModel();
-
-  const collectedDays: DayPlan[] = [];
-  const systemPrompt = "You are a clinical nutritionist. Return ONLY valid JSON. No explanation. No markdown.";
-
-  for (let i = 0; i < DAY_NAMES.length; i++) {
-    const dayName = DAY_NAMES[i];
-    onProgress?.(dayName, i);
-    console.log(`🔄 Generating ${dayName} (${i + 1}/7)...`);
-
-    const prompt = buildSingleDayPrompt(profile, dayName);
-
-    try {
-      const response = await LlamaService.chat(
-        [{ role: "user", content: prompt }],
-        systemPrompt
-      );
-
-      console.log(`📝 Raw LLM for ${dayName} (first 300):`, response.substring(0, 300));
-
-      const dayPlan = parseSingleDay(response, dayName);
-      if (dayPlan) {
-        dayPlan.day = dayName; // enforce correct day name
-        collectedDays.push(dayPlan);
-        console.log(`✅ ${dayName} OK — meals: ${dayPlan.meals.length}, foods: ${dayPlan.meals.map(m => m.items[0]?.name).join(" | ")}`);
-      } else {
-        console.warn(`⚠️ ${dayName} parse failed — using day-specific fallback`);
-        collectedDays.push({
-          day: dayName,
-          summary: { calories: 1470, protein: "93g", carbs: "155g", fat: "41g" },
-          meals: getFallbackMeals(dayName),
-        });
-      }
-    } catch (err) {
-      console.error(`❌ ${dayName} error:`, err);
-      collectedDays.push({
-        day: dayName,
-        summary: { calories: 1470, protein: "93g", carbs: "155g", fat: "41g" },
-        meals: getFallbackMeals(dayName),
-      });
-    }
-  }
-
-  console.log(`✅ Total days: ${collectedDays.length}`);
-
-  const fullPlan: StructuredDietPlan = {
-    title: "7-Day Personalised Diet Plan",
-    days: collectedDays,
-  };
-
-  await storageService.savePlan({
-    id: Date.now().toString(),
-    type: "diet",
-    title: fullPlan.title,
-    content: JSON.stringify(fullPlan),
-    createdAt: new Date().toISOString(),
-  });
-}
 
 export async function loadLatestDietPlan(): Promise<StructuredDietPlan | null> {
   const plans = await storageService.getPlans("diet");
