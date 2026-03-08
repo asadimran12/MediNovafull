@@ -1,4 +1,5 @@
 import ReactNativeFS from "react-native-fs";
+
 export interface LocalMessage {
   id: string;
   role: "user" | "assistant";
@@ -54,17 +55,60 @@ export interface StructuredDietPlan {
   days: DayPlan[];
 }
 
-const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const DAY_FOOD_HINTS: Record<string, { breakfast: string; lunch: string; dinner: string; snack: string }> = {
-  Monday: { breakfast: "oats, berries, honey", lunch: "chicken, leafy greens, olive oil", dinner: "salmon, brown rice, lemon", snack: "yogurt, nuts" },
-  Tuesday: { breakfast: "eggs, spinach, cheese", lunch: "lentils, whole grain bread, tomato", dinner: "chicken, bell peppers, soy sauce", snack: "apple, almond butter" },
-  Wednesday: { breakfast: "whole grain bread, avocado, egg", lunch: "tuna, lettuce, whole wheat wrap", dinner: "beef, sweet potato, herbs", snack: "mixed nuts, dried fruit" },
-  Thursday: { breakfast: "yogurt, granola, banana", lunch: "chickpeas, cauliflower, curry spices", dinner: "turkey, quinoa, roasted garlic", snack: "banana, peanut butter" },
-  Friday: { breakfast: "oats, banana, milk, chia seeds", lunch: "white fish, cucumber, lemon salad", dinner: "lean beef, pasta, tomato sauce", snack: "cottage cheese, berries" },
-  Saturday: { breakfast: "eggs, zucchini, bell pepper", lunch: "black beans, brown rice, salsa", dinner: "chicken breast, broccoli, olive oil", snack: "hummus, carrot, celery" },
-  Sunday: { breakfast: "whole grain flour, eggs, maple", lunch: "chickpeas, quinoa, cucumber, feta", dinner: "shrimp, couscous, garlic, parsley", snack: "orange, walnuts, dark chocolate" },
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DAY_NAMES = [
+  "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+];
+
+// ─── Halal Fallback Meals ──────────────────────────────────────────────────────
+
+const HALAL_FALLBACK_MEALS: Record<string, Meal[]> = {
+  Monday: [
+    { type: "Breakfast", items: [{ name: "Scrambled Eggs with Whole Wheat Toast", calories: 320, protein: "18g", carbs: "34g", fat: "10g" }] },
+    { type: "Lunch", items: [{ name: "Grilled Halal Chicken Salad with Olive Oil Dressing", calories: 420, protein: "35g", carbs: "20g", fat: "14g" }] },
+    { type: "Dinner", items: [{ name: "Baked Salmon with Steamed Brown Rice and Broccoli", calories: 520, protein: "38g", carbs: "48g", fat: "12g" }] },
+    { type: "Snacks", items: [{ name: "Greek Yogurt with Mixed Berries", calories: 180, protein: "10g", carbs: "22g", fat: "4g" }] },
+  ],
+  Tuesday: [
+    { type: "Breakfast", items: [{ name: "Oatmeal with Banana and Honey", calories: 310, protein: "8g", carbs: "58g", fat: "5g" }] },
+    { type: "Lunch", items: [{ name: "Lentil Soup with Whole Grain Bread", calories: 430, protein: "22g", carbs: "60g", fat: "8g" }] },
+    { type: "Dinner", items: [{ name: "Halal Beef Stir-Fry with Jasmine Rice and Vegetables", calories: 540, protein: "36g", carbs: "52g", fat: "14g" }] },
+    { type: "Snacks", items: [{ name: "Apple with Almond Butter", calories: 190, protein: "4g", carbs: "26g", fat: "8g" }] },
+  ],
+  Wednesday: [
+    { type: "Breakfast", items: [{ name: "Avocado Toast with Poached Egg", calories: 340, protein: "14g", carbs: "30g", fat: "16g" }] },
+    { type: "Lunch", items: [{ name: "Tuna Wrap with Lettuce and Tomato", calories: 410, protein: "30g", carbs: "38g", fat: "10g" }] },
+    { type: "Dinner", items: [{ name: "Halal Lamb Stew with Sweet Potato and Herbs", calories: 560, protein: "38g", carbs: "44g", fat: "16g" }] },
+    { type: "Snacks", items: [{ name: "Mixed Nuts and Dried Apricots", calories: 200, protein: "5g", carbs: "22g", fat: "12g" }] },
+  ],
+  Thursday: [
+    { type: "Breakfast", items: [{ name: "Yogurt Parfait with Granola and Strawberries", calories: 330, protein: "12g", carbs: "50g", fat: "8g" }] },
+    { type: "Lunch", items: [{ name: "Chickpea and Cauliflower Curry with Basmati Rice", calories: 450, protein: "18g", carbs: "62g", fat: "10g" }] },
+    { type: "Dinner", items: [{ name: "Grilled Halal Turkey Patties with Quinoa and Roasted Garlic", calories: 510, protein: "40g", carbs: "40g", fat: "14g" }] },
+    { type: "Snacks", items: [{ name: "Banana with Peanut Butter", calories: 210, protein: "6g", carbs: "30g", fat: "8g" }] },
+  ],
+  Friday: [
+    { type: "Breakfast", items: [{ name: "Chia Seed Pudding with Mango and Coconut Milk", calories: 300, protein: "8g", carbs: "42g", fat: "10g" }] },
+    { type: "Lunch", items: [{ name: "Grilled White Fish with Cucumber and Lemon Salad", calories: 380, protein: "32g", carbs: "18g", fat: "12g" }] },
+    { type: "Dinner", items: [{ name: "Halal Beef Pasta with Homemade Tomato Sauce", calories: 560, protein: "36g", carbs: "58g", fat: "14g" }] },
+    { type: "Snacks", items: [{ name: "Cottage Cheese with Pineapple", calories: 170, protein: "14g", carbs: "18g", fat: "4g" }] },
+  ],
+  Saturday: [
+    { type: "Breakfast", items: [{ name: "Vegetable Omelette with Zucchini and Bell Pepper", calories: 290, protein: "18g", carbs: "12g", fat: "16g" }] },
+    { type: "Lunch", items: [{ name: "Black Bean and Brown Rice Bowl with Salsa", calories: 440, protein: "18g", carbs: "64g", fat: "8g" }] },
+    { type: "Dinner", items: [{ name: "Oven-Baked Halal Chicken Breast with Roasted Broccoli", calories: 490, protein: "42g", carbs: "22g", fat: "18g" }] },
+    { type: "Snacks", items: [{ name: "Hummus with Carrot and Celery Sticks", calories: 160, protein: "6g", carbs: "18g", fat: "7g" }] },
+  ],
+  Sunday: [
+    { type: "Breakfast", items: [{ name: "Whole Grain Pancakes with Maple Syrup and Berries", calories: 360, protein: "12g", carbs: "60g", fat: "8g" }] },
+    { type: "Lunch", items: [{ name: "Chickpea and Quinoa Salad with Cucumber and Feta", calories: 420, protein: "20g", carbs: "48g", fat: "14g" }] },
+    { type: "Dinner", items: [{ name: "Garlic Butter Shrimp with Couscous and Parsley", calories: 500, protein: "34g", carbs: "50g", fat: "14g" }] },
+    { type: "Snacks", items: [{ name: "Orange Slices with Walnuts and Dark Chocolate", calories: 190, protein: "4g", carbs: "24g", fat: "10g" }] },
+  ],
 };
 
+// ─── Condition Guidelines ──────────────────────────────────────────────────────
 
 function buildConditionGuidelines(conditions: string): string {
   const lower = conditions.toLowerCase();
@@ -72,54 +116,72 @@ function buildConditionGuidelines(conditions: string): string {
   if (lower.includes("diabet"))
     rules.push("low GI foods, no refined sugar, spread carbs evenly");
   if (lower.includes("hypertension") || lower.includes("blood pressure"))
-    rules.push("low sodium under 1500mg, add potassium foods");
+    rules.push("low sodium under 1500mg, add potassium-rich foods");
   if (lower.includes("heart") || lower.includes("cholesterol"))
-    rules.push("low saturated fat, add omega-3 foods");
+    rules.push("low saturated fat, add omega-3 rich foods");
   if (lower.includes("kidney"))
-    rules.push("limit potassium phosphorus and sodium");
+    rules.push("limit potassium, phosphorus, and sodium");
   if (lower.includes("obesity") || lower.includes("overweight"))
-    rules.push("300-500 kcal deficit, high protein high fibre");
+    rules.push("300-500 kcal deficit, high protein, high fibre");
   return rules.length > 0 ? rules.join(", ") : "balanced healthy diet";
 }
 
-function buildSingleDayPrompt(profile: UserProfile, dayName: string): string {
+// ─── Compact already-used meals summary (tiny, won't fill context) ────────────
+
+function buildUsedMealsSummary(collectedDays: DayPlan[]): string {
+  if (collectedDays.length === 0) return "None yet — this is the very first day.";
+  return collectedDays
+    .map((d) => {
+      const names = d.meals
+        .map((m) => m.items[0]?.name ?? "")
+        .filter(Boolean)
+        .join(", ");
+      return `${d.day}: ${names}`;
+    })
+    .join(" | ");
+}
+
+// ─── Prompt Builder — FRESH each day, NO shared history ───────────────────────
+
+function buildSingleDayPrompt(
+  profile: UserProfile,
+  dayName: string,
+  usedMealsSummary: string
+): string {
   const age = profile.age ? `${profile.age}yo` : "adult";
   const gender = profile.gender || "unspecified";
   const conditions = profile.conditions?.trim() || "none";
   const guidelines = buildConditionGuidelines(conditions);
-  const hints = DAY_FOOD_HINTS[dayName];
+  const dayIndex = DAY_NAMES.indexOf(dayName) + 1;
 
-  return `You are generating day ${DAY_NAMES.indexOf(dayName) + 1} of 7 in a meal plan.
-Do NOT repeat foods from previous days in this conversation.
+  return `You are a certified halal nutritionist. Generate ONLY Day ${dayIndex} (${dayName}) of a 7-day halal meal plan.
 
-Patient: ${age} ${gender}. Conditions: ${conditions}. Rules: ${guidelines}.
+HALAL RULES:
+- Halal meat only: chicken, beef, lamb, turkey, fish, seafood
+- NO pork, bacon, ham, lard, gelatin, alcohol, or cooking wine
 
-For ${dayName}, create meals using ONLY these ingredients as inspiration:
-- Breakfast ingredients: ${hints.breakfast}
-- Lunch ingredients: ${hints.lunch}
-- Dinner ingredients: ${hints.dinner}
-- Snack ingredients: ${hints.snack}
+PATIENT: ${age} ${gender} | Conditions: ${conditions} | Rules: ${guidelines}
 
-IMPORTANT rules for macros:
-- Protein must be realistic: chicken=25-35g, eggs=6g each, fish=20-30g, legumes=10-15g
-- Calories must match macros: (protein*4) + (carbs*4) + (fat*9) = total calories
-- Fat should be 10-25g per meal, NOT 50g
-- Carbs should be 30-60g per meal
-- Do NOT copy ingredient names directly — create a proper meal name like "Pan-seared salmon with steamed brown rice"
+ALREADY USED MEALS — DO NOT REPEAT ANY OF THESE:
+${usedMealsSummary}
 
-Return ONLY a JSON object. No markdown. Start with { end with }.
+FOR ${dayName.toUpperCase()} YOU MUST:
+- Pick meals NOT listed above
+- Use a different main protein than the previous day
+- Use a different cooking method (choose: grill/bake/stew/stir-fry/steam/roast)
+- Use a different cuisine (choose: Middle Eastern/South Asian/Mediterranean/Asian/African)
+- Write full descriptive meal names e.g. "Spiced Halal Lamb Kofta with Bulgur Wheat"
 
-{
-  "day": "${dayName}",
-  "summary": {"calories": <sum of all meals>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"},
-  "meals": [
-    {"type": "Breakfast", "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
-    {"type": "Lunch",     "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
-    {"type": "Dinner",    "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]},
-    {"type": "Snacks",    "items": [{"name": "<creative meal name>", "calories": <number>, "protein": "<Xg>", "carbs": "<Xg>", "fat": "<Xg>"}]}
-  ]
-}`;
+MACRO ACCURACY:
+- chicken=25-35g protein, eggs=6g each, fish=20-30g, legumes=10-15g
+- Calories = (protein×4)+(carbs×4)+(fat×9)
+- Fat 10-25g per meal, Carbs 30-60g per meal
+
+Return ONLY this JSON (no markdown, no extra text):
+{"day":"${dayName}","summary":{"calories":<sum>,"protein":"<Xg>","carbs":"<Xg>","fat":"<Xg>"},"meals":[{"type":"Breakfast","items":[{"name":"<meal>","calories":<n>,"protein":"<Xg>","carbs":"<Xg>","fat":"<Xg>"}]},{"type":"Lunch","items":[{"name":"<meal>","calories":<n>,"protein":"<Xg>","carbs":"<Xg>","fat":"<Xg>"}]},{"type":"Dinner","items":[{"name":"<meal>","calories":<n>,"protein":"<Xg>","carbs":"<Xg>","fat":"<Xg>"}]},{"type":"Snacks","items":[{"name":"<meal>","calories":<n>,"protein":"<Xg>","carbs":"<Xg>","fat":"<Xg>"}]}]}`;
 }
+
+// ─── Diet Plan Generator ───────────────────────────────────────────────────────
 
 export async function generateDietPlan(
   onProgress?: (dayName: string, index: number) => void
@@ -129,62 +191,44 @@ export async function generateDietPlan(
   await LlamaService.loadModel();
 
   const collectedDays: DayPlan[] = [];
-  const systemPrompt =
-    "You are a clinical nutritionist creating a 7-day meal plan. Each day MUST use different foods. Return ONLY valid JSON. No explanation. No markdown.";
-
-  const conversationHistory: { role: "user" | "assistant"; content: string }[] = [];
+  const systemPrompt = "You are a halal nutritionist. Return ONLY valid JSON. No markdown. No extra text.";
 
   for (let i = 0; i < DAY_NAMES.length; i++) {
     const dayName = DAY_NAMES[i];
     onProgress?.(dayName, i);
     console.log(`🔄 Generating ${dayName} (${i + 1}/7)...`);
 
-    const prompt = buildSingleDayPrompt(profile, dayName);
-
-    conversationHistory.push({ role: "user", content: prompt });
+    // ✅ Compact summary of already-done meals (just names, not full JSON)
+    const usedMealsSummary = buildUsedMealsSummary(collectedDays);
+    const prompt = buildSingleDayPrompt(profile, dayName, usedMealsSummary);
 
     try {
-      const response = await LlamaService.chat(
-        [...conversationHistory],
-        systemPrompt
-      );
+      // ✅ FRESH context every single day — FIXES "Context is full" error
+      // We never accumulate previous responses into history
+      const freshMessages: { role: "user" | "assistant"; content: string }[] = [
+        { role: "user", content: prompt },
+      ];
 
+      const response = await LlamaService.chat(freshMessages, systemPrompt);
       console.log(`📝 Raw LLM for ${dayName} (first 300):`, response.substring(0, 300));
-
-      conversationHistory.push({ role: "assistant", content: response });
 
       const dayPlan = parseSingleDay(response, dayName);
       if (dayPlan) {
         dayPlan.day = dayName;
         collectedDays.push(dayPlan);
-        console.log(
-          `✅ ${dayName} — foods: ${dayPlan.meals.map((m) => m.items[0]?.name).join(" | ")}`
-        );
+        console.log(`✅ ${dayName} — ${dayPlan.meals.map((m) => m.items[0]?.name).join(" | ")}`);
       } else {
-        console.warn(`⚠️ ${dayName} parse failed — using fallback`);
-        const fallback = {
-          day: dayName,
-          summary: { calories: 1470, protein: "93g", carbs: "155g", fat: "41g" },
-          meals: getFallbackMeals(dayName),
-        };
-        collectedDays.push(fallback);
-        conversationHistory.push({
-          role: "assistant",
-          content: JSON.stringify(fallback),
-        });
+        console.warn(`⚠️ ${dayName} parse failed — using halal fallback`);
+        collectedDays.push(buildFallbackDay(dayName));
       }
     } catch (err) {
       console.error(`❌ ${dayName} error:`, err);
-      collectedDays.push({
-        day: dayName,
-        summary: { calories: 1470, protein: "93g", carbs: "155g", fat: "41g" },
-        meals: getFallbackMeals(dayName),
-      });
+      collectedDays.push(buildFallbackDay(dayName));
     }
   }
 
   const fullPlan: StructuredDietPlan = {
-    title: "7-Day Personalised Diet Plan",
+    title: "7-Day Personalised Halal Diet Plan",
     days: collectedDays,
   };
 
@@ -196,6 +240,24 @@ export async function generateDietPlan(
     createdAt: new Date().toISOString(),
   });
 }
+
+// ─── Fallback Helpers ──────────────────────────────────────────────────────────
+
+function buildFallbackDay(dayName: string): DayPlan {
+  const meals = getFallbackMeals(dayName);
+  const totalCalories = meals.reduce((sum, m) => sum + (m.items[0]?.calories ?? 0), 0);
+  return {
+    day: dayName,
+    summary: { calories: totalCalories, protein: "93g", carbs: "155g", fat: "41g" },
+    meals,
+  };
+}
+
+function getFallbackMeals(dayName: string): Meal[] {
+  return HALAL_FALLBACK_MEALS[dayName] ?? HALAL_FALLBACK_MEALS["Monday"];
+}
+
+// ─── JSON Helpers ──────────────────────────────────────────────────────────────
 
 function extractJson(raw: string): string {
   let cleaned = raw.replace(/```json|```/gi, "").trim();
@@ -218,17 +280,9 @@ function closeJson(s: string): string {
   return result;
 }
 
-const REQUIRED_MEALS: Meal["type"][] = ["Breakfast", "Lunch", "Dinner", "Snacks"];
+// ─── Normalisation ─────────────────────────────────────────────────────────────
 
-function getFallbackMeals(dayName: string): Meal[] {
-  const hints = DAY_FOOD_HINTS[dayName] ?? DAY_FOOD_HINTS["Monday"];
-  return [
-    { type: "Breakfast", items: [{ name: hints.breakfast, calories: 320, protein: "12g", carbs: "50g", fat: "8g" }] },
-    { type: "Lunch", items: [{ name: hints.lunch, calories: 450, protein: "35g", carbs: "30g", fat: "14g" }] },
-    { type: "Dinner", items: [{ name: hints.dinner, calories: 520, protein: "40g", carbs: "55g", fat: "12g" }] },
-    { type: "Snacks", items: [{ name: hints.snack, calories: 180, protein: "6g", carbs: "20g", fat: "7g" }] },
-  ];
-}
+const REQUIRED_MEALS: Meal["type"][] = ["Breakfast", "Lunch", "Dinner", "Snacks"];
 
 function normaliseMealItem(raw: any): MealItem {
   const toGramString = (val: any): string => {
@@ -247,9 +301,8 @@ function normaliseMealItem(raw: any): MealItem {
 
 function normaliseMeal(raw: any, dayName: string): Meal {
   const rawType = (raw.type ?? raw.name ?? "Breakfast") as string;
-  const mealType: Meal["type"] = REQUIRED_MEALS.find(
-    (t) => t.toLowerCase() === rawType.toLowerCase()
-  ) ?? "Breakfast";
+  const mealType: Meal["type"] =
+    REQUIRED_MEALS.find((t) => t.toLowerCase() === rawType.toLowerCase()) ?? "Breakfast";
 
   if (Array.isArray(raw.items) && raw.items.length > 0) {
     const validItems = raw.items.filter(
@@ -266,6 +319,7 @@ function normaliseMeal(raw: any, dayName: string): Meal {
       items: [normaliseMealItem({ name: raw.name, calories: raw.calories, protein: raw.protein, carbs: raw.carbs, fat: raw.fat })],
     };
   }
+
   const fallback = getFallbackMeals(dayName).find((m) => m.type === mealType);
   return fallback ?? { type: mealType, items: [] };
 }
@@ -274,12 +328,10 @@ function normaliseDay(raw: any, dayName?: string): DayPlan {
   const name = dayName ?? raw.day ?? "Day";
   const existingMeals: Meal[] = (raw.meals ?? []).map((m: any) => normaliseMeal(m, name));
   const mealMap = new Map(existingMeals.map((m) => [m.type, m]));
-
   const fallbacks = getFallbackMeals(name);
   const meals: Meal[] = REQUIRED_MEALS.map(
     (t) => mealMap.get(t) ?? fallbacks.find((f) => f.type === t) ?? { type: t, items: [] }
   );
-
   return {
     day: name,
     summary: raw.summary ?? { calories: 0, protein: "0g", carbs: "0g", fat: "0g" },
@@ -289,18 +341,15 @@ function normaliseDay(raw: any, dayName?: string): DayPlan {
 
 function parseSingleDay(raw: string, expectedDay: string): DayPlan | null {
   const cleaned = extractJson(raw);
-
   try {
     const parsed = JSON.parse(cleaned);
     if (parsed?.day && Array.isArray(parsed?.meals)) return normaliseDay(parsed, expectedDay);
     if (parsed?.days?.[0]) return normaliseDay(parsed.days[0], expectedDay);
   } catch (_) { }
-
   try {
     const parsed = JSON.parse(closeJson(cleaned));
     if (parsed?.day && Array.isArray(parsed?.meals)) return normaliseDay(parsed, expectedDay);
   } catch (_) { }
-
   console.warn(`⚠️ Could not parse day: ${expectedDay}, raw: ${raw.substring(0, 200)}`);
   return null;
 }
@@ -308,32 +357,31 @@ function parseSingleDay(raw: string, expectedDay: string): DayPlan | null {
 export function safeParseDietPlan(raw: string): StructuredDietPlan | null {
   if (!raw || raw.trim().length < 10) return null;
   const cleaned = extractJson(raw);
-
   try {
     const parsed = JSON.parse(cleaned);
     if (parsed?.days?.length > 0) {
       return {
-        title: parsed.title ?? "7-Day Diet Plan",
+        title: parsed.title ?? "7-Day Halal Diet Plan",
         days: parsed.days.map((d: any, i: number) => normaliseDay(d, DAY_NAMES[i] ?? d.day)),
       };
     }
     if (parsed?.day && Array.isArray(parsed?.meals)) {
-      return { title: "7-Day Diet Plan", days: [normaliseDay(parsed)] };
+      return { title: "7-Day Halal Diet Plan", days: [normaliseDay(parsed)] };
     }
   } catch (_) { }
-
   try {
     const parsed = JSON.parse(closeJson(cleaned));
     if (parsed?.days?.length > 0) {
       return {
-        title: parsed.title ?? "7-Day Diet Plan",
+        title: parsed.title ?? "7-Day Halal Diet Plan",
         days: parsed.days.map((d: any, i: number) => normaliseDay(d, DAY_NAMES[i] ?? d.day)),
       };
     }
   } catch (_) { }
-
   return null;
 }
+
+// ─── Storage Service ───────────────────────────────────────────────────────────
 
 class StorageService {
   private userId: string | null = null;
@@ -351,7 +399,8 @@ class StorageService {
   async setUser(userId: string | null) { this.userId = userId; await this.init(); }
 
   async init() {
-    if (!(await ReactNativeFS.exists(this.USERS_BASE_DIR))) await ReactNativeFS.mkdir(this.USERS_BASE_DIR);
+    if (!(await ReactNativeFS.exists(this.USERS_BASE_DIR)))
+      await ReactNativeFS.mkdir(this.USERS_BASE_DIR);
     const userDir = this.getUserDir();
     if (!(await ReactNativeFS.exists(userDir))) await ReactNativeFS.mkdir(userDir);
     if (!(await ReactNativeFS.exists(this.chatsDir))) await ReactNativeFS.mkdir(this.chatsDir);
@@ -434,7 +483,6 @@ class StorageService {
 }
 
 const storageService = new StorageService();
-
 
 export async function loadLatestDietPlan(): Promise<StructuredDietPlan | null> {
   const plans = await storageService.getPlans("diet");

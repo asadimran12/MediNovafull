@@ -98,6 +98,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
   const [loading, setLoading] = useState(false);
   const [progressDay, setProgressDay] = useState<string>("");
 
+  console.log("plans", plans);
   /* ──────────────────────────────────────────────────────────
      On mount: call loadLatestDietPlan() directly from storage.
      loadLatestDietPlan() already returns a StructuredDietPlan
