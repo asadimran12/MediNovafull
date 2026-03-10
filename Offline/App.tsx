@@ -8,7 +8,6 @@ import {
   FlatList,
   Keyboard,
   Animated,
-  Dimensions,
   Alert,
   AppState,
   Image,
@@ -43,9 +42,10 @@ import { ModelSelectionScreen } from "./src/screens/ModelSelectionScreen";
 import { ModelManagerScreen } from "./src/screens/ModelManagerScreen";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { ReportAnalysisScreen } from "./src/screens/ReportAnalysisScreen";
+import { ReportAnalyzeScreen } from "./src/screens/ReportAnalyzeScreen";
 import ModelService from "./src/services/ModelService";
 
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "analyze_report";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
@@ -438,6 +438,8 @@ export default function App() {
         return <ModelManagerScreen onBack={() => setCurrentView("settings")} />;
       case "report_analysis":
         return <ReportAnalysisScreen onBack={() => setCurrentView("dashboard")} />;
+      case "analyze_report":
+        return <ReportAnalyzeScreen />;
       default:
         return (
           <View style={{ flex: 1 }}>

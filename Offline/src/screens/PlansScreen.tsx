@@ -146,6 +146,12 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   const [parsedPlan, setParsedPlan] = useState<StructuredDietPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [progressDay, setProgressDay] = useState<string>("");
+  const [planNumbers, setPlanNumbers] = useState({
+    totalCalories: 0,
+    totalProtein: 0,
+    totalCarbs: 0,
+    totalFat: 0,
+  });
 
   /* ─── Load plan on mount ──────────────────────────────────── */
   useEffect(() => {
@@ -197,6 +203,20 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 
   const days = parsedPlan?.days ?? [];
   const currentDay = days[selectedDayIndex];
+
+  useEffect(() => {
+    if (currentDay) {
+      const summary = currentDay.summary;
+      const parseNum = (val: any) => Number(String(val).replace(/[^\d.-]/g, '')) || 0;
+      setPlanNumbers({
+        totalCalories: parseNum(summary.calories),
+        totalProtein: parseNum(summary.protein),
+        totalCarbs: parseNum(summary.carbs),
+        totalFat: parseNum(summary.fat),
+      });
+    }
+  }, [currentDay]);
+
   const normalizedMeals = currentDay ? normalizeMeals(currentDay.meals ?? []) : [];
 
   /* ─── Exercise fallback ───────────────────────────────────── */
@@ -221,21 +241,46 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       )}
 
       {/* Generate Button */}
-      <TouchableOpacity
-        style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
-        onPress={handleGeneratePlan}
-        disabled={loading}
-        activeOpacity={0.85}
-      >
-        {loading ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.generateButtonText}>{progressDay}</Text>
+
+      <View>
+        <TouchableOpacity
+          style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
+          onPress={handleGeneratePlan}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.generateButtonText}>{progressDay}</Text>
+            </View>
+          ) : (
+            <Text style={styles.generateButtonText}>✨ Generate Diet Plan</Text>
+          )}
+        </TouchableOpacity>
+
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{planNumbers.totalCalories}</Text>
+            <Text style={styles.statLabel}>Calories</Text>
           </View>
-        ) : (
-          <Text style={styles.generateButtonText}>✨ Generate Diet Plan</Text>
-        )}
-      </TouchableOpacity>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{planNumbers.totalProtein}</Text>
+            <Text style={styles.statLabel}>Protein</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{planNumbers.totalCarbs}</Text>
+            <Text style={styles.statLabel}>Carbs</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{planNumbers.totalFat}</Text>
+            <Text style={styles.statLabel}>Fat</Text>
+          </View>
+        </View>
+      </View>
 
       {days.length > 0 ? (
         <>
@@ -301,6 +346,42 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 
 /* ─── Styles ───────────────────────────────────────────────── */
 const styles = StyleSheet.create({
+
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginBottom: 10,
+  },
+
+  statCard: {
+    backgroundColor: "#fff",
+    flex: 1,
+    marginHorizontal: 4,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+
+  statValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.primary,
+  },
+
+  statLabel: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 4,
+    fontWeight: "600",
+  },
+
+
   generateButton: {
     backgroundColor: COLORS.primary,
     padding: 14,

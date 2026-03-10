@@ -52,7 +52,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     const [plan, setPlan] = useState<StructuredExercisePlan | null>(null);
     const [loading, setLoading] = useState(false);
     const [progressDay, setProgressDay] = useState("");
-    const [completedSections, setCompletedSections] = useState<number[]>([]);
+    const [completedItems, setCompletedItems] = useState<string[]>([]);
 
     /* Load latest plan */
     useEffect(() => {
@@ -64,26 +64,28 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
 
     /* Reset completion when day changes */
     useEffect(() => {
-        setCompletedSections([]);
+        setCompletedItems([]);
     }, [selectedDayIndex]);
 
     const days = plan?.days ?? [];
     const currentDay = days[selectedDayIndex];
 
     /* Progress calculation */
-    const totalSections = currentDay?.exercises?.length ?? 0;
+    const totalItems =
+        currentDay?.exercises?.reduce(
+            (acc, section) => acc + (section.items?.length ?? 0),
+            0
+        ) ?? 0;
 
     const progress =
-        totalSections === 0
+        totalItems === 0
             ? 0
-            : Math.round((completedSections.length / totalSections) * 100);
+            : Math.round((completedItems.length / totalItems) * 100);
 
-    /* Toggle section complete */
-    const toggleSection = (index: number) => {
-        setCompletedSections((prev) =>
-            prev.includes(index)
-                ? prev.filter((i) => i !== index)
-                : [...prev, index]
+    const toggleItem = (si: number, ii: number) => {
+        const key = `${si}-${ii}`;
+        setCompletedItems((prev) =>
+            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
         );
     };
 
@@ -198,17 +200,19 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
 
                         {/* Exercise Sections */}
                         {currentDay?.exercises.map((section: Exercise, si: number) => {
-                            const completed = completedSections.includes(si);
+                            const completed =
+                                section.items.length > 0 &&
+                                section.items.every((_, ii) =>
+                                    completedItems.includes(`${si}-${ii}`)
+                                );
 
                             return (
-                                <TouchableOpacity
+                                <View
                                     key={si}
                                     style={[
                                         styles.mealSection,
                                         completed && styles.sectionCompleted,
                                     ]}
-                                    onPress={() => toggleSection(si)}
-                                    activeOpacity={0.8}
                                 >
                                     <View style={styles.mealHeader}>
                                         <Text style={styles.mealIcon}>
@@ -220,10 +224,26 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                                         {completed && <Text style={styles.check}>✔</Text>}
                                     </View>
 
-                                    {section.items.map((item, ii) => (
-                                        <ExerciseItemCard key={ii} item={item} />
-                                    ))}
-                                </TouchableOpacity>
+                                    {section.items.map((item, ii) => {
+                                        const completed = completedItems.includes(`${si}-${ii}`);
+
+                                        return (
+                                            <View key={ii} style={styles.exerciseItemWrapper}>
+                                                <ExerciseItemCard item={item} />
+
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.circle,
+                                                        completed && styles.circleCompleted
+                                                    ]}
+                                                    onPress={() => toggleItem(si, ii)}
+                                                >
+                                                    {completed && <Text style={styles.tick}>✓</Text>}
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    })}
+                                </View>
                             );
                         })}
                     </ScrollView>
@@ -346,11 +366,17 @@ const styles = StyleSheet.create({
         color: "#222",
     },
 
-    exerciseCard: {
+    exerciseItemWrapper: {
+        flexDirection: "row",
+        alignItems: "center",
         backgroundColor: "#fff",
         borderRadius: 12,
         padding: 14,
         marginBottom: 10,
+    },
+
+    exerciseCard: {
+        flex: 1,
     },
 
     exerciseName: {
@@ -362,6 +388,28 @@ const styles = StyleSheet.create({
     exerciseDetails: {
         fontSize: 13,
         color: "#555",
+    },
+
+    circle: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: "#ddd",
+        justifyContent: "center",
+        alignItems: "center",
+        marginLeft: 12,
+    },
+
+    circleCompleted: {
+        backgroundColor: "#27ae60",
+        borderColor: "#27ae60",
+    },
+
+    tick: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "bold",
     },
 
     sectionCompleted: {
