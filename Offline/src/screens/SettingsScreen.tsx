@@ -25,7 +25,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll }) =>
       </View>
       <View style={styles.settingItem}>
         <Text style={styles.settingLabel}>Model Context</Text>
-        <Text style={styles.settingValue}>2048 Tokens</Text>
+        <Text style={styles.settingValue}>4096 Tokens</Text>
       </View>
       <View style={styles.settingItem}>
         <Text style={styles.settingLabel}>Clear All History</Text>

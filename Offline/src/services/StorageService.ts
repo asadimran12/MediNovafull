@@ -31,12 +31,6 @@ export interface UserProfile {
   isSet: boolean;
 }
 
-// ─── Re-exports from DietPlanGenerator ────────────────────────────────────────
-// Keep backward compatibility for any consumer that imports diet-plan symbols
-// from StorageService.
-
-export { generateDietPlan, safeParseDietPlan, loadLatestDietPlan } from './DietPlanGenerator';
-export type { MealItem, Meal, DayPlan, StructuredDietPlan } from './DietPlanGenerator';
 
 // ─── Storage Service ───────────────────────────────────────────────────────────
 

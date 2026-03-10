@@ -92,8 +92,6 @@ OUTPUT STRUCTURE
 
 }
 
-
-
 export async function generateExercisePlan(onProgress?: (dayName: string, index: number) => void): Promise<void> {
     const profile = await storageService.getProfile();
     const LlamaService = (await import("./LlamaService")).default;

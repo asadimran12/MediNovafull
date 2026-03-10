@@ -7,37 +7,38 @@ export const SIDEBAR_WIDTH = width * 0.8;
 
 export const COLORS = {
   // Brand Colors
-  primary: "#0A84FF",      // Vibrant Blue
-  secondary: "#30D158",    // Health Green
+
+  primary: "#59AA6F",
+  secondary: "#30D158",      // Vibrant Blue
   accent: "#5856D6",       // Indigo Accent
-  
+
   // Backgrounds
   background: "#F2F2F7",   // Light Grayish Blue
   surface: "#FFFFFF",
   card: "#FFFFFF",
-  
+
   // Text
   textHeader: "#1C1C1E",   // Dark Gray
   textMain: "#3A3A3C",     // Medium Gray
   textSub: "#8E8E93",      // Light Gray
   textMuted: "#C7C7CC",    // Muted Gray
   textWhite: "#FFFFFF",
-  
+
   // Functional
   success: "#34C759",
   warning: "#FFCC00",
   danger: "#FF3B30",
   border: "#E5E5EA",
   overlay: "rgba(0,0,0,0.4)",
-  
+
   // UI Specific
   fullNoticeBg: "#FEF3C7",
   fullNoticeText: "#92400E",
   fullNoticeBorder: "#FDE68A",
   fullNoticeBtn: "#F59E0B",
-  
+
   // Gradients (Represented as primary pairs)
-  brandGradient: ["#0A84FF", "#5856D6"], 
+  brandGradient: ["#0A84FF", "#5856D6"],
   splashGradient: ["#1C1C1E", "#2C2C2E"], // Dark modern splash
 };
 

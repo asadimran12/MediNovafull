@@ -11,6 +11,7 @@ import {
   Dimensions,
   Alert,
   AppState,
+  Image,
 } from "react-native";
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -454,9 +455,21 @@ export default function App() {
             />
             <View style={styles.header}>
               <TouchableOpacity onPress={toggleSidebar} style={styles.menuIcon}><Text style={{ fontSize: 24 }}>☰</Text></TouchableOpacity>
-              <View style={{ flex: 1, marginLeft: 15 }}>
-                <Text style={styles.headerTitle}>MediNova</Text>
-                <Text style={[styles.statusText, { color: isReady ? COLORS.success : COLORS.warning }]}>
+              <View style={styles.logoContainer}>
+                <View style={styles.imageContainer}>
+                  <Image
+                    source={require("../Offline/src/assets/images/splash_logo.png")}
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: isReady ? COLORS.success : COLORS.warning },
+                  ]}
+                >
                   ● {isReady ? "Ready & Private" : status}
                 </Text>
               </View>
@@ -481,6 +494,36 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+
+  logoContainer: {
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    flex: 1,
+    marginLeft: 15,
+  },
+
+  imageContainer: {
+    width: 140,
+    height: 140,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    marginTop: -45,
+    marginBottom: -45,
+    marginLeft: -15,
+  },
+
+  logo: {
+    width: "100%",
+    height: "100%",
+  },
+
+  appName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.textHeader,
+  },
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { flexDirection: "row", alignItems: "center", padding: 15, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   headerTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textHeader },

@@ -6,8 +6,9 @@ import {
   Animated,
   StatusBar,
   ActivityIndicator,
+  Image,
 } from "react-native";
-import { COLORS, RADIUS, SPACING } from "../constants/theme";
+import { COLORS } from "../constants/theme";
 
 interface SplashScreenProps {
   status: string;
@@ -17,7 +18,7 @@ interface SplashScreenProps {
 export const SplashScreen: React.FC<SplashScreenProps> = ({ status, progress }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  
+
   // Progress bar width animation
   const progressWidth = useRef(new Animated.Value(0)).current;
 
@@ -49,41 +50,41 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ status, progress }) 
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
-      <Animated.View 
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+
+      <Animated.View
         style={[
-          styles.content, 
+          styles.content,
           { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
         ]}
       >
-        <View style={styles.logoPlaceholder}>
-          <Text style={styles.logoIcon}>✚</Text>
-        </View>
-        <Text style={styles.brandName}>MediNova</Text>
-        <Text style={styles.tagline}>Your Private AI Health Assistant</Text>
+        <Image
+          source={require('../assets/images/splash_logo.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       <View style={styles.footer}>
         {progress !== undefined && progress < 100 ? (
           <View style={styles.progressContainer}>
             <View style={styles.progressBarBg}>
-               <Animated.View 
-                 style={[
-                   styles.progressBarFill, 
-                   { 
-                     width: progressWidth.interpolate({
-                       inputRange: [0, 100],
-                       outputRange: ['0%', '100%']
-                     }) 
-                   }
-                 ]} 
-               />
+              <Animated.View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: progressWidth.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ['0%', '100%']
+                    })
+                  }
+                ]}
+              />
             </View>
             <Text style={styles.progressText}>{Math.round(progress)}% Downloaded</Text>
           </View>
         ) : (
-          <ActivityIndicator color={COLORS.primary} size="small" style={{ marginBottom: 10 }} />
+          <ActivityIndicator color={COLORS.primary} size="large" style={{ marginBottom: 10 }} />
         )}
         <Text style={styles.statusText}>{status}</Text>
       </View>
@@ -94,39 +95,16 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ status, progress }) 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1C1C1E", // Dark premium background
+    backgroundColor: "#FFFFFF", // White background
     alignItems: "center",
     justifyContent: "center",
   },
   content: {
     alignItems: "center",
   },
-  logoPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 24,
-    backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-    elevation: 10,
-  },
-  logoIcon: {
-    fontSize: 50,
-    color: "#FFF",
-    fontWeight: "300",
-  },
-  brandName: {
-    fontSize: 36,
-    fontWeight: "800",
-    color: "#FFF",
-    letterSpacing: 1,
-  },
-  tagline: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
-    marginTop: 8,
-    letterSpacing: 0.5,
+  logoImage: {
+    width: 250, // Big size logo
+    height: 250,
   },
   footer: {
     position: "absolute",
@@ -136,12 +114,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   statusText: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 11,
+    color: "#000000", // Black text
+    fontSize: 12,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 1.5,
     marginTop: 10,
+    textAlign: "center",
   },
   progressContainer: {
     width: '100%',
@@ -151,7 +130,7 @@ const styles = StyleSheet.create({
   progressBarBg: {
     width: '100%',
     height: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.1)', // Light gray background for contrast
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -160,7 +139,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   progressText: {
-    color: "#FFF",
+    color: "#000000", // Black text
     fontSize: 12,
     fontWeight: "500",
     marginTop: 8,

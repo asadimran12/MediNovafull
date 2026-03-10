@@ -7,6 +7,7 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SPACING, RADIUS } from "../constants/theme";
@@ -60,7 +61,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.sidebarHeader}>
             <View>
-              <Text style={styles.sidebarBrand}>MediNova</Text>
+              <Image
+                source={require('../assets/images/splash_logo.png')}
+                style={{ width: 100, height: 100 }}
+                resizeMode="contain"
+              />
               {currentUser && (
                 <Text style={styles.userBadge}>User: {currentUser.username}</Text>
               )}
