@@ -9,14 +9,14 @@ import {
 } from "react-native";
 
 import { COLORS } from "../constants/theme";
+import { HealthPlan } from "../services/StorageService";
 import {
-  HealthPlan,
   StructuredDietPlan,
   DayPlan,
   MealItem,
   generateDietPlan,
   loadLatestDietPlan,
-} from "../services/StorageService";
+} from "../services/DietPlanGenerator";
 
 interface PlansScreenProps {
   type: "diet" | "exercise";
@@ -25,7 +25,6 @@ interface PlansScreenProps {
 }
 
 /* ─── Meal icons ───────────────────────────────────────────── */
-
 const MEAL_ICONS: Record<string, string> = {
   breakfast: "🍳",
   lunch: "🥗",
@@ -39,11 +38,16 @@ function getMealIcon(type: string): string {
 }
 
 /* ─── MacroPill ────────────────────────────────────────────── */
-
 const MacroPill = ({
-  label, value, color, bg,
+  label,
+  value,
+  color,
+  bg,
 }: {
-  label: string; value: string | number; color: string; bg: string;
+  label: string;
+  value: string | number;
+  color: string;
+  bg: string;
 }) => (
   <View style={[styles.pill, { backgroundColor: bg }]}>
     <Text style={[styles.pillValue, { color }]}>{value}</Text>
@@ -52,7 +56,6 @@ const MacroPill = ({
 );
 
 /* ─── SummaryCard ──────────────────────────────────────────── */
-
 const SummaryCard = ({ summary }: { summary: DayPlan["summary"] }) => (
   <View style={styles.summaryCard}>
     <Text style={styles.summaryHeading}>Today's Total</Text>
@@ -73,7 +76,6 @@ const SummaryCard = ({ summary }: { summary: DayPlan["summary"] }) => (
 );
 
 /* ─── FoodItemCard ─────────────────────────────────────────── */
-
 const FoodItemCard = ({ item }: { item: MealItem }) => (
   <View style={styles.foodCard}>
     <Text style={styles.foodName}>{item.name}</Text>
@@ -86,55 +88,90 @@ const FoodItemCard = ({ item }: { item: MealItem }) => (
   </View>
 );
 
-/* ─── Main Screen ──────────────────────────────────────────── */
+/* ─── Helpers ─────────────────────────────────────────────── */
+function normalizeMeals(meals: any[]): MealItem[][] {
+  return meals.map((meal) => {
+    try {
+      // Helper to forcefully extract primitives
+      const extractSafeItem = (raw: any): MealItem | null => {
+        if (!raw || typeof raw !== "object") return null;
+        if (!raw.name && !raw.calories && !raw.protein) return null;
 
-export const PlansScreen: React.FC<PlansScreenProps> = ({
-  type,
-  plans,
-  onDelete,
-}) => {
+        const safeString = (val: any) => {
+          if (val === undefined || val === null) return "-";
+          if (typeof val === "object") {
+            return String(val.amount ?? val.value ?? val.qty ?? Object.values(val)[0] ?? "-");
+          }
+          return String(val);
+        };
+
+        return {
+          name: typeof raw.name === "string" ? raw.name : "Meal",
+          calories: Number(raw.calories) || 0,
+          protein: safeString(raw.protein),
+          carbs: safeString(raw.carbs),
+          fat: safeString(raw.fat),
+        };
+      };
+
+      // 1. If it's already an array format -> map each safe item
+      if (Array.isArray(meal.items)) {
+        const mapped = meal.items.map(extractSafeItem).filter(Boolean) as MealItem[];
+        if (mapped.length > 0) return mapped;
+      }
+
+      // 2. Check if there's a nested items array directly on the object body
+      if (Array.isArray(meal)) {
+        const mapped = meal.map(extractSafeItem).filter(Boolean) as MealItem[];
+        if (mapped.length > 0) return mapped;
+      }
+
+      // 3. If it's a single object that holds the item metrics -> wrap and map
+      const safeSingle = extractSafeItem(meal);
+      if (safeSingle) return [safeSingle];
+
+    } catch (e) {
+      console.warn("normalizeMeals failed on item:", meal, e);
+    }
+
+    // 4. Fallback empty array to prevent React from crashing on raw objects
+    return [];
+  });
+}
+
+/* ─── Main Screen ──────────────────────────────────────────── */
+export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans }) => {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [parsedPlan, setParsedPlan] = useState<StructuredDietPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [progressDay, setProgressDay] = useState<string>("");
 
-  console.log("plans", plans);
-  /* ──────────────────────────────────────────────────────────
-     On mount: call loadLatestDietPlan() directly from storage.
-     loadLatestDietPlan() already returns a StructuredDietPlan
-     (not a HealthPlan), so NO JSON.parse needed here.
-     If storage is empty, fall back to parsing from props.
-  ────────────────────────────────────────────────────────── */
+  /* ─── Load plan on mount ──────────────────────────────────── */
   useEffect(() => {
     if (type !== "diet") return;
 
     (async () => {
       try {
-        // PRIMARY: load the latest plan straight from file storage
         const latest = await loadLatestDietPlan();
+        console.log("=== LOADED LATEST PLAN ===\n", JSON.stringify(latest, null, 2));
 
-        if (latest && Array.isArray(latest.days) && latest.days.length > 0) {
-          console.log("✅ Loaded latest plan from storage, days:", latest.days.length);
+        if (latest?.days?.length) {
           setParsedPlan(latest);
           return;
         }
 
-        // FALLBACK: parse from props (passed in from parent)
         const dietPlans = plans.filter((p) => p.type === "diet");
         if (dietPlans.length > 0) {
           const parsed = JSON.parse(dietPlans[0].content) as StructuredDietPlan;
-          if (parsed?.days?.length > 0) {
-            console.log("✅ Loaded plan from props, days:", parsed.days.length);
-            setParsedPlan(parsed);
-          }
+          if (parsed?.days?.length) setParsedPlan(parsed);
         }
       } catch (e) {
-        console.warn("⚠️ Could not load saved plan:", e);
+        console.warn("⚠️ Could not load plan:", e);
       }
     })();
-  }, []); // intentionally empty — run once on mount only
+  }, []);
 
-  /* ── Generate new plan ───────────────────────────────────── */
+  /* ─── Generate new plan ───────────────────────────────────── */
   const handleGeneratePlan = async () => {
     try {
       setLoading(true);
@@ -144,10 +181,8 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
         setProgressDay(`Generating ${dayName} (${index + 1}/7)...`);
       });
 
-      // loadLatestDietPlan returns StructuredDietPlan directly — use as-is
       const latest = await loadLatestDietPlan();
-      if (latest && Array.isArray(latest.days) && latest.days.length > 0) {
-        console.log("✅ New plan generated, days:", latest.days.length);
+      if (latest?.days?.length) {
         setParsedPlan(latest);
         setSelectedDayIndex(0);
       }
@@ -161,8 +196,9 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
 
   const days = parsedPlan?.days ?? [];
   const currentDay = days[selectedDayIndex];
+  const normalizedMeals = currentDay ? normalizeMeals(currentDay.meals ?? []) : [];
 
-  /* ── Exercise fallback ───────────────────────────────────── */
+  /* ─── Exercise fallback ───────────────────────────────────── */
   if (type === "exercise") {
     return (
       <View style={styles.empty}>
@@ -171,10 +207,9 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
     );
   }
 
-  /* ── Diet UI ─────────────────────────────────────────────── */
+  /* ─── Diet UI ─────────────────────────────────────────────── */
   return (
     <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-
       {/* Generate Button */}
       <TouchableOpacity
         style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
@@ -223,44 +258,22 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: 20, paddingBottom: 50 }}
           >
-            {currentDay ? (
-              <>
-                {currentDay.summary && <SummaryCard summary={currentDay.summary} />}
+            {normalizedMeals.map((items, mi) => {
+              const title = currentDay?.meals?.[mi]?.type ?? "Meal";
 
-                {currentDay.meals?.map((meal, mi) => {
-                  const title = meal.type ?? (meal as any).name ?? "Meal";
-                  const items: MealItem[] = meal.items ?? [];
+              return (
+                <View key={mi} style={styles.mealSection}>
+                  <View style={styles.mealHeader}>
+                    <Text style={styles.mealIcon}>{getMealIcon(title)}</Text>
+                    <Text style={styles.mealTitle}>{title}</Text>
+                  </View>
 
-                  return (
-                    <View key={mi} style={styles.mealSection}>
-                      <View style={styles.mealHeader}>
-                        <Text style={styles.mealIcon}>{getMealIcon(title)}</Text>
-                        <Text style={styles.mealTitle}>{title}</Text>
-                      </View>
-
-                      {items.length > 0 ? (
-                        items.map((item, ii) => <FoodItemCard key={ii} item={item} />)
-                      ) : (
-                        /* Fallback: LLM put macros on meal directly instead of items[] */
-                        <View style={styles.foodCard}>
-                          <Text style={styles.foodName}>{(meal as any).name ?? title}</Text>
-                          <View style={styles.pillRow}>
-                            <MacroPill label="cal" value={(meal as any).calories ?? "-"} color="#e17055" bg="#ffeaa744" />
-                            <MacroPill label="protein" value={(meal as any).protein ?? "-"} color={COLORS.primary} bg={COLORS.primary + "22"} />
-                            <MacroPill label="carbs" value={(meal as any).carbs ?? "-"} color="#6c5ce7" bg="#6c5ce722" />
-                            <MacroPill label="fat" value={(meal as any).fat ?? "-"} color="#e0a800" bg="#fdcb6e33" />
-                          </View>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </>
-            ) : (
-              <Text style={{ textAlign: "center", color: "#aaa", marginTop: 30 }}>
-                No content for this day.
-              </Text>
-            )}
+                  {items.map((item, ii) => (
+                    <FoodItemCard key={ii} item={item} />
+                  ))}
+                </View>
+              );
+            })}
           </ScrollView>
         </>
       ) : (
@@ -277,7 +290,6 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({
 };
 
 /* ─── Styles ───────────────────────────────────────────────── */
-
 const styles = StyleSheet.create({
   generateButton: {
     backgroundColor: COLORS.primary,
@@ -347,13 +359,7 @@ const styles = StyleSheet.create({
   },
   foodName: { fontWeight: "700", fontSize: 15, color: "#222", marginBottom: 10 },
   pillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  pill: {
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignItems: "center",
-    minWidth: 52,
-  },
+  pill: { borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, alignItems: "center", minWidth: 52 },
   pillValue: { fontWeight: "700", fontSize: 13 },
   pillLabel: { fontSize: 10, opacity: 0.8 },
   empty: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },

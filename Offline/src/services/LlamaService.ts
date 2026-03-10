@@ -154,8 +154,9 @@ INSTRUCTIONS:
       const res = await this.context.completion(
         {
           prompt,
-          n_predict: 512,
-          stop: ["<|im_end|>", "<|im_start|>", "assistant\n", "user\n", "system\n"],
+          n_predict: 700,
+          temperature: 0.6,
+          stop: ["<|im_end|>"]
         },
         onToken
       );

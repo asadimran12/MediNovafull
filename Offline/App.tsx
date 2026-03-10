@@ -37,6 +37,7 @@ import { AboutScreen } from "./src/screens/AboutScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { AuthScreen } from "./src/screens/AuthScreen";
+import { ExercisePlansScreen } from "./src/screens/ExercisePlan";
 
 type AppView = "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile";
 
@@ -68,21 +69,21 @@ export default function App() {
     (async () => {
       try {
         const isDownloaded = await LlamaService.isModelDownloaded();
-        
+
         if (!isDownloaded) {
-            setStatus("Starting First-Time Download");
-            await LlamaService.downloadModel((progress) => {
-                setDownloadProgress(progress);
-                setStatus(progress < 100 ? "Downloading Secure AI" : "Download Complete");
-            });
+          setStatus("Starting First-Time Download");
+          await LlamaService.downloadModel((progress) => {
+            setDownloadProgress(progress);
+            setStatus(progress < 100 ? "Downloading Secure AI" : "Download Complete");
+          });
         }
 
         setStatus("Initializing Medical AI");
         await LlamaService.loadModel();
-        
+
         setStatus("Syncing Health Data");
         await StorageService.init();
-        
+
         // Initial Auth Check
         const userId = await AuthService.getCurrentUserId();
         if (userId) {
@@ -356,7 +357,7 @@ export default function App() {
     const allChats = await StorageService.getAllChats();
     setSessions(allChats);
     await fetchPlans();
-    
+
     if (!profile.isSet) {
       setCurrentView("profile");
     } else {
@@ -389,7 +390,7 @@ export default function App() {
       case "diet_plans":
         return <PlansScreen type="diet" plans={plans} onDelete={async (id) => { await StorageService.deletePlan(id); fetchPlans(); }} />;
       case "exercise_plans":
-        return <PlansScreen type="exercise" plans={plans} onDelete={async (id) => { await StorageService.deletePlan(id); fetchPlans(); }} />;
+        return <ExercisePlansScreen />;
       case "about":
         return <AboutScreen />;
       case "settings":
@@ -417,13 +418,13 @@ export default function App() {
               </View>
             )}
             {isTyping && <Text style={styles.generatingState}>MediNova is generating...</Text>}
-            <ChatInput 
-              inputText={inputText} 
-              setInputText={setInputText} 
-              onSend={handleSend} 
+            <ChatInput
+              inputText={inputText}
+              setInputText={setInputText}
+              onSend={handleSend}
               onStop={handleStopGeneration}
               isGenerating={isTyping}
-              disabled={!isReady || isTyping || isChatFull} 
+              disabled={!isReady || isTyping || isChatFull}
             />
           </View>
         );
@@ -437,17 +438,17 @@ export default function App() {
       <SafeAreaView style={styles.container}>
         {currentUser && (
           <>
-            <Sidebar 
-              isOpen={isSidebarOpen} 
-              sidebarAnim={sidebarAnim} 
-              toggleSidebar={toggleSidebar} 
-              currentView={currentView} 
-              navigateTo={navigateTo} 
-              sessions={sessions} 
-              currentSessionId={currentSessionId} 
-              loadSession={loadSession} 
-              deleteSession={deleteSession} 
-              startNewChat={startNewChat} 
+            <Sidebar
+              isOpen={isSidebarOpen}
+              sidebarAnim={sidebarAnim}
+              toggleSidebar={toggleSidebar}
+              currentView={currentView}
+              navigateTo={navigateTo}
+              sessions={sessions}
+              currentSessionId={currentSessionId}
+              loadSession={loadSession}
+              deleteSession={deleteSession}
+              startNewChat={startNewChat}
               onLogout={handleLogout}
               currentUser={currentUser}
             />
