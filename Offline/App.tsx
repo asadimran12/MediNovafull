@@ -8,7 +8,6 @@ import {
   FlatList,
   Keyboard,
   Animated,
-  Dimensions,
   Alert,
   AppState,
   Image,
@@ -39,8 +38,10 @@ import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { AuthScreen } from "./src/screens/AuthScreen";
 import { ExercisePlansScreen } from "./src/screens/ExercisePlan";
+import { ReportAnalyzeScreen } from "./src/screens/ReportAnalyzeScreen";
 
-type AppView = "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile";
+
+type AppView = "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "analyze_report";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("chat");
@@ -398,6 +399,8 @@ export default function App() {
         return <SettingsScreen onClearAll={handleClearAll} />;
       case "profile":
         return <ProfileScreen onSave={handleSaveProfile} onClose={handleCloseProfile} />;
+      case "analyze_report":
+        return <ReportAnalyzeScreen />;
       default:
         return (
           <View style={{ flex: 1 }}>
