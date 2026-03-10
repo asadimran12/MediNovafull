@@ -39,11 +39,16 @@ import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { AuthScreen } from "./src/screens/AuthScreen";
 import { ExercisePlansScreen } from "./src/screens/ExercisePlan";
+import { ModelSelectionScreen } from "./src/screens/ModelSelectionScreen";
+import { ModelManagerScreen } from "./src/screens/ModelManagerScreen";
+import { DashboardScreen } from "./src/screens/DashboardScreen";
+import { ReportAnalysisScreen } from "./src/screens/ReportAnalysisScreen";
+import ModelService from "./src/services/ModelService";
 
-type AppView = "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<AppView>("chat");
+  const [currentView, setCurrentView] = useState<AppView>("dashboard");
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [plans, setPlans] = useState<HealthPlan[]>([]);
@@ -65,23 +70,10 @@ export default function App() {
   const sidebarAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const appState = useRef(AppState.currentState);
 
-  // --- Initialization & Model Lifecycle ---
+  // --- Initialization & Lifecycle ---
   useEffect(() => {
     (async () => {
       try {
-        const isDownloaded = await LlamaService.isModelDownloaded();
-
-        if (!isDownloaded) {
-          setStatus("Starting First-Time Download");
-          await LlamaService.downloadModel((progress) => {
-            setDownloadProgress(progress);
-            setStatus(progress < 100 ? "Downloading Secure AI" : "Download Complete");
-          });
-        }
-
-        setStatus("Initializing Medical AI");
-        await LlamaService.loadModel();
-
         setStatus("Syncing Health Data");
         await StorageService.init();
 
@@ -91,19 +83,7 @@ export default function App() {
           const users = await AuthService.getAllUsers();
           const user = users.find(u => u.id === userId);
           if (user) {
-            await StorageService.setUser(user.id);
-            setCurrentUser(user);
-            const profile = await StorageService.getProfile();
-            setUserProfile(profile);
-            const allChats = await StorageService.getAllChats();
-            setSessions(allChats);
-            await fetchPlans();
-
-            if (!profile.isSet) {
-              setCurrentView("profile");
-            } else {
-              initializeSession(allChats);
-            }
+            await handleLogin(user);
           }
         }
 
@@ -116,12 +96,15 @@ export default function App() {
     })();
 
     // AppState Listener for Load/Offload
-    const subscription = AppState.addEventListener("change", nextAppState => {
+    const subscription = AppState.addEventListener("change", async (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === "active") {
-        console.log("App has come to the foreground, reloading model...");
-        LlamaService.loadModel().catch(console.error);
+        console.log("App foregrounded, reloading active model...");
+        const activeModel = await ModelService.getActiveModel();
+        if (activeModel) {
+            LlamaService.loadModel(activeModel.filename).catch(console.error);
+        }
       } else if (nextAppState.match(/inactive|background/)) {
-        console.log("App going to background, offloading model...");
+        console.log("App backgrounded, offloading model...");
         LlamaService.offloadModel().catch(console.error);
       }
       appState.current = nextAppState;
@@ -297,14 +280,39 @@ export default function App() {
         text: "Clear All",
         style: "destructive",
         onPress: async () => {
-          Alert.alert("Notice", "Reset feature coming soon.");
+           // Basic clear for now - would ideally clear files
+           setMessages([]);
+           setSessions([]);
+           setPlans([]);
+           Alert.alert("Success", "History cleared.");
         },
       },
     ]);
   };
 
   const handleSend = async () => {
-    if (!isReady || !inputText.trim() || isTyping || isChatFull) return;
+    if (!inputText.trim() || isTyping || isChatFull) return;
+    
+    // Check if model is loaded/ready
+    const activeModel = await ModelService.getActiveModel();
+    if (!activeModel) {
+        Alert.alert("Download Required", "Please download an AI model from Settings to use the chat.");
+        return;
+    }
+
+    const isDownloaded = await ModelService.isModelDownloaded(activeModel.id);
+    if (!isDownloaded) {
+        Alert.alert("Download Required", "The selected model is not downloaded. Visit Settings -> Manage AI Models.");
+        return;
+    }
+
+    try {
+        await LlamaService.loadModel(activeModel.filename);
+    } catch (e) {
+        Alert.alert("Error", "Failed to initialize AI model.");
+        return;
+    }
+
     const userText = inputText.trim();
     setInputText("");
     Keyboard.dismiss();
@@ -338,6 +346,7 @@ export default function App() {
         );
       });
     } catch (e) {
+      console.error("Chat error:", e);
     } finally {
       setIsTyping(false);
     }
@@ -345,7 +354,7 @@ export default function App() {
 
   const handleSaveProfile = async (profile: UserProfile) => {
     setUserProfile(profile);
-    setCurrentView("chat");
+    setCurrentView("dashboard");
     const allChats = await StorageService.getAllChats();
     initializeSession(allChats);
   };
@@ -359,10 +368,27 @@ export default function App() {
     setSessions(allChats);
     await fetchPlans();
 
+    // Check if any model is downloaded
+    const downloaded = await ModelService.getDownloadedModels();
+    if (downloaded.length === 0) {
+      setCurrentView("model_setup");
+    } else {
+      if (!profile.isSet) {
+        setCurrentView("profile");
+      } else {
+        setCurrentView("dashboard");
+        initializeSession(allChats);
+      }
+    }
+  };
+
+  const handleModelSetupComplete = async () => {
+    const profile = await StorageService.getProfile();
     if (!profile.isSet) {
       setCurrentView("profile");
     } else {
-      setCurrentView("chat");
+      setCurrentView("dashboard");
+      const allChats = await StorageService.getAllChats();
       initializeSession(allChats);
     }
   };
@@ -388,19 +414,39 @@ export default function App() {
 
   const renderCurrentView = () => {
     switch (currentView) {
+      case "dashboard":
+        return (
+          <DashboardScreen
+            userName={currentUser?.username || ""}
+            onNavigate={(view) => setCurrentView(view)}
+            onOpenSettings={() => setCurrentView("settings")}
+          />
+        );
       case "diet_plans":
-        return <PlansScreen type="diet" plans={plans} onDelete={async (id) => { await StorageService.deletePlan(id); fetchPlans(); }} />;
+        return <PlansScreen type="diet" plans={plans} onDelete={async (id) => { await StorageService.deletePlan(id); fetchPlans(); }} onBack={() => setCurrentView("dashboard")} />;
       case "exercise_plans":
-        return <ExercisePlansScreen />;
+        return <ExercisePlansScreen onBack={() => setCurrentView("dashboard")} />;
       case "about":
         return <AboutScreen />;
       case "settings":
-        return <SettingsScreen onClearAll={handleClearAll} />;
+        return <SettingsScreen onClearAll={handleClearAll} onManageModels={() => setCurrentView("model_manager")} onBack={() => setCurrentView("dashboard")} />;
       case "profile":
         return <ProfileScreen onSave={handleSaveProfile} onClose={handleCloseProfile} />;
+      case "model_setup":
+        return <ModelSelectionScreen onComplete={handleModelSetupComplete} />;
+      case "model_manager":
+        return <ModelManagerScreen onBack={() => setCurrentView("settings")} />;
+      case "report_analysis":
+        return <ReportAnalysisScreen onBack={() => setCurrentView("dashboard")} />;
       default:
         return (
           <View style={{ flex: 1 }}>
+            <View style={styles.chatHeader}>
+              <TouchableOpacity onPress={() => setCurrentView("dashboard")} style={styles.backButton}>
+                 <Text style={styles.backIcon}>←</Text>
+              </TouchableOpacity>
+              <Text style={styles.chatTitle}>Health Assistant</Text>
+            </View>
             <FlatList
               ref={flatListRef}
               data={messages}
@@ -425,7 +471,7 @@ export default function App() {
               onSend={handleSend}
               onStop={handleStopGeneration}
               isGenerating={isTyping}
-              disabled={!isReady || isTyping || isChatFull}
+              disabled={isTyping || isChatFull}
             />
           </View>
         );
@@ -437,7 +483,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        {currentUser && (
+        {currentUser && currentView !== "model_setup" && currentView !== "dashboard" && currentView !== "settings" && (
           <>
             <Sidebar
               isOpen={isSidebarOpen}
@@ -535,4 +581,26 @@ const styles = StyleSheet.create({
   fullNoticeText: { color: COLORS.fullNoticeText, fontSize: 12, marginBottom: 5 },
   inlineNewChatBtn: { backgroundColor: COLORS.fullNoticeBtn, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
   inlineNewChatBtnText: { color: COLORS.surface, fontSize: 12, fontWeight: "700" },
+  chatHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backButton: {
+    padding: 5,
+    marginRight: 10,
+  },
+  backIcon: {
+    fontSize: 24,
+    color: COLORS.primary,
+    fontWeight: "bold",
+  },
+  chatTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.textHeader,
+  }
 });

@@ -4,12 +4,27 @@ import { COLORS, SPACING } from "../constants/theme";
 
 interface SettingsScreenProps {
   onClearAll: () => void;
+  onManageModels: () => void;
+  onBack?: () => void;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onManageModels, onBack }) => {
   return (
     <View style={styles.sectionView}>
+      {onBack && (
+        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+      )}
       <Text style={styles.sectionTitle}>Settings</Text>
+      
+      <View style={styles.settingItem}>
+        <Text style={styles.settingLabel}>AI Models</Text>
+        <TouchableOpacity onPress={onManageModels}>
+          <Text style={styles.settingAction}>Manage</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.settingItem}>
         <Text style={styles.settingLabel}>Export Data</Text>
         <TouchableOpacity
@@ -55,4 +70,6 @@ const styles = StyleSheet.create({
   settingLabel: { fontSize: 16, color: COLORS.textHeader },
   settingValue: { color: COLORS.textSub },
   settingAction: { color: COLORS.primary, fontWeight: "600" },
+  backBtn: { marginBottom: 15 },
+  backText: { color: COLORS.primary, fontWeight: "600", fontSize: 16 },
 });

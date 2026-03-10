@@ -1,4 +1,5 @@
 import storageService, { UserProfile, HealthPlan } from "./StorageService";
+import KnowledgeBase from "./KnowledgeBase";
 
 // ─── Diet Plan Types ──────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ function buildConditionGuidelines(conditions: string): string {
     return rules.length > 0 ? rules.join(" | ") : "Balanced healthy diet. Standard macros (50% Carb, 25% Protein, 25% Fat).";
 }
 
-function buildDayPrompt(profile: UserProfile, day: string): string {
+function buildDayPrompt(profile: UserProfile, day: string, medicalContext: string): string {
     const age = profile.age ? `${profile.age} year old` : "adult";
     const gender = profile.gender || "person";
     const conditions = profile.conditions?.trim() || "none";
@@ -65,6 +66,9 @@ Medical Conditions: ${conditions}
 
 MEDICAL DIET GUIDELINES
 ${guidelines}
+
+GROUND TRUTH MEDICAL KNOWLEDGE
+${medicalContext || "Standard healthy nutrition principles."}
 
 DIET RULES
 * All food must be halal
@@ -144,7 +148,32 @@ export async function generateDietPlan(
     const profile = await storageService.getProfile();
     const LlamaService = (await import("./LlamaService")).default;
 
-    await LlamaService.loadModel();
+    onProgress?.("Loading Knowledge Base...", 0);
+    
+    const ModelService = (await import("./ModelService")).default;
+    const activeModel = await ModelService.getActiveModel();
+
+    if (!activeModel) {
+        throw new Error("No AI model selected. Please visit Settings -> Manage AI Models.");
+    }
+
+    if (!(await ModelService.isModelDownloaded(activeModel.id))) {
+        throw new Error("Active model is not downloaded. Please visit Settings -> Manage AI Models.");
+    }
+
+    // Ensure embedding model is ready (bundled as asset)
+    if (!(await LlamaService.isModelDownloaded(LlamaService.EMBEDDING_MODEL_NAME))) {
+        await LlamaService.downloadModel(LlamaService.EMBEDDING_MODEL_NAME, ""); // This handles assets/copy
+    }
+
+    // Initialize/Query RAG
+    await KnowledgeBase.initialize();
+    const query = `${profile.gender} ${profile.age} years old with ${profile.conditions || "no conditions"}`;
+    const medicalContext = await KnowledgeBase.getRelevantContext(query);
+    console.log("🔍 RAG Context Retrieved for query:", query);
+
+    // Switch back to generation model
+    await LlamaService.loadModel(activeModel.filename);
 
     const generatedDays: DayPlan[] = [];
 
@@ -155,7 +184,7 @@ export async function generateDietPlan(
 
         console.log(`🔄 Generating ${day}`);
 
-        const prompt = buildDayPrompt(profile, day);
+        const prompt = buildDayPrompt(profile, day, medicalContext);
         const systemPrompt = "You are a nutritionist. Return ONLY valid JSON.";
 
         let attempts = 0;

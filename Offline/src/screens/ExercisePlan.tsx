@@ -43,8 +43,11 @@ const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => (
     </View>
 );
 
-/* ─── Main Screen ─────────────────────────────── */
-export const ExercisePlansScreen: React.FC = () => {
+interface ExercisePlansScreenProps {
+    onBack?: () => void;
+}
+
+export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack }) => {
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
     const [plan, setPlan] = useState<StructuredExercisePlan | null>(null);
     const [loading, setLoading] = useState(false);
@@ -107,6 +110,15 @@ export const ExercisePlansScreen: React.FC = () => {
 
     return (
         <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+            {/* Header with Back Button */}
+            {onBack && (
+                <View style={styles.headerRow}>
+                    <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                        <Text style={styles.backButtonText}>← Back</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             {/* Generate Button */}
             <TouchableOpacity
                 style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
@@ -386,5 +398,24 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: "#888",
         textAlign: "center",
+    },
+    headerRow: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        paddingHorizontal: 16,
+        paddingTop: 10,
+    },
+    backButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: COLORS.surface,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+    },
+    backButtonText: {
+        color: COLORS.primary,
+        fontWeight: "700",
+        fontSize: 14,
     },
 });

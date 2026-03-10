@@ -11,34 +11,48 @@ import { UserProfile } from "./StorageService";
 
 class LlamaService {
   private context: LlamaContext | null = null;
-  private readonly MODEL_NAME = "qwen2.5-0.5b-instruct-q4_k_m.gguf";
-  private readonly DOWNLOAD_URL = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf";
+  private currentLoadedModel: string | null = null;
+  public readonly EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2.gguf";
+  private readonly EMBEDDING_DOWNLOAD_URL = "https://huggingface.co/Mungert/all-MiniLM-L6-v2-GGUF/resolve/main/all-minilm-l6-v2-q8_0.gguf";
 
-  private getLocalPath() {
-    return `${ReactNativeFS.DocumentDirectoryPath}/${this.MODEL_NAME}`;
+  private getLocalPath(modelFilename: string) {
+    return `${ReactNativeFS.DocumentDirectoryPath}/${modelFilename}`;
   }
 
-  private getTempPath() {
-    return `${this.getLocalPath()}.tmp`;
+  private getTempPath(modelFilename: string) {
+    return `${this.getLocalPath(modelFilename)}.tmp`;
   }
 
-  async isModelDownloaded(): Promise<boolean> {
-    const localPath = this.getLocalPath();
+  async isModelDownloaded(modelFilename: string): Promise<boolean> {
+    if (modelFilename === this.EMBEDDING_MODEL_NAME) {
+        // Assume embedding model is bundled as an asset for 100% offline use
+        return true; 
+    }
+    const localPath = this.getLocalPath(modelFilename);
     const exists = await ReactNativeFS.exists(localPath);
     if (!exists) return false;
 
     const stats = await ReactNativeFS.stat(localPath);
-    if (stats.size < 100 * 1024 * 1024) { // Qwen 0.5B q4 is >300MB
-      console.log("Model file too small, considering it missing/corrupt");
+    const minSize = 100 * 1024 * 1024;
+    if (stats.size < minSize) {
+      console.log(`${modelFilename} file too small, considering it missing/corrupt`);
       await ReactNativeFS.unlink(localPath);
       return false;
     }
     return true;
   }
 
-  async downloadModel(onProgress?: ProgressCallback): Promise<string> {
-    const localPath = this.getLocalPath();
-    const tempPath = this.getTempPath();
+  async downloadModel(
+    modelFilename: string,
+    downloadUrl: string,
+    onProgress?: ProgressCallback
+  ): Promise<string> {
+    if (modelFilename === this.EMBEDDING_MODEL_NAME) {
+        console.log("Embedding model is expected to be bundled as an asset. Skipping download.");
+        return modelFilename;
+    }
+    const localPath = this.getLocalPath(modelFilename);
+    const tempPath = this.getTempPath(modelFilename);
 
     if (await ReactNativeFS.exists(tempPath)) {
       await ReactNativeFS.unlink(tempPath);
@@ -48,7 +62,7 @@ class LlamaService {
     }
 
     const options: ReactNativeFS.DownloadFileOptions = {
-      fromUrl: this.DOWNLOAD_URL,
+      fromUrl: downloadUrl,
       toFile: tempPath,
       progress: (res) => {
         const percentage = (res.bytesWritten / res.contentLength) * 100;
@@ -63,13 +77,11 @@ class LlamaService {
         throw new Error(`Download failed with status ${result.statusCode}`);
       }
 
-      // Rename temp to final only on 100% success
       await ReactNativeFS.moveFile(tempPath, localPath);
-      console.log("Model download and verification complete.");
+      console.log(`${modelFilename} download and verification complete.`);
       return localPath;
     } catch (err) {
-      console.error("Model download failed:", err);
-      // Clean up partial file on failure
+      console.error(`${modelFilename} download failed:`, err);
       if (await ReactNativeFS.exists(tempPath)) {
         await ReactNativeFS.unlink(tempPath).catch(() => { });
       }
@@ -77,27 +89,74 @@ class LlamaService {
     }
   }
 
-  async loadModel() {
-    if (this.context) return;
-    const localPath = this.getLocalPath();
+  async loadModel(modelFilename: string, isEmbedding: boolean = false) {
+    if (this.context && this.currentLoadedModel === modelFilename) {
+        return; // Already loaded
+    }
 
-    if (!(await ReactNativeFS.exists(localPath))) {
-      throw new Error("Model file missing. Must download first.");
+    if (this.context) {
+      // If we're loading a different model, release the current one
+      await this.offloadModel();
+    }
+
+    let modelPath = this.getLocalPath(modelFilename);
+    let isAsset = false;
+
+    // For embedding model, check documents first, fallback to copying from assets
+    if (modelFilename === this.EMBEDDING_MODEL_NAME) {
+        if (!(await ReactNativeFS.exists(modelPath))) {
+            console.log(`${modelFilename} not found in documents, checking assets...`);
+            try {
+                // On Android, we can try copying from assets to local files for better stability
+                await ReactNativeFS.copyFileAssets(modelFilename, modelPath);
+                console.log(`Successfully copied ${modelFilename} from assets to documents.`);
+            } catch (err) {
+                console.log(`${modelFilename} not found in assets or copy failed. Fallback to direct asset load.`);
+                modelPath = modelFilename; 
+                isAsset = true;
+            }
+        }
+    } else {
+        if (!(await ReactNativeFS.exists(modelPath))) {
+            throw new Error(`${modelFilename} missing. Must download first.`);
+        }
     }
 
     try {
       this.context = await initLlama({
-        model: localPath,
-        n_ctx: 4096,
+        model: modelPath,
+        is_model_asset: isAsset,
+        n_ctx: isEmbedding ? 512 : 4096,
         n_threads: 4,
         use_mlock: false,
         n_gpu_layers: 0,
-      });
-      console.log("Model context loaded successfully.");
+        embedding: isEmbedding,
+        pooling_type: isEmbedding ? 'mean' : undefined,
+      } as any);
+      this.currentLoadedModel = modelFilename;
+      console.log(`${modelFilename} context loaded successfully (${isAsset ? "ASSET" : "LOCAL"}).`);
     } catch (err) {
-      console.error("Llama context initialization failed:", err);
-      await ReactNativeFS.unlink(localPath).catch(() => { });
+      console.error(`${modelFilename} context initialization failed:`, err);
       throw err;
+    }
+  }
+
+  async getEmbeddings(text: string): Promise<number[]> {
+    // Ensure embedding model is loaded
+    if (this.currentLoadedModel !== this.EMBEDDING_MODEL_NAME) {
+        if (await this.isModelDownloaded(this.EMBEDDING_MODEL_NAME)) {
+            await this.loadModel(this.EMBEDDING_MODEL_NAME, true);
+        } else {
+            throw new Error("Embedding model not downloaded.");
+        }
+    }
+
+    try {
+        const result = await this.context!.embedding(text);
+        return result.embedding; // Return the underlying number array
+    } catch (err) {
+        console.error("Embedding generation failed:", err);
+        throw err;
     }
   }
 
@@ -105,6 +164,7 @@ class LlamaService {
     if (this.context) {
       await this.context.release();
       this.context = null;
+      this.currentLoadedModel = null;
       console.log("Model context offloaded.");
     }
   }

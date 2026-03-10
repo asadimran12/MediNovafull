@@ -1,4 +1,5 @@
 import storageService, { UserProfile } from "./StorageService";
+import KnowledgeBase from "./KnowledgeBase";
 
 
 export interface ExerciseItem {
@@ -50,7 +51,7 @@ function buildExerciseGuidelines(conditions: string): string {
 
     return rules.length > 0 ? rules.join(" | ") : "Balanced weekly exercise plan with mixed intensity.";
 }
-function buildExerciseDayPrompt(profile: UserProfile, day: string): string {
+function buildExerciseDayPrompt(profile: UserProfile, day: string, medicalContext: string): string {
     const age = profile.age ? `${profile.age} year old` : "adult";
     const gender = profile.gender || "person";
     const conditions = profile.conditions?.trim() || "none";
@@ -66,6 +67,9 @@ Medical Conditions: ${conditions}
 
 EXERCISE GUIDELINES
 ${guidelines}
+
+GROUND TRUTH MEDICAL KNOWLEDGE
+${medicalContext || "Standard healthy exercise principles."}
 
 EXERCISE RULES
 * Use real exercise names (e.g., push-ups, squats, jogging, cycling, yoga)
@@ -96,13 +100,37 @@ export async function generateExercisePlan(onProgress?: (dayName: string, index:
     const profile = await storageService.getProfile();
     const LlamaService = (await import("./LlamaService")).default;
 
-    await LlamaService.loadModel();
+    onProgress?.("Loading Knowledge Base...", 0);
+
+    const ModelService = (await import("./ModelService")).default;
+    const activeModel = await ModelService.getActiveModel();
+
+    if (!activeModel) {
+        throw new Error("No AI model selected. Please visit Settings -> Manage AI Models.");
+    }
+
+    if (!(await ModelService.isModelDownloaded(activeModel.id))) {
+        throw new Error("Active model is not downloaded. Please visit Settings -> Manage AI Models.");
+    }
+
+    // Ensure embedding model is ready (bundled as asset)
+    if (!(await LlamaService.isModelDownloaded(LlamaService.EMBEDDING_MODEL_NAME))) {
+        await LlamaService.downloadModel(LlamaService.EMBEDDING_MODEL_NAME, ""); // This handles assets/copy
+    }
+
+    // Initialize/Query RAG
+    await KnowledgeBase.initialize();
+    const query = `${profile.gender} ${profile.age} years old with ${profile.conditions || "no conditions"}`;
+    const medicalContext = await KnowledgeBase.getRelevantContext(query);
+    console.log("🔍 RAG Context Retrieved for Exercise query:", query);
+
+    await LlamaService.loadModel(activeModel.filename);
     const generatedDays: DayExercisePlan[] = [];
     for (let i = 0; i < DAY_NAMES.length; i++) {
         const day = DAY_NAMES[i];
         onProgress?.(`Generating ${day}`, i);
         console.log(`🔄 Generating ${day}`);
-        const prompt = buildExerciseDayPrompt(profile, day);
+        const prompt = buildExerciseDayPrompt(profile, day, medicalContext);
         const systemPrompt = "You are a fitness trainer. Return ONLY valid JSON.";
         let attempts = 0;
         let success = false;

@@ -126,6 +126,18 @@ class StorageService {
     if (await ReactNativeFS.exists(this.profilePath)) await ReactNativeFS.unlink(this.profilePath);
   }
 
+  // ─── Generic Storage ────────────────────────────────────────────────────────
+  async setItem(key: string, value: string) {
+    const path = `${this.getUserDir()}/${key}.txt`;
+    await ReactNativeFS.writeFile(path, value, "utf8");
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    const path = `${this.getUserDir()}/${key}.txt`;
+    if (!(await ReactNativeFS.exists(path))) return null;
+    return await ReactNativeFS.readFile(path, "utf8");
+  }
+
   generateTitle(messages: LocalMessage[]): string {
     const first = messages.find((m) => m.role === "user");
     if (!first) return "New Health Chat";
