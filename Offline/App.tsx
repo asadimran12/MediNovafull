@@ -101,7 +101,7 @@ export default function App() {
         console.log("App foregrounded, reloading active model...");
         const activeModel = await ModelService.getActiveModel();
         if (activeModel) {
-            LlamaService.loadModel(activeModel.filename).catch(console.error);
+          LlamaService.loadModel(activeModel.filename).catch(console.error);
         }
       } else if (nextAppState.match(/inactive|background/)) {
         console.log("App backgrounded, offloading model...");
@@ -280,11 +280,11 @@ export default function App() {
         text: "Clear All",
         style: "destructive",
         onPress: async () => {
-           // Basic clear for now - would ideally clear files
-           setMessages([]);
-           setSessions([]);
-           setPlans([]);
-           Alert.alert("Success", "History cleared.");
+          // Basic clear for now - would ideally clear files
+          setMessages([]);
+          setSessions([]);
+          setPlans([]);
+          Alert.alert("Success", "History cleared.");
         },
       },
     ]);
@@ -292,25 +292,25 @@ export default function App() {
 
   const handleSend = async () => {
     if (!inputText.trim() || isTyping || isChatFull) return;
-    
+
     // Check if model is loaded/ready
     const activeModel = await ModelService.getActiveModel();
     if (!activeModel) {
-        Alert.alert("Download Required", "Please download an AI model from Settings to use the chat.");
-        return;
+      Alert.alert("Download Required", "Please download an AI model from Settings to use the chat.");
+      return;
     }
 
     const isDownloaded = await ModelService.isModelDownloaded(activeModel.id);
     if (!isDownloaded) {
-        Alert.alert("Download Required", "The selected model is not downloaded. Visit Settings -> Manage AI Models.");
-        return;
+      Alert.alert("Download Required", "The selected model is not downloaded. Visit Settings -> Manage AI Models.");
+      return;
     }
 
     try {
-        await LlamaService.loadModel(activeModel.filename);
+      await LlamaService.loadModel(activeModel.filename);
     } catch (e) {
-        Alert.alert("Error", "Failed to initialize AI model.");
-        return;
+      Alert.alert("Error", "Failed to initialize AI model.");
+      return;
     }
 
     const userText = inputText.trim();
@@ -438,14 +438,12 @@ export default function App() {
         return <ModelManagerScreen onBack={() => setCurrentView("settings")} />;
       case "report_analysis":
         return <ReportAnalysisScreen onBack={() => setCurrentView("dashboard")} />;
-      case "analyze_report":
-        return <ReportAnalyzeScreen />;
       default:
         return (
           <View style={{ flex: 1 }}>
             <View style={styles.chatHeader}>
               <TouchableOpacity onPress={() => setCurrentView("dashboard")} style={styles.backButton}>
-                 <Text style={styles.backIcon}>←</Text>
+                <Text style={styles.backIcon}>←</Text>
               </TouchableOpacity>
               <Text style={styles.chatTitle}>Health Assistant</Text>
             </View>

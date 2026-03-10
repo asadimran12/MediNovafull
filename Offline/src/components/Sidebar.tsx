@@ -111,8 +111,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Text style={styles.sideGroupTitle}>HEALTH REPORTS</Text>
             <SidebarItem
               label="📊 Analyze Report"
-              active={currentView === "analyze_report"}
-              onPress={() => navigateTo("analyze_report")}
+              active={currentView === "report_analysis"}
+              onPress={() => navigateTo("report_analysis")}
             />
 
             <Text style={styles.sideGroupTitle}>VITAL PLANS</Text>
