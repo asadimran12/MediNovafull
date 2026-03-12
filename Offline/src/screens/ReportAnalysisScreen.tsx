@@ -4,9 +4,17 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
 
 interface ReportAnalysisScreenProps {
   onBack: () => void;
+  onNavigateToUpload: () => void;
+  onNavigateToChat: () => void;
 }
 
-export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBack }) => {
+export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBack, onNavigateToUpload, onNavigateToChat }) => {
+  const handleUpload = () => {
+    onNavigateToUpload();
+  }
+  const handleChat = () => {
+    onNavigateToChat();
+  }
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -16,26 +24,21 @@ export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBa
         <Text style={styles.headerTitle}>Analyse Report</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <TouchableOpacity onPress={handleUpload} style={styles.content}>
         <View style={styles.card}>
           <Text style={styles.icon}>🔬</Text>
-          <Text style={styles.title}>Medical Report Analysis</Text>
-          <Text style={styles.desc}>
-            This feature will allow you to upload or scan medical reports (blood tests, prescriptions, etc.) and get an AI-powered summary and explanation of the results.
-          </Text>
-          
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>COMING SOON</Text>
-          </View>
-        </View>
+          <Text style={styles.title}>Upload image,pdf or capture image</Text>
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>🔒 Privacy First</Text>
-          <Text style={styles.infoText}>
-            Just like all other features in MediNova, report analysis will happen 100% on your device. Your sensitive medical documents never leave your phone.
-          </Text>
         </View>
-      </ScrollView>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={handleChat} style={styles.content}>
+        <View style={styles.card}>
+          <Text style={styles.icon}>💬</Text>
+          <Text style={styles.title}>Chat with AI</Text>
+
+        </View>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -65,22 +68,4 @@ const styles = StyleSheet.create({
   },
   icon: { fontSize: 60, marginBottom: SPACING.md },
   title: { fontSize: 22, fontWeight: "bold", color: COLORS.textHeader, textAlign: "center", marginBottom: SPACING.sm },
-  desc: { fontSize: 16, color: COLORS.textSub, textAlign: "center", lineHeight: 24, marginBottom: SPACING.lg },
-  comingSoonBadge: {
-    backgroundColor: COLORS.primary + "22",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: RADIUS.pill,
-  },
-  comingSoonText: { color: COLORS.primary, fontWeight: "900", letterSpacing: 1 },
-  infoBox: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: COLORS.primary + "44",
-  },
-  infoTitle: { fontSize: 16, fontWeight: "bold", color: COLORS.textHeader, marginBottom: 8 },
-  infoText: { fontSize: 14, color: COLORS.textMain, lineHeight: 20 },
 });

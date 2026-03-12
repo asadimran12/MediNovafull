@@ -42,10 +42,10 @@ import { ModelSelectionScreen } from "./src/screens/ModelSelectionScreen";
 import { ModelManagerScreen } from "./src/screens/ModelManagerScreen";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { ReportAnalysisScreen } from "./src/screens/ReportAnalysisScreen";
-import { ReportAnalyzeScreen } from "./src/screens/ReportAnalyzeScreen";
+import ImageUploader from "./src/screens/ImageUploader";
 import ModelService from "./src/services/ModelService";
-
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "analyze_report";
+import ChatPage from "./src/screens/ChatPage";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
@@ -62,6 +62,7 @@ export default function App() {
   const [downloadProgress, setDownloadProgress] = useState<number | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+  const [scannedReport, setScannedReport] = useState<any>(null);
 
   const MAX_MESSAGES = 40;
   const isChatFull = messages.length >= MAX_MESSAGES;
@@ -437,7 +438,17 @@ export default function App() {
       case "model_manager":
         return <ModelManagerScreen onBack={() => setCurrentView("settings")} />;
       case "report_analysis":
-        return <ReportAnalysisScreen onBack={() => setCurrentView("dashboard")} />;
+        return <ReportAnalysisScreen onBack={() => setCurrentView("dashboard")} onNavigateToUpload={() => setCurrentView("image_uploader")} onNavigateToChat={() => setCurrentView("chat_page")} />;
+      case "image_uploader":
+        return <ImageUploader 
+            onNavigate={(report) => {
+                setScannedReport(report);
+                setCurrentView("chat_page");
+            }} 
+            onBack={() => setCurrentView("report_analysis")} 
+        />;
+      case "chat_page":
+        return <ChatPage onBack={() => setCurrentView("report_analysis")} reportData={scannedReport} />;
       default:
         return (
           <View style={{ flex: 1 }}>
