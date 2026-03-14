@@ -25,8 +25,8 @@ class LlamaService {
 
   async isModelDownloaded(modelFilename: string): Promise<boolean> {
     if (modelFilename === this.EMBEDDING_MODEL_NAME) {
-        // Assume embedding model is bundled as an asset for 100% offline use
-        return true; 
+      // Assume embedding model is bundled as an asset for 100% offline use
+      return true;
     }
     const localPath = this.getLocalPath(modelFilename);
     const exists = await ReactNativeFS.exists(localPath);
@@ -48,8 +48,8 @@ class LlamaService {
     onProgress?: ProgressCallback
   ): Promise<string> {
     if (modelFilename === this.EMBEDDING_MODEL_NAME) {
-        console.log("Embedding model is expected to be bundled as an asset. Skipping download.");
-        return modelFilename;
+      console.log("Embedding model is expected to be bundled as an asset. Skipping download.");
+      return modelFilename;
     }
     const localPath = this.getLocalPath(modelFilename);
     const tempPath = this.getTempPath(modelFilename);
@@ -91,7 +91,7 @@ class LlamaService {
 
   async loadModel(modelFilename: string, isEmbedding: boolean = false) {
     if (this.context && this.currentLoadedModel === modelFilename) {
-        return; // Already loaded
+      return; // Already loaded
     }
 
     if (this.context) {
@@ -104,22 +104,22 @@ class LlamaService {
 
     // For embedding model, check documents first, fallback to copying from assets
     if (modelFilename === this.EMBEDDING_MODEL_NAME) {
-        if (!(await ReactNativeFS.exists(modelPath))) {
-            console.log(`${modelFilename} not found in documents, checking assets...`);
-            try {
-                // On Android, we can try copying from assets to local files for better stability
-                await ReactNativeFS.copyFileAssets(modelFilename, modelPath);
-                console.log(`Successfully copied ${modelFilename} from assets to documents.`);
-            } catch (err) {
-                console.log(`${modelFilename} not found in assets or copy failed. Fallback to direct asset load.`);
-                modelPath = modelFilename; 
-                isAsset = true;
-            }
+      if (!(await ReactNativeFS.exists(modelPath))) {
+        console.log(`${modelFilename} not found in documents, checking assets...`);
+        try {
+          // On Android, we can try copying from assets to local files for better stability
+          await ReactNativeFS.copyFileAssets(modelFilename, modelPath);
+          console.log(`Successfully copied ${modelFilename} from assets to documents.`);
+        } catch (err) {
+          console.log(`${modelFilename} not found in assets or copy failed. Fallback to direct asset load.`);
+          modelPath = modelFilename;
+          isAsset = true;
         }
+      }
     } else {
-        if (!(await ReactNativeFS.exists(modelPath))) {
-            throw new Error(`${modelFilename} missing. Must download first.`);
-        }
+      if (!(await ReactNativeFS.exists(modelPath))) {
+        throw new Error(`${modelFilename} missing. Must download first.`);
+      }
     }
 
     try {
@@ -144,19 +144,19 @@ class LlamaService {
   async getEmbeddings(text: string): Promise<number[]> {
     // Ensure embedding model is loaded
     if (this.currentLoadedModel !== this.EMBEDDING_MODEL_NAME) {
-        if (await this.isModelDownloaded(this.EMBEDDING_MODEL_NAME)) {
-            await this.loadModel(this.EMBEDDING_MODEL_NAME, true);
-        } else {
-            throw new Error("Embedding model not downloaded.");
-        }
+      if (await this.isModelDownloaded(this.EMBEDDING_MODEL_NAME)) {
+        await this.loadModel(this.EMBEDDING_MODEL_NAME, true);
+      } else {
+        throw new Error("Embedding model not downloaded.");
+      }
     }
 
     try {
-        const result = await this.context!.embedding(text);
-        return result.embedding; // Return the underlying number array
+      const result = await this.context!.embedding(text);
+      return result.embedding; // Return the underlying number array
     } catch (err) {
-        console.error("Embedding generation failed:", err);
-        throw err;
+      console.error("Embedding generation failed:", err);
+      throw err;
     }
   }
 
@@ -226,6 +226,46 @@ INSTRUCTIONS:
       throw err;
     }
   }
+
+
+  async reportChat(
+    reportData: { title: string; lines: { label: string, value: string }[] },
+    messages: Message[],
+    profile: UserProfile | null,
+    onToken?: (data: TokenData) => void
+  ) {
+    if (!this.context) throw new Error("Model not initialized. Call LoadModel first.");
+
+    let systemPrompt = "You are a specialized medical report analyzer AI for MediNova. Your job is to explain medical and health reports to the user in simple, easily understandable terms.";
+
+    if (profile && profile.isSet) {
+      systemPrompt += `\n\nKeep in mind the user's profile:\n- Age: ${profile.age || "N/A"}\n- Gender: ${profile.gender || "N/A"}\n- Medical Conditions: ${profile.conditions || "None"}.`;
+    }
+
+    systemPrompt += `\n\nHEre is the report data the user uploaded:\nTitle: ${reportData.title}\nLines:\n${reportData.lines.map(l => `${l.label}: ${l.value}`).join("\n")}`;
+
+    systemPrompt += `\nAnalyze this data carefully. Answer the user's questions strictly based on this report's information. Do NOT guess or make up numbers. Explain what values mean for their health. If you see abnormal values, gently advise consulting a healthcare professional. Be concise and helpful.`;
+
+    const prompt = this.formatChatPrompt(messages, systemPrompt);
+    console.log("--- GENERATING REPORT CHAT WITH PROMPT ---\n", prompt, "\n----------------------------");
+
+    try {
+      const res = await this.context.completion({
+        prompt,
+        n_predict: 1000,
+        temperature: 0.6,
+        stop: ["<|im_end|>"]
+      }, onToken);
+      return res?.text ?? "";
+
+    } catch (error) {
+      console.error("Report chat failed:", error);
+      throw error;
+    }
+
+
+  }
+
 
   stopCompletion() {
     if (this.context) {
