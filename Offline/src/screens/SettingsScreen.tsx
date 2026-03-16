@@ -7,12 +7,10 @@ interface SettingsScreenProps {
   onClearAll: () => void;
   onManageModels: () => void;
   onBack?: () => void;
+  onLogout?: () => void;
 }
 
-
-
-
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onManageModels, onBack }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onManageModels, onBack, onLogout }) => {
 
   const handleExportOnCloud = () => {
     Alert.alert(
@@ -59,8 +57,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onMa
       ]
     );
   };
-
-
   return (
     <View style={styles.sectionView}>
       {onBack && (
@@ -95,6 +91,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onMa
           <Text style={{ color: COLORS.danger }}>Reset App</Text>
         </TouchableOpacity>
       </View>
+
+      {onLogout && (
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() =>
+            Alert.alert("Logout", "Are you sure you want to logout?", [
+              { text: "Cancel", style: "cancel" },
+              { text: "Logout", style: "destructive", onPress: onLogout },
+            ])
+          }
+        >
+          <Text style={styles.logoutText}>🚪  Logout</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -119,4 +129,17 @@ const styles = StyleSheet.create({
   settingAction: { color: COLORS.primary, fontWeight: "600" },
   backBtn: { marginBottom: 15 },
   backText: { color: COLORS.primary, fontWeight: "600", fontSize: 16 },
+  logoutBtn: {
+    marginTop: 30,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: COLORS.danger,
+    alignItems: "center",
+  },
+  logoutText: {
+    color: COLORS.danger,
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

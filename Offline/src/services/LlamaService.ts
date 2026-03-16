@@ -1,5 +1,6 @@
 import { initLlama, LlamaContext, TokenData } from "llama.rn";
 import ReactNativeFS from "react-native-fs";
+import RNBackgroundDownloader, { DownloadTask } from '@kesha-antonov/react-native-background-downloader';
 
 export interface Message {
   role: "system" | "user" | "assistant";
@@ -14,6 +15,13 @@ class LlamaService {
   private currentLoadedModel: string | null = null;
   public readonly EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2.gguf";
   private readonly EMBEDDING_DOWNLOAD_URL = "https://huggingface.co/Mungert/all-MiniLM-L6-v2-GGUF/resolve/main/all-minilm-l6-v2-q8_0.gguf";
+  private activeDownloadTasks: Record<string, DownloadTask> = {};
+  private pausedDownloads: Record<string, { url: string; bytesDownloaded: number; bytesTotal: number }> = {};
+  private downloadCallbacks: Record<string, {
+    onProgress?: ProgressCallback;
+    onComplete?: () => void;
+    onError?: (err: any) => void;
+  }> = {};
 
   private getLocalPath(modelFilename: string) {
     return `${ReactNativeFS.DocumentDirectoryPath}/${modelFilename}`;
@@ -45,49 +53,208 @@ class LlamaService {
   async downloadModel(
     modelFilename: string,
     downloadUrl: string,
-    onProgress?: ProgressCallback
-  ): Promise<string> {
+    onProgress?: ProgressCallback,
+    onComplete?: () => void,
+    onError?: (err: any) => void
+  ): Promise<void> {
     if (modelFilename === this.EMBEDDING_MODEL_NAME) {
       console.log("Embedding model is expected to be bundled as an asset. Skipping download.");
-      return modelFilename;
+      if (onComplete) onComplete();
+      return;
     }
-    const localPath = this.getLocalPath(modelFilename);
-    const tempPath = this.getTempPath(modelFilename);
 
-    if (await ReactNativeFS.exists(tempPath)) {
-      await ReactNativeFS.unlink(tempPath);
+    const localPath = this.getLocalPath(modelFilename);
+
+    // Update callbacks
+    this.downloadCallbacks[modelFilename] = { onProgress, onComplete, onError };
+
+    // If an existing task is already running, just update callbacks and return
+    if (this.activeDownloadTasks[modelFilename]) {
+       console.log("Re-subscribed to active task for", modelFilename);
+       const task = this.activeDownloadTasks[modelFilename];
+       const taskAny = task as any;
+       if (task.state === 'PAUSED' && onProgress) onProgress(taskAny.bytesTotal > 0 ? (taskAny.bytesDownloaded / taskAny.bytesTotal) * 100 : 0);
+       return;
     }
+
+    // Attempt to re-attach to existing task first
+    const existingTasks = await RNBackgroundDownloader.checkForExistingDownloads();
+    let task = existingTasks.find((t: DownloadTask) => t.id === modelFilename);
+
+    if (!task) {
+        if (await ReactNativeFS.exists(localPath)) {
+            await ReactNativeFS.unlink(localPath);
+        }
+
+        // Track the URL so we can resume later with Range header
+        this.pausedDownloads[modelFilename] = { url: downloadUrl, bytesDownloaded: 0, bytesTotal: 0 };
+
+        task = RNBackgroundDownloader.download({
+            id: modelFilename,
+            url: downloadUrl,
+            destination: localPath,
+        });
+    } else {
+        console.log(`Re-attached to existing task: ${modelFilename}`);
+    }
+
+    this.activeDownloadTasks[modelFilename] = task;
+
+    task.begin((event: any) => {
+        console.log(`Going to download ${event?.expectedBytes || 0} bytes!`);
+    })
+    .progress((event: any) => {
+        const bd = event?.bytesDownloaded || 0;
+        const bt = event?.bytesTotal || 0;
+        let currentProgress = bt > 0 ? (bd / bt) * 100 : 0;
+        const cb = this.downloadCallbacks[modelFilename];
+        if (cb?.onProgress) cb.onProgress(currentProgress || 0);
+    })
+    .done(() => {
+        console.log('Download is done!');
+        delete this.activeDownloadTasks[modelFilename];
+        const cb = this.downloadCallbacks[modelFilename];
+        delete this.downloadCallbacks[modelFilename];
+        if (cb?.onComplete) cb.onComplete();
+    })
+    .error((errorObj: any) => {
+        console.error('Download canceled/failed due to error: ', errorObj?.error);
+        delete this.activeDownloadTasks[modelFilename];
+        const cb = this.downloadCallbacks[modelFilename];
+        delete this.downloadCallbacks[modelFilename];
+        if (cb?.onError) cb.onError(errorObj?.error || "Unknown error");
+    });
+  }
+
+  pauseDownload(modelFilename: string) {
+    const task = this.activeDownloadTasks[modelFilename];
+    if (!task) return;
+
+    const taskAny = task as any;
+    const bytesDownloaded = taskAny.bytesDownloaded || 0;
+    const bytesTotal = taskAny.bytesTotal || 0;
+
+    // Store pause state before stopping. We need the URL to restart later.
+    // We saved the URL from the original download call in pausedDownloads.
+    if (!this.pausedDownloads[modelFilename]) {
+      // URL not stored yet; we can't resume — just stop cleanly
+      console.warn('[LlamaService] pauseDownload: URL not tracked, canceling instead.');
+      task.stop();
+      delete this.activeDownloadTasks[modelFilename];
+      return;
+    }
+
+    // Update bytes downloaded
+    this.pausedDownloads[modelFilename].bytesDownloaded = bytesDownloaded;
+    this.pausedDownloads[modelFilename].bytesTotal = bytesTotal;
+
+    // Stop the native task (DownloadManager doesn't support pause)
+    task.stop();
+    delete this.activeDownloadTasks[modelFilename];
+
+    console.log(`[LlamaService] Paused ${modelFilename} at ${bytesDownloaded} bytes`);
+
+    // Notify UI of current paused progress
+    const cb = this.downloadCallbacks[modelFilename];
+    const pct = bytesTotal > 0 ? (bytesDownloaded / bytesTotal) * 100 : 0;
+    if (cb?.onProgress) cb.onProgress(pct);
+  }
+
+  async resumeDownload(modelFilename: string) {
+    const paused = this.pausedDownloads[modelFilename];
+    if (!paused) {
+      console.warn('[LlamaService] resumeDownload: no paused state found for', modelFilename);
+      return;
+    }
+
+    if (this.activeDownloadTasks[modelFilename]) {
+      console.log('[LlamaService] Already downloading', modelFilename);
+      return;
+    }
+
+    const localPath = this.getLocalPath(modelFilename);
+    const { url } = paused;
+
+    // Android DownloadManager deletes temp files when a task is stopped,
+    // so there are no partial bytes to resume from. We restart from scratch.
+    console.log(`[LlamaService] Resuming ${modelFilename} — restarting fresh download`);
+
+    // Clean up any partial file at destination
     if (await ReactNativeFS.exists(localPath)) {
       await ReactNativeFS.unlink(localPath);
     }
 
-    const options: ReactNativeFS.DownloadFileOptions = {
-      fromUrl: downloadUrl,
-      toFile: tempPath,
-      progress: (res) => {
-        const percentage = (res.bytesWritten / res.contentLength) * 100;
-        if (onProgress) onProgress(percentage);
-      },
-      progressDivider: 1,
-    };
+    const task = RNBackgroundDownloader.download({
+      id: modelFilename,
+      url,
+      destination: localPath,
+    });
 
-    try {
-      const result = await ReactNativeFS.downloadFile(options).promise;
-      if (result.statusCode !== 200) {
-        throw new Error(`Download failed with status ${result.statusCode}`);
-      }
+    this.activeDownloadTasks[modelFilename] = task;
 
-      await ReactNativeFS.moveFile(tempPath, localPath);
-      console.log(`${modelFilename} download and verification complete.`);
-      return localPath;
-    } catch (err) {
-      console.error(`${modelFilename} download failed:`, err);
-      if (await ReactNativeFS.exists(tempPath)) {
-        await ReactNativeFS.unlink(tempPath).catch(() => { });
-      }
-      throw err;
+    task.begin((event: any) => {
+      console.log(`[LlamaService] Restarted download, expectedBytes: ${event?.expectedBytes}`);
+    })
+    .progress((event: any) => {
+      const bd = event?.bytesDownloaded || 0;
+      const bt = event?.bytesTotal || 0;
+      const pct = bt > 0 ? (bd / bt) * 100 : 0;
+      const cb = this.downloadCallbacks[modelFilename];
+      if (cb?.onProgress) cb.onProgress(pct);
+    })
+    .done(() => {
+      console.log('[LlamaService] Restarted download done:', modelFilename);
+      delete this.activeDownloadTasks[modelFilename];
+      delete this.pausedDownloads[modelFilename];
+      const cb = this.downloadCallbacks[modelFilename];
+      delete this.downloadCallbacks[modelFilename];
+      if (cb?.onComplete) cb.onComplete();
+    })
+    .error((errorObj: any) => {
+      console.error('[LlamaService] Restarted download error:', errorObj?.error);
+      delete this.activeDownloadTasks[modelFilename];
+      const cb = this.downloadCallbacks[modelFilename];
+      delete this.downloadCallbacks[modelFilename];
+      if (cb?.onError) cb.onError(errorObj?.error || 'Unknown error');
+    });
+  }
+
+  cancelDownload(modelFilename: string) {
+    const task = this.activeDownloadTasks[modelFilename];
+    if (task) {
+      task.stop();
+      delete this.activeDownloadTasks[modelFilename];
+      delete this.downloadCallbacks[modelFilename];
     }
   }
+
+  /** Re-subscribe a UI component to an already-running download. */
+  subscribeToDownload(
+    modelFilename: string,
+    onProgress?: ProgressCallback,
+    onComplete?: () => void,
+    onError?: (err: any) => void
+  ): boolean {
+    if (!this.activeDownloadTasks[modelFilename]) return false;
+    this.downloadCallbacks[modelFilename] = { onProgress, onComplete, onError };
+    const task = this.activeDownloadTasks[modelFilename];
+    // Emit current progress immediately so UI populates
+    const taskAny = task as any;
+    const current = taskAny.bytesTotal > 0 ? (taskAny.bytesDownloaded / taskAny.bytesTotal) * 100 : 0;
+    if (onProgress) onProgress(current);
+    return true;
+  }
+
+  /** Returns list of filenames currently being downloaded. */
+  getActiveDownloadIds(): string[] {
+    return Object.keys(this.activeDownloadTasks);
+  }
+
+  /** Remove UI callbacks (doesn't stop the download). */
+  unsubscribeFromDownload(modelFilename: string) {
+    delete this.downloadCallbacks[modelFilename];
+  }
+
 
   async loadModel(modelFilename: string, isEmbedding: boolean = false) {
     if (this.context && this.currentLoadedModel === modelFilename) {

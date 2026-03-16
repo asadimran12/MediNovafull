@@ -377,6 +377,13 @@ export default function App() {
       setCurrentView("model_setup");
     } else {
       if (!profile.isSet) {
+        // Close sidebar before showing profile setup
+        setIsSidebarOpen(false);
+        Animated.timing(sidebarAnim, {
+          toValue: -SIDEBAR_WIDTH,
+          duration: 0,
+          useNativeDriver: true,
+        }).start();
         setCurrentView("profile");
       } else {
         setCurrentView("dashboard");
@@ -412,7 +419,7 @@ export default function App() {
   };
 
   const handleCloseProfile = () => {
-    setCurrentView("chat");
+    setCurrentView("dashboard");
   };
 
   const renderCurrentView = () => {
@@ -432,7 +439,7 @@ export default function App() {
       case "about":
         return <AboutScreen />;
       case "settings":
-        return <SettingsScreen onClearAll={handleClearAll} onManageModels={() => setCurrentView("model_manager")} onBack={() => setCurrentView("dashboard")} />;
+        return <SettingsScreen onClearAll={handleClearAll} onManageModels={() => setCurrentView("model_manager")} onBack={() => setCurrentView("dashboard")} onLogout={handleLogout} />;
       case "profile":
         return <ProfileScreen onSave={handleSaveProfile} onClose={handleCloseProfile} />;
       case "model_setup":
@@ -496,7 +503,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        {currentUser && currentView !== "model_setup" && currentView !== "dashboard" && currentView !== "settings" && (
+        {currentUser && currentView !== "model_setup" && currentView !== "dashboard" && currentView !== "settings" && currentView !== "profile" && (
           <>
             <Sidebar
               isOpen={isSidebarOpen}

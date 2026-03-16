@@ -26,6 +26,8 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
   const [progress, setProgress] = useState<number>(0);
   const [guideVisible, setGuideVisible] = useState(false);
 
+  const [isPaused, setIsPaused] = useState(false);
+
   useEffect(() => {
     loadModels();
   }, []);
@@ -39,18 +41,49 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
   const handleDownload = async (model: AIModel) => {
     setDownloadingId(model.id);
     setProgress(0);
+    setIsPaused(false);
     try {
-      await LlamaService.downloadModel(model.filename, model.downloadUrl, (p) => {
-        setProgress(p);
-      });
-      await ModelService.setActiveModel(model.id);
-      Alert.alert("Success", `${model.name} downloaded and set as active.`);
-      onComplete();
+      await LlamaService.downloadModel(
+        model.filename, 
+        model.downloadUrl, 
+        (p) => {
+          setProgress(p);
+        },
+        async () => {
+          await ModelService.setActiveModel(model.id);
+          setDownloadingId(null);
+          setIsPaused(false);
+          Alert.alert("Success", `${model.name} downloaded and set as active.`);
+          onComplete();
+        },
+        (err) => {
+          setDownloadingId(null);
+          setIsPaused(false);
+          Alert.alert("Error", "Download failed or canceled.");
+        }
+      );
     } catch (err) {
-      Alert.alert("Error", "Download failed. Please check your connection.");
-    } finally {
       setDownloadingId(null);
+      setIsPaused(false);
+      Alert.alert("Error", "Download failed. Please check your connection.");
     }
+  };
+
+  const handlePause = (model: AIModel) => {
+    LlamaService.pauseDownload(model.filename);
+    setIsPaused(true);
+  };
+
+  const handleResume = (model: AIModel) => {
+    LlamaService.resumeDownload(model.filename);
+    setIsPaused(false);
+  };
+
+  const handleCancelDownload = (model: AIModel) => {
+    LlamaService.cancelDownload(model.filename);
+    setDownloadingId(null);
+    setProgress(0);
+    setIsPaused(false);
   };
 
   const renderModel = ({ item }: { item: AIModel }) => (
@@ -63,8 +96,23 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
       
       {downloadingId === item.id ? (
         <View style={styles.progressContainer}>
-          <View style={[styles.progressBar, { width: `${progress}%` }]} />
-          <Text style={styles.progressText}>{Math.round(progress)}%</Text>
+          <Text style={styles.progressText}>
+            {isPaused ? `Paused at ${Math.round(progress || 0)}%` : `Downloading ${Math.round(progress || 0)}%`}
+          </Text>
+          <View style={styles.progressActions}>
+             {isPaused ? (
+               <TouchableOpacity style={[styles.controlBtn]} onPress={() => handleResume(item)}>
+                  <Text style={styles.controlBtnText}>Resume</Text>
+               </TouchableOpacity>
+             ) : (
+               <TouchableOpacity style={[styles.controlBtn]} onPress={() => handlePause(item)}>
+                  <Text style={styles.controlBtnText}>Pause</Text>
+               </TouchableOpacity>
+             )}
+             <TouchableOpacity style={[styles.controlBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
+                <Text style={[styles.controlBtnText, styles.dangerText]}>Cancel</Text>
+             </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <TouchableOpacity 
@@ -339,4 +387,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   gotItBtnText: { color: "#FFF", fontWeight: "bold", fontSize: 16 },
+  progressActions: { flexDirection: "row", justifyContent: "space-between", gap: SPACING.xs, marginTop: SPACING.sm },
+  controlBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.textMuted, alignItems: "center" },
+  controlBtnText: { color: COLORS.textMain, fontSize: 12, fontWeight: "600" },
+  dangerBorder: { borderColor: COLORS.danger },
+  dangerText: { color: COLORS.danger }
 });
