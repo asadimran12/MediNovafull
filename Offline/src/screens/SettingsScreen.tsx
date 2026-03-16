@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, View, Text, TouchableOpacity, Alert } from "react-native";
 import { COLORS, SPACING } from "../constants/theme";
+import storageService from "../services/StorageService";
 
 interface SettingsScreenProps {
   onClearAll: () => void;
@@ -8,7 +9,58 @@ interface SettingsScreenProps {
   onBack?: () => void;
 }
 
+
+
+
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onManageModels, onBack }) => {
+
+  const handleExportOnCloud = () => {
+    Alert.alert(
+      "Export on Cloud",
+      "Export on Cloud pressed"
+    );
+  };
+
+  const handleExportLocally = async () => {
+    try {
+      const exportPath = await storageService.exportAllDataLocally();
+      Alert.alert(
+        "Export Successful",
+        `All your data (chats, plans, profile, and login credentials) has been exported to:\n\n${exportPath}`
+      );
+    } catch (error) {
+      console.error("Export failed", error);
+      Alert.alert("Export Failed", "Failed to export data locally. Please try again.");
+    }
+  };
+
+
+
+  const handleExportData = () => {
+    Alert.alert(
+      "Export Data",
+      "Choose an export method",
+      [
+
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+
+        {
+          text: "Export on Cloud",
+          onPress: handleExportOnCloud,
+        },
+
+        {
+          text: "Export Locally",
+          onPress: handleExportLocally,
+        },
+      ]
+    );
+  };
+
+
   return (
     <View style={styles.sectionView}>
       {onBack && (
@@ -17,7 +69,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onMa
         </TouchableOpacity>
       )}
       <Text style={styles.sectionTitle}>Settings</Text>
-      
+
       <View style={styles.settingItem}>
         <Text style={styles.settingLabel}>AI Models</Text>
         <TouchableOpacity onPress={onManageModels}>
@@ -28,12 +80,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onMa
       <View style={styles.settingItem}>
         <Text style={styles.settingLabel}>Export Data</Text>
         <TouchableOpacity
-          onPress={() =>
-            Alert.alert(
-              "Coming Soon",
-              "Backup and export will be available in future updates."
-            )
-          }
+          onPress={handleExportData}
         >
           <Text style={styles.settingAction}>Manage</Text>
         </TouchableOpacity>

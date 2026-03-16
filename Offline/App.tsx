@@ -37,6 +37,7 @@ import { AboutScreen } from "./src/screens/AboutScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { AuthScreen } from "./src/screens/AuthScreen";
+import ImportData from "./src/screens/ImporData";
 import { ExercisePlansScreen } from "./src/screens/ExercisePlan";
 import { ModelSelectionScreen } from "./src/screens/ModelSelectionScreen";
 import { ModelManagerScreen } from "./src/screens/ModelManagerScreen";
@@ -49,6 +50,7 @@ type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" 
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
+  const [hasSkippedImport, setHasSkippedImport] = useState(false);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [plans, setPlans] = useState<HealthPlan[]>([]);
@@ -440,12 +442,12 @@ export default function App() {
       case "report_analysis":
         return <ReportAnalysisScreen onBack={() => setCurrentView("dashboard")} onNavigateToUpload={() => setCurrentView("image_uploader")} onNavigateToChat={() => setCurrentView("chat_page")} />;
       case "image_uploader":
-        return <ImageUploader 
-            onNavigate={(report) => {
-                setScannedReport(report);
-                setCurrentView("chat_page");
-            }} 
-            onBack={() => setCurrentView("report_analysis")} 
+        return <ImageUploader
+          onNavigate={(report) => {
+            setScannedReport(report);
+            setCurrentView("chat_page");
+          }}
+          onBack={() => setCurrentView("report_analysis")}
         />;
       case "chat_page":
         return <ChatPage onBack={() => setCurrentView("report_analysis")} reportData={scannedReport} />;
@@ -540,7 +542,26 @@ export default function App() {
         )}
         <View style={{ flex: 1 }}>
           {!currentUser ? (
-            <AuthScreen onLogin={handleLogin} />
+            !hasSkippedImport ? (
+              <ImportData 
+                onSkip={() => setHasSkippedImport(true)} 
+                onImportSuccess={async () => {
+                  // Re-check auth since import might have added a session
+                  const userId = await AuthService.getCurrentUserId();
+                  if (userId) {
+                    const users = await AuthService.getAllUsers();
+                    const user = users.find(u => u.id === userId);
+                    if (user) {
+                      await handleLogin(user);
+                      return;
+                    }
+                  }
+                  setHasSkippedImport(true); // Fallback to login
+                }} 
+              />
+            ) : (
+              <AuthScreen onLogin={handleLogin} />
+            )
           ) : (
             renderCurrentView()
           )}

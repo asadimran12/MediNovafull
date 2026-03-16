@@ -62,6 +62,82 @@ class StorageService {
     await ReactNativeFS.writeFile(`${this.chatsDir}/${chat.id}.json`, JSON.stringify(chat), "utf8");
   }
 
+  async exportAllDataLocally(): Promise<string> {
+    await this.init();
+
+    // Gather all data
+    const exportData: any = {
+      timestamp: new Date().toISOString(),
+      profile: await this.getProfile(),
+      chats: await this.getAllChats(),
+      plans: await this.getPlans(),
+      auth: {}
+    };
+
+    // Gather Auth Data (Users & Sessions)
+    const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
+    try {
+      if (await ReactNativeFS.exists(`${authDir}/users.json`)) {
+        exportData.auth.users = JSON.parse(await ReactNativeFS.readFile(`${authDir}/users.json`, "utf8"));
+      }
+      if (await ReactNativeFS.exists(`${authDir}/session.json`)) {
+        exportData.auth.session = JSON.parse(await ReactNativeFS.readFile(`${authDir}/session.json`, "utf8"));
+      }
+    } catch (e) {
+      console.error("Failed to read auth data for export", e);
+    }
+
+    // Determine export path (try Download directory first, fallback to Document directory)
+    const exportDir = ReactNativeFS.DownloadDirectoryPath || ReactNativeFS.DocumentDirectoryPath;
+    const exportPath = `${exportDir}/MediNova_Export_${Date.now()}.json`;
+
+    await ReactNativeFS.writeFile(exportPath, JSON.stringify(exportData, null, 2), "utf8");
+    return exportPath;
+  }
+
+
+
+  async importAllDataLocally(filePath: string) {
+    try {
+      const content = await ReactNativeFS.readFile(filePath, "utf8");
+      const data = JSON.parse(content);
+
+      await this.init();
+
+
+      if (data.profile) {
+        await this.saveProfile(data.profile);
+      }
+
+      if (data.chats) {
+        for (const chat of data.chats) {
+          await this.saveChat(chat);
+        }
+      }
+
+      if (data.plans) {
+        for (const plan of data.plans) {
+          await this.savePlan(plan);
+        }
+      }
+
+      const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
+      if (!(await ReactNativeFS.exists(authDir))) {
+        await ReactNativeFS.mkdir(authDir);
+      }
+      if (data.auth?.users) {
+        await ReactNativeFS.writeFile(`${authDir}/users.json`, JSON.stringify(data.auth.users), "utf8");
+      }
+      if (data.auth?.session) {
+        await ReactNativeFS.writeFile(`${authDir}/session.json`, JSON.stringify(data.auth.session), "utf8");
+      }
+      return true;
+    } catch (e) {
+      console.error("Failed to import data", e);
+      return false;
+    }
+  }
+
   async loadChat(id: string): Promise<ChatSession | null> {
     const path = `${this.chatsDir}/${id}.json`;
     if (!(await ReactNativeFS.exists(path))) return null;
