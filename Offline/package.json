@@ -19,7 +19,8 @@
     "react-native-fs": "^2.20.0",
     "react-native-gifted-chat": "^3.2.3",
     "react-native-image-picker": "^8.2.1",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-safe-area-context": "^5.5.2",
+    "@kesha-antonov/react-native-background-downloader": "^3.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

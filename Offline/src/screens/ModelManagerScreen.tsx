@@ -23,9 +23,50 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
 
+  const [isPaused, setIsPaused] = useState(false);
+
   useEffect(() => {
     loadStatus();
+    reAttachActiveDownloads();
+
+    return () => {
+      // Unsubscribe UI callbacks when leaving the screen — download itself keeps running
+      const activeIds = LlamaService.getActiveDownloadIds();
+      activeIds.forEach(id => LlamaService.unsubscribeFromDownload(id));
+    };
   }, []);
+
+  const reAttachActiveDownloads = () => {
+    const activeIds = LlamaService.getActiveDownloadIds();
+    if (activeIds.length > 0) {
+      const filename = activeIds[0]; // Re-attach to first active download
+      setDownloadingId(null); // will be set from ModelService id below
+
+      // Map filename back to model ID
+      ModelService.getAvailableModels().then(models => {
+        const model = models.find(m => m.filename === filename);
+        if (!model) return;
+
+        setDownloadingId(model.id);
+        setIsPaused(false);
+
+        LlamaService.subscribeToDownload(
+          filename,
+          (p) => setProgress(p),
+          async () => {
+            await loadStatus();
+            setDownloadingId(null);
+            setIsPaused(false);
+            Alert.alert("Success", `${model.name} downloaded successfully.`);
+          },
+          () => {
+            setDownloadingId(null);
+            setIsPaused(false);
+          }
+        );
+      });
+    }
+  };
 
   const loadStatus = async () => {
     setLoading(true);
@@ -45,17 +86,48 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   const handleDownload = async (model: AIModel) => {
     setDownloadingId(model.id);
     setProgress(0);
+    setIsPaused(false);
     try {
-      await LlamaService.downloadModel(model.filename, model.downloadUrl, (p) => {
-        setProgress(p);
-      });
-      await loadStatus();
-      Alert.alert("Success", `${model.name} downloaded successfully.`);
+      await LlamaService.downloadModel(
+        model.filename, 
+        model.downloadUrl, 
+        (p) => {
+          setProgress(p);
+        },
+        async () => {
+          await loadStatus();
+          setDownloadingId(null);
+          setIsPaused(false);
+          Alert.alert("Success", `${model.name} downloaded successfully.`);
+        },
+        (err) => {
+          setDownloadingId(null);
+          setIsPaused(false);
+          Alert.alert("Error", "Download failed or canceled.");
+        }
+      );
     } catch (err) {
-      Alert.alert("Error", "Download failed.");
-    } finally {
       setDownloadingId(null);
+      setIsPaused(false);
+      Alert.alert("Error", "Download failed.");
     }
+  };
+
+  const handlePause = (model: AIModel) => {
+    LlamaService.pauseDownload(model.filename);
+    setIsPaused(true);
+  };
+
+  const handleResume = (model: AIModel) => {
+    LlamaService.resumeDownload(model.filename);
+    setIsPaused(false);
+  };
+
+  const handleCancelDownload = (model: AIModel) => {
+    LlamaService.cancelDownload(model.filename);
+    setDownloadingId(null);
+    setProgress(0);
+    setIsPaused(false);
   };
 
   const handleDelete = async (model: AIModel) => {
@@ -106,17 +178,37 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
 
       <View style={styles.actions}>
         {!item.isDownloaded ? (
-          <TouchableOpacity 
-            style={[styles.btn, styles.primaryBtn, downloadingId && styles.disabledBtn]} 
-            onPress={() => handleDownload(item)}
-            disabled={!!downloadingId}
-          >
+          <>
             {downloadingId === item.id ? (
-              <Text style={styles.btnText}>Downloading {Math.round(progress)}%</Text>
+              <View style={styles.downloadProgressContainer}>
+                <Text style={styles.progressText}>
+                  {isPaused ? `Paused at ${Math.round(progress || 0)}%` : `Downloading ${Math.round(progress || 0)}%`}
+                </Text>
+                <View style={styles.progressActions}>
+                   {isPaused ? (
+                     <TouchableOpacity style={[styles.controlBtn]} onPress={() => handleResume(item)}>
+                        <Text style={styles.controlBtnText}>Resume</Text>
+                     </TouchableOpacity>
+                   ) : (
+                     <TouchableOpacity style={[styles.controlBtn]} onPress={() => handlePause(item)}>
+                        <Text style={styles.controlBtnText}>Pause</Text>
+                     </TouchableOpacity>
+                   )}
+                   <TouchableOpacity style={[styles.controlBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
+                      <Text style={[styles.controlBtnText, styles.dangerText]}>Cancel</Text>
+                   </TouchableOpacity>
+                </View>
+              </View>
             ) : (
-              <Text style={styles.btnText}>Download</Text>
+              <TouchableOpacity 
+                style={[styles.btn, styles.primaryBtn]} 
+                onPress={() => handleDownload(item)}
+                disabled={!!downloadingId}
+              >
+                <Text style={styles.btnText}>Download</Text>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </>
         ) : (
           <>
             {!item.isActive && (
@@ -212,4 +304,11 @@ const styles = StyleSheet.create({
   btnText: { color: "#FFF", fontWeight: "700" },
   secondaryBtnText: { color: COLORS.primary, fontWeight: "700" },
   dangerBtnText: { color: COLORS.danger, fontWeight: "700" },
+  downloadProgressContainer: { flex: 1, backgroundColor: COLORS.surface, borderRadius: RADIUS.md, padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.border },
+  progressText: { fontSize: 13, fontWeight: "600", color: COLORS.primary, marginBottom: SPACING.sm, textAlign: "center" },
+  progressActions: { flexDirection: "row", justifyContent: "space-between", gap: SPACING.xs },
+  controlBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.textMuted, alignItems: "center" },
+  controlBtnText: { color: COLORS.textMain, fontSize: 12, fontWeight: "600" },
+  dangerBorder: { borderColor: COLORS.danger },
+  dangerText: { color: COLORS.danger }
 });
