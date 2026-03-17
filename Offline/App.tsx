@@ -46,7 +46,9 @@ import { ReportAnalysisScreen } from "./src/screens/ReportAnalysisScreen";
 import ImageUploader from "./src/screens/ImageUploader";
 import ModelService from "./src/services/ModelService";
 import ChatPage from "./src/screens/ChatPage";
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page";
+import { ForgetPassword } from "./src/screens/ForgetPassword";
+
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
@@ -458,6 +460,8 @@ export default function App() {
         />;
       case "chat_page":
         return <ChatPage onBack={() => setCurrentView("report_analysis")} reportData={scannedReport} />;
+      case "forget_password":
+        return <ForgetPassword onBack={() => setCurrentView("chat")} />;
       default:
         return (
           <View style={{ flex: 1 }}>
@@ -550,8 +554,8 @@ export default function App() {
         <View style={{ flex: 1 }}>
           {!currentUser ? (
             !hasSkippedImport ? (
-              <ImportData 
-                onSkip={() => setHasSkippedImport(true)} 
+              <ImportData
+                onSkip={() => setHasSkippedImport(true)}
                 onImportSuccess={async () => {
                   // Re-check auth since import might have added a session
                   const userId = await AuthService.getCurrentUserId();
@@ -564,10 +568,12 @@ export default function App() {
                     }
                   }
                   setHasSkippedImport(true); // Fallback to login
-                }} 
+                }}
               />
+            ) : currentView === "forget_password" ? (
+              <ForgetPassword onBack={() => setCurrentView("chat")} />
             ) : (
-              <AuthScreen onLogin={handleLogin} />
+              <AuthScreen onLogin={handleLogin} onForgetPassword={() => setCurrentView("forget_password")} />
             )
           ) : (
             renderCurrentView()

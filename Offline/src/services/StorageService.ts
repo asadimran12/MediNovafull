@@ -28,6 +28,8 @@ export interface UserProfile {
   gender?: "Male" | "Female" | "Other" | "";
   conditions?: string;
   severity?: "Low" | "Medium" | "High" | "";
+  forgetPasswordQuestion?: string;
+  forgetPasswordAnswer?: string;
   isSet: boolean;
 }
 
@@ -92,6 +94,7 @@ class StorageService {
     const exportPath = `${exportDir}/MediNova_Export_${Date.now()}.json`;
 
     await ReactNativeFS.writeFile(exportPath, JSON.stringify(exportData, null, 2), "utf8");
+    console.log(`Exported ${exportData.chats.length} chats, ${exportData.plans.length} plans to: ${exportPath}`);
     return exportPath;
   }
 
@@ -101,6 +104,7 @@ class StorageService {
     try {
       const content = await ReactNativeFS.readFile(filePath, "utf8");
       const data = JSON.parse(content);
+      console.log("Importing data:", data);
 
       await this.init();
 

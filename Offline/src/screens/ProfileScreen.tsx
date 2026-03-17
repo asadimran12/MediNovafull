@@ -27,6 +27,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
   const [conditions, setConditions] = useState("");
   const [severity, setSeverity] = useState<UserProfile["severity"]>("");
   const [isSet, setIsSet] = useState(false);
+  const [forgetPasswordQuestion, setForgetPasswordQuestion] = useState("");
+  const [forgetPasswordAnswer, setForgetPasswordAnswer] = useState("");
 
   useEffect(() => {
     loadProfile();
@@ -39,6 +41,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
       setGender(profile.gender || "");
       setConditions(profile.conditions || "");
       setSeverity(profile.severity || "");
+      setForgetPasswordAnswer(profile.forgetPasswordAnswer || "");
+      setForgetPasswordQuestion(profile.forgetPasswordQuestion || "");
       setIsSet(true);
     } else {
       setIsSet(false);
@@ -51,6 +55,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
       gender,
       conditions,
       severity,
+      forgetPasswordQuestion,
+      forgetPasswordAnswer,
       isSet: true,
     };
     await StorageService.saveProfile(profile);
@@ -164,6 +170,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
               ))}
             </View>
           </View>
+
+          <View style={styles.securityContainer}>
+            <Text style={styles.sectionTitle}>🔐 Security Question</Text>
+            <Text style={styles.sectionSubtitle}>
+              This will help you recover your account if you forget your password.
+            </Text>
+
+            {/* Question Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Security Question</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. What is your pet's name?"
+                placeholderTextColor={COLORS.textSub}
+                value={forgetPasswordQuestion}
+                onChangeText={setForgetPasswordQuestion}
+              />
+            </View>
+
+            {/* Answer Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Answer</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your answer"
+                placeholderTextColor={COLORS.textSub}
+                value={forgetPasswordAnswer}
+                onChangeText={setForgetPasswordAnswer}
+              />
+
+            </View>
+          </View>
         </View>
 
         <View style={styles.footer}>
@@ -185,6 +223,52 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
 };
 
 const styles = StyleSheet.create({
+
+  securityContainer: {
+    marginTop: SPACING.lg,
+    padding: SPACING.md,
+    backgroundColor: "#F8FAFC",
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.textHeader,
+    marginBottom: 4,
+  },
+
+  sectionSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSub,
+    marginBottom: SPACING.md,
+  },
+
+  inputGroup: {
+    marginBottom: SPACING.md,
+  },
+
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textMain,
+    marginBottom: 4,
+  },
+
+  input: {
+    backgroundColor: "#FFF",
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    fontSize: 15,
+    color: COLORS.textMain,
+  },
+
+
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -209,24 +293,6 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: SPACING.lg,
-  },
-  inputGroup: {
-    gap: SPACING.xs,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textMain,
-    marginLeft: 4,
-  },
-  input: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    color: COLORS.textMain,
-    fontSize: 16,
-    ...SHADOWS.light,
   },
   textArea: {
     minHeight: 100,

@@ -34,7 +34,7 @@ class AuthService {
   async register(username: string, passwordHash: string): Promise<UserAccount | null> {
     const users = await this.getAllUsers();
     if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-        return null; // User already exists
+      return null; // User already exists
     }
 
     const newUser: UserAccount = {
@@ -52,7 +52,7 @@ class AuthService {
   async login(username: string, passwordHash: string): Promise<UserAccount | null> {
     const users = await this.getAllUsers();
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.passwordHash === passwordHash);
-    
+
     if (user) {
       await this.saveSession(user.id);
       return user;
@@ -82,6 +82,15 @@ class AuthService {
     if (exists) {
       await ReactNativeFS.unlink(this.SESSION_FILE);
     }
+  }
+
+  async updatePassword(username: string, newPasswordHash: string): Promise<boolean> {
+    const users = await this.getAllUsers();
+    const index = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
+    if (index === -1) return false;
+    users[index].passwordHash = newPasswordHash;
+    await ReactNativeFS.writeFile(this.USERS_FILE, JSON.stringify(users), "utf8");
+    return true;
   }
 }
 

@@ -16,9 +16,10 @@ import AuthService, { UserAccount } from "../services/AuthService";
 
 interface AuthScreenProps {
   onLogin: (user: UserAccount) => void;
+  onForgetPassword: () => void;
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPassword }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -121,16 +122,29 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.toggleButton}
-              onPress={() => setIsRegistering(!isRegistering)}
-            >
-              <Text style={styles.toggleText}>
-                {isRegistering
-                  ? "Already have an account? Login"
-                  : "Don't have an account? Sign Up"}
-              </Text>
-            </TouchableOpacity>
+            <View style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+            }}>
+              <TouchableOpacity
+                style={styles.toggleButton}
+                onPress={() => setIsRegistering(!isRegistering)}
+              >
+                <Text style={styles.toggleText}>
+                  {isRegistering
+                    ? "Already have an account? Login"
+                    : "Don't have an account? Sign Up"}
+                </Text>
+              </TouchableOpacity>
+
+
+              <TouchableOpacity onPress={onForgetPassword} >
+                <Text style={styles.toggleText}>Forgot Password?</Text>
+              </TouchableOpacity>
+
+
+            </View>
           </View>
         </View>
 
