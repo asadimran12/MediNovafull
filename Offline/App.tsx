@@ -25,7 +25,7 @@ import StorageService, {
 import AuthService, { UserAccount } from "./src/services/AuthService";
 
 // Constant & Components
-import { COLORS, SIDEBAR_WIDTH, SPACING } from "./src/constants/theme";
+import { COLORS, SIDEBAR_WIDTH, SPACING, RADIUS, SHADOWS } from "./src/constants/theme";
 import { Sidebar } from "./src/components/Sidebar";
 import { ChatBubble } from "./src/components/ChatBubble";
 import { ChatInput } from "./src/components/ChatInput";
@@ -48,7 +48,7 @@ import ModelService from "./src/services/ModelService";
 import ChatPage from "./src/screens/ChatPage";
 import { ForgetPassword } from "./src/screens/ForgetPassword";
 
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
@@ -67,6 +67,8 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [scannedReport, setScannedReport] = useState<any>(null);
+  const [scannedImage, setScannedImage] = useState<string | null>(null);
+  const [uploadMode, setUploadMode] = useState<'gallery' | 'pdf' | 'camera' | undefined>();
 
   const MAX_MESSAGES = 40;
   const isChatFull = messages.length >= MAX_MESSAGES;
@@ -110,7 +112,7 @@ export default function App() {
         }
       } else if (nextAppState.match(/inactive|background/)) {
         console.log("App backgrounded, offloading model...");
-        LlamaService.offloadModel().catch(console.error);
+        LlamaService.offloadChatModel().catch(console.error);
       }
       appState.current = nextAppState;
     });
@@ -137,7 +139,7 @@ export default function App() {
       setMessages([
         {
           id: "initial-greeting",
-          text: "Hello! I am MediNova. Ask me for a diet plan, exercise routine, or medical guidance!",
+          text: "Hello! I am MediNova. Ask me anything about diabetes, cardiovascular diseases, or other general health questions. I can also provide diet and exercise guidance!",
           role: "assistant",
           timestamp: new Date(),
         },
@@ -205,7 +207,7 @@ export default function App() {
     setMessages([
       {
         id: "initial-greeting",
-        text: "Hello! I am MediNova. Ask me for a diet plan, exercise routine, or medical guidance!",
+          text: "Hello! I am MediNova. Ask me anything about diabetes, cardiovascular diseases, or other general health questions. I can also provide diet and exercise guidance!",
         role: "assistant",
         timestamp: new Date(),
       },
@@ -441,7 +443,13 @@ export default function App() {
       case "about":
         return <AboutScreen />;
       case "settings":
-        return <SettingsScreen onClearAll={handleClearAll} onManageModels={() => setCurrentView("model_manager")} onBack={() => setCurrentView("dashboard")} onLogout={handleLogout} />;
+        return <SettingsScreen 
+          onClearAll={handleClearAll} 
+          onManageModels={() => setCurrentView("model_manager")} 
+          onManageProfile={() => setCurrentView("profile")}
+          onBack={() => setCurrentView("dashboard")} 
+          onLogout={handleLogout} 
+        />;
       case "profile":
         return <ProfileScreen onSave={handleSaveProfile} onClose={handleCloseProfile} />;
       case "model_setup":
@@ -449,19 +457,58 @@ export default function App() {
       case "model_manager":
         return <ModelManagerScreen onBack={() => setCurrentView("settings")} />;
       case "report_analysis":
-        return <ReportAnalysisScreen onBack={() => setCurrentView("dashboard")} onNavigateToUpload={() => setCurrentView("image_uploader")} onNavigateToChat={() => setCurrentView("chat_page")} />;
+        return <ReportAnalysisScreen 
+          onBack={() => setCurrentView("dashboard")} 
+          onNavigateToUpload={(mode) => {
+            setUploadMode(mode);
+            setCurrentView("image_uploader");
+          }} 
+          onNavigateToChat={() => setCurrentView("chat_page")} 
+        />;
       case "image_uploader":
         return <ImageUploader
-          onNavigate={(report) => {
+          initialMode={uploadMode}
+          onNavigate={(report, imageUri) => {
             setScannedReport(report);
+            setScannedImage(imageUri || null);
             setCurrentView("chat_page");
           }}
-          onBack={() => setCurrentView("report_analysis")}
+          onBack={() => {
+            setUploadMode(undefined);
+            setCurrentView("report_analysis");
+          }}
         />;
       case "chat_page":
-        return <ChatPage onBack={() => setCurrentView("report_analysis")} reportData={scannedReport} />;
+        return <ChatPage 
+          onBack={() => {
+            setScannedReport(null);
+            setScannedImage(null);
+            setCurrentView("report_analysis");
+          }} 
+          reportData={scannedReport} 
+          imageUri={scannedImage}
+        />;
       case "forget_password":
         return <ForgetPassword onBack={() => setCurrentView("chat")} />;
+      case "restore":
+        return (
+          <ImportData
+            onSkip={() => setCurrentView("dashboard")}
+            onImportSuccess={async () => {
+              const userId = await AuthService.getCurrentUserId();
+              if (userId) {
+                const users = await AuthService.getAllUsers();
+                const user = users.find(u => u.id === userId);
+                if (user) {
+                  await handleLogin(user);
+                  setCurrentView("dashboard");
+                  return;
+                }
+              }
+              setCurrentView("dashboard");
+            }}
+          />
+        );
       default:
         return (
           <View style={{ flex: 1 }}>
@@ -469,7 +516,10 @@ export default function App() {
               <TouchableOpacity onPress={() => setCurrentView("dashboard")} style={styles.backButton}>
                 <Text style={styles.backIcon}>←</Text>
               </TouchableOpacity>
-              <Text style={styles.chatTitle}>Health Assistant</Text>
+              <View>
+                <Text style={styles.chatTitle}>Health Assistant</Text>
+                <Text style={styles.chatSubtitle}>General Consultation & Guidance</Text>
+              </View>
             </View>
             <FlatList
               ref={flatListRef}
@@ -525,24 +575,28 @@ export default function App() {
             />
             <View style={styles.header}>
               <TouchableOpacity onPress={toggleSidebar} style={styles.menuIcon}><Text style={{ fontSize: 24 }}>☰</Text></TouchableOpacity>
-              <View style={styles.logoContainer}>
-                <View style={styles.imageContainer}>
-                  <Image
-                    source={require("../Offline/src/assets/images/splash_logo.png")}
-                    style={styles.logo}
-                    resizeMode="contain"
-                  />
-                </View>
+              {currentView !== "chat" && currentView !== "chat_page" && currentView !== "report_analysis" && currentView !== "image_uploader" && currentView !== "diet_plans" && currentView !== "exercise_plans" && currentView !== "model_manager" ? (
+                <View style={styles.logoContainer}>
+                  <View style={styles.imageContainer}>
+                    <Image
+                      source={require("../Offline/src/assets/images/splash_logo.png")}
+                      style={styles.logo}
+                      resizeMode="contain"
+                    />
+                  </View>
 
-                <Text
-                  style={[
-                    styles.statusText,
-                    { color: isReady ? COLORS.success : COLORS.warning },
-                  ]}
-                >
-                  ● {isReady ? "Ready & Private" : status}
-                </Text>
-              </View>
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: isReady ? COLORS.success : COLORS.warning },
+                    ]}
+                  >
+                    ● {isReady ? "Ready & Private" : status}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ flex: 1 }} />
+              )}
               {currentView === "chat" && (
                 <TouchableOpacity onPress={startNewChat}>
                   <Text style={{ color: COLORS.primary, fontWeight: "600" }}>New</Text>
@@ -553,27 +607,16 @@ export default function App() {
         )}
         <View style={{ flex: 1 }}>
           {!currentUser ? (
-            !hasSkippedImport ? (
-              <ImportData
-                onSkip={() => setHasSkippedImport(true)}
-                onImportSuccess={async () => {
-                  // Re-check auth since import might have added a session
-                  const userId = await AuthService.getCurrentUserId();
-                  if (userId) {
-                    const users = await AuthService.getAllUsers();
-                    const user = users.find(u => u.id === userId);
-                    if (user) {
-                      await handleLogin(user);
-                      return;
-                    }
-                  }
-                  setHasSkippedImport(true); // Fallback to login
-                }}
-              />
+            currentView === "restore" ? (
+              renderCurrentView()
             ) : currentView === "forget_password" ? (
               <ForgetPassword onBack={() => setCurrentView("chat")} />
             ) : (
-              <AuthScreen onLogin={handleLogin} onForgetPassword={() => setCurrentView("forget_password")} />
+              <AuthScreen 
+                onLogin={handleLogin} 
+                onForgetPassword={() => setCurrentView("forget_password")} 
+                onRestore={() => setCurrentView("restore")}
+              />
             )
           ) : (
             renderCurrentView()
@@ -645,7 +688,34 @@ const styles = StyleSheet.create({
   },
   chatTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "800",
     color: COLORS.textHeader,
+  },
+  chatSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSub,
+    fontWeight: "500",
+  },
+  chatInfoBanner: {
+    backgroundColor: COLORS.surface,
+    padding: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.lg,
+    marginHorizontal: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    ...SHADOWS.light,
+  },
+  chatInfoEmoji: {
+    fontSize: 24,
+    marginRight: SPACING.md,
+  },
+  chatInfoText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textMain,
+    lineHeight: 18,
   }
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Modal,
+  Alert,
 } from "react-native";
 
 import { COLORS } from "../constants/theme";
-import { HealthPlan } from "../services/StorageService";
+import storageService, { HealthPlan } from "../services/StorageService";
 import {
   StructuredDietPlan,
-  DayPlan,
   MealItem,
   generateDietPlan,
   loadLatestDietPlan,
+  sanitisePlan,
+  safeParseDietPlan,
 } from "../services/DietPlanGenerator";
 
 interface PlansScreenProps {
@@ -56,26 +59,6 @@ const MacroPill = ({
   </View>
 );
 
-/* ─── SummaryCard ──────────────────────────────────────────── */
-const SummaryCard = ({ summary }: { summary: DayPlan["summary"] }) => (
-  <View style={styles.summaryCard}>
-    <Text style={styles.summaryHeading}>Today's Total</Text>
-    <View style={styles.summaryRow}>
-      {[
-        { label: "Calories", value: summary.calories },
-        { label: "Protein", value: summary.protein },
-        { label: "Carbs", value: summary.carbs },
-        { label: "Fat", value: summary.fat },
-      ].map((item) => (
-        <View key={item.label} style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{item.value}</Text>
-          <Text style={styles.summaryLabel}>{item.label}</Text>
-        </View>
-      ))}
-    </View>
-  </View>
-);
-
 /* ─── FoodItemCard ─────────────────────────────────────────── */
 const FoodItemCard = ({ item }: { item: MealItem }) => (
   <View style={styles.foodCard}>
@@ -93,11 +76,9 @@ const FoodItemCard = ({ item }: { item: MealItem }) => (
 function normalizeMeals(meals: any[]): MealItem[][] {
   return meals.map((meal) => {
     try {
-      // Helper to forcefully extract primitives
       const extractSafeItem = (raw: any): MealItem | null => {
         if (!raw || typeof raw !== "object") return null;
         if (!raw.name && !raw.calories && !raw.protein) return null;
-
         const safeString = (val: any) => {
           if (val === undefined || val === null) return "-";
           if (typeof val === "object") {
@@ -105,7 +86,6 @@ function normalizeMeals(meals: any[]): MealItem[][] {
           }
           return String(val);
         };
-
         return {
           name: typeof raw.name === "string" ? raw.name : "Meal",
           calories: Number(raw.calories) || 0,
@@ -114,100 +94,136 @@ function normalizeMeals(meals: any[]): MealItem[][] {
           fat: safeString(raw.fat),
         };
       };
-
-      // 1. If it's already an array format -> map each safe item
       if (Array.isArray(meal.items)) {
         const mapped = meal.items.map(extractSafeItem).filter(Boolean) as MealItem[];
         if (mapped.length > 0) return mapped;
       }
-
-      // 2. Check if there's a nested items array directly on the object body
       if (Array.isArray(meal)) {
         const mapped = meal.map(extractSafeItem).filter(Boolean) as MealItem[];
         if (mapped.length > 0) return mapped;
       }
-
-      // 3. If it's a single object that holds the item metrics -> wrap and map
       const safeSingle = extractSafeItem(meal);
       if (safeSingle) return [safeSingle];
-
     } catch (e) {
       console.warn("normalizeMeals failed on item:", meal, e);
     }
-
-    // 4. Fallback empty array to prevent React from crashing on raw objects
     return [];
   });
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
 /* ─── Main Screen ──────────────────────────────────────────── */
 export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack }) => {
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const [parsedPlan, setParsedPlan] = useState<StructuredDietPlan | null>(null);
+  const [activePlan, setActivePlan] = useState<StructuredDietPlan | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<StructuredDietPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [progressDay, setProgressDay] = useState<string>("");
-  const [planNumbers, setPlanNumbers] = useState({
-    totalCalories: 0,
-    totalProtein: 0,
-    totalCarbs: 0,
-    totalFat: 0,
-  });
+  const [planNumbers, setPlanNumbers] = useState({ totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 });
+  const [savedPlans, setSavedPlans] = useState<HealthPlan[]>([]);
+  const [showManageModal, setShowManageModal] = useState(false);
 
-  /* ─── Load plan on mount ──────────────────────────────────── */
+  /* ─── Load latest plan and all saved plans on mount ─ */
+  const loadPlans = useCallback(async () => {
+    const all = await storageService.getPlans("diet");
+    setSavedPlans(all);
+    // Load the most recent plan as active
+    if (all.length > 0 && !activePlan) {
+      const latest = await loadLatestDietPlan();
+      if (latest?.days?.length) {
+        setActivePlan(latest);
+        setActivePlanId(all[0].id);
+      }
+    }
+  }, [activePlan]);
+
   useEffect(() => {
     if (type !== "diet") return;
-
-    (async () => {
-      try {
-        const latest = await loadLatestDietPlan();
-        console.log("=== LOADED LATEST PLAN ===\n", JSON.stringify(latest, null, 2));
-
-        if (latest?.days?.length) {
-          setParsedPlan(latest);
-          return;
-        }
-
-        const dietPlans = plans.filter((p) => p.type === "diet");
-        if (dietPlans.length > 0) {
-          const parsed = JSON.parse(dietPlans[0].content) as StructuredDietPlan;
-          if (parsed?.days?.length) setParsedPlan(parsed);
-        }
-      } catch (e) {
-        console.warn("⚠️ Could not load plan:", e);
-      }
-    })();
+    loadPlans();
   }, []);
 
-  /* ─── Generate new plan ───────────────────────────────────── */
+  /* ─── Generate new plan (no auto-save) ─────────────── */
   const handleGeneratePlan = async () => {
     try {
       setLoading(true);
+      setPendingPlan(null);
       setProgressDay("Starting...");
-
-      await generateDietPlan((dayName: string, index: number) => {
-        setProgressDay(`Generating ${dayName} (${index + 1}/7)...`);
-      });
-
-      const latest = await loadLatestDietPlan();
-      if (latest?.days?.length) {
-        setParsedPlan(latest);
+      const result = await generateDietPlan(
+        (dayName, index) => setProgressDay(`Generating ${dayName} (${index + 1}/7)...`),
+        { autoSave: false }
+      );
+      if (result) {
+        const sanitised = sanitisePlan(result);
+        setPendingPlan(sanitised);
         setSelectedDayIndex(0);
       }
-    } catch (err) {
-      console.error("Plan generation failed:", err);
+    } catch (err: any) {
+      Alert.alert("Generation Failed", err?.message ?? "Please try again.");
     } finally {
       setLoading(false);
       setProgressDay("");
     }
   };
 
-  const days = parsedPlan?.days ?? [];
+  /* ─── Save pending plan ─────────────────────────────── */
+  const handleSavePlan = async () => {
+    if (!pendingPlan) return;
+    const id = Date.now().toString();
+    await storageService.savePlan({
+      id,
+      type: "diet",
+      title: pendingPlan.title,
+      content: JSON.stringify(pendingPlan),
+      createdAt: new Date().toISOString(),
+    });
+    setActivePlan(pendingPlan);
+    setActivePlanId(id);
+    setPendingPlan(null);
+    await loadPlans();
+    Alert.alert("Saved!", "Your diet plan has been saved.");
+  };
+
+  /* ─── Delete a plan ─────────────────────────────────── */
+  const handleDeletePlan = (id: string) => {
+    Alert.alert("Delete Plan", "Remove this saved plan?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive",
+        onPress: async () => {
+          await storageService.deletePlan(id);
+          await loadPlans();
+        },
+      },
+    ]);
+  };
+
+  /* ─── Use a saved plan ──────────────────────────────── */
+  const handleUsePlan = (plan: HealthPlan) => {
+    const parsed = safeParseDietPlan(plan.content);
+    if (parsed) {
+      const sanitised = sanitisePlan(parsed);
+      setActivePlan(sanitised);
+      setActivePlanId(plan.id);
+      setPendingPlan(null);
+      setSelectedDayIndex(0);
+    }
+    setShowManageModal(false);
+  };
+
+  /* ─── Derived state ─────────────────────────────────── */
+  const displayPlan = pendingPlan ?? activePlan;
+  const days = displayPlan?.days ?? [];
   const currentDay = days[selectedDayIndex];
 
   useEffect(() => {
     if (currentDay) {
       const summary = currentDay.summary;
-      const parseNum = (val: any) => Number(String(val).replace(/[^\d.-]/g, '')) || 0;
+      const parseNum = (val: any) => Number(String(val).replace(/[^\d.-]/g, "")) || 0;
       setPlanNumbers({
         totalCalories: parseNum(summary.calories),
         totalProtein: parseNum(summary.protein),
@@ -219,7 +235,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 
   const normalizedMeals = currentDay ? normalizeMeals(currentDay.meals ?? []) : [];
 
-  /* ─── Exercise fallback ───────────────────────────────────── */
+  /* ─── Exercise fallback ───────────────────────────────── */
   if (type === "exercise") {
     return (
       <View style={styles.empty}>
@@ -228,21 +244,51 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
     );
   }
 
-  /* ─── Diet UI ─────────────────────────────────────────────── */
+  /* ─── Diet UI ─────────────────────────────────────────── */
   return (
     <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-      {/* Header with Back Button */}
-      {onBack && (
-        <View style={styles.headerRow}>
+
+      {/* ── Header ── */}
+      <View style={styles.headerRow}>
+        {onBack && (
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
+        )}
+        <Text style={styles.screenTitle}>Diet Plan</Text>
+        <TouchableOpacity onPress={() => setShowManageModal(true)} style={styles.manageButton}>
+          <Text style={styles.manageButtonText}>📋 Manage</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Stats Row ── */}
+      <View style={styles.statsContainer}>
+        {[
+          { label: "Calories", value: planNumbers.totalCalories },
+          { label: "Protein", value: planNumbers.totalProtein },
+          { label: "Carbs", value: planNumbers.totalCarbs },
+          { label: "Fat", value: planNumbers.totalFat },
+        ].map((item) => (
+          <View key={item.label} style={styles.statCard}>
+            <Text style={styles.statValue}>{item.value}</Text>
+            <Text style={styles.statLabel}>{item.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* ── Action Buttons ── */}
+      {pendingPlan ? (
+        /* After generation: Save or Generate Another */
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleSavePlan}>
+            <Text style={styles.actionBtnText}>💾 Save Plan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.regenBtn]} onPress={handleGeneratePlan} disabled={loading}>
+            <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>🔄 Generate Another</Text>
+          </TouchableOpacity>
         </View>
-      )}
-
-      {/* Generate Button */}
-
-      <View>
+      ) : (
+        /* Default: Generate button */
         <TouchableOpacity
           style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
           onPress={handleGeneratePlan}
@@ -258,33 +304,18 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
             <Text style={styles.generateButtonText}>✨ Generate Diet Plan</Text>
           )}
         </TouchableOpacity>
+      )}
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{planNumbers.totalCalories}</Text>
-            <Text style={styles.statLabel}>Calories</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{planNumbers.totalProtein}</Text>
-            <Text style={styles.statLabel}>Protein</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{planNumbers.totalCarbs}</Text>
-            <Text style={styles.statLabel}>Carbs</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{planNumbers.totalFat}</Text>
-            <Text style={styles.statLabel}>Fat</Text>
-          </View>
+      {/* ── Plan indicator badge ── */}
+      {pendingPlan && (
+        <View style={styles.unsavedBadge}>
+          <Text style={styles.unsavedBadgeText}>⚠️ Preview — not saved yet</Text>
         </View>
-      </View>
+      )}
 
+      {/* ── Day Tabs + Content ── */}
       {days.length > 0 ? (
         <>
-          {/* Day Tabs */}
           <View style={styles.topBar}>
             <ScrollView
               horizontal
@@ -308,24 +339,16 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
             </ScrollView>
           </View>
 
-          {/* Day Content */}
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 20, paddingBottom: 50 }}
-          >
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 50 }}>
             {normalizedMeals.map((items, mi) => {
               const title = currentDay?.meals?.[mi]?.type ?? "Meal";
-
               return (
                 <View key={mi} style={styles.mealSection}>
                   <View style={styles.mealHeader}>
                     <Text style={styles.mealIcon}>{getMealIcon(title)}</Text>
                     <Text style={styles.mealTitle}>{title}</Text>
                   </View>
-
-                  {items.map((item, ii) => (
-                    <FoodItemCard key={ii} item={item} />
-                  ))}
+                  {items.map((item, ii) => <FoodItemCard key={ii} item={item} />)}
                 </View>
               );
             })}
@@ -335,30 +358,101 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>🥗</Text>
           <Text style={styles.emptyTitle}>No Diet Plan Yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Tap "Generate Diet Plan" above to create a personalised 7-day meal plan.
-          </Text>
+          <Text style={styles.emptySubtitle}>Tap "Generate Diet Plan" above to create a personalised 7-day meal plan.</Text>
         </View>
       )}
+
+      {/* ── Manage Plans Modal ── */}
+      <Modal visible={showManageModal} transparent animationType="slide" onRequestClose={() => setShowManageModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowManageModal(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>📋 Saved Diet Plans</Text>
+            {savedPlans.length === 0 ? (
+              <Text style={styles.modalEmpty}>No saved plans yet.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 400 }}>
+                {savedPlans.map((plan) => {
+                const isActive = plan.id === activePlanId;
+                return (
+                  <View key={plan.id} style={[styles.planRow, isActive && styles.planRowActive]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.planRowTitle}>{plan.title}</Text>
+                      <Text style={styles.planRowDate}>{formatDate(plan.createdAt)}</Text>
+                      {isActive && (
+                        <View style={styles.inUseBadge}>
+                          <Text style={styles.inUseBadgeText}>● In Use</Text>
+                        </View>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.useBtn, isActive && styles.useBtnDisabled]}
+                      onPress={() => !isActive && handleUsePlan(plan)}
+                      disabled={isActive}
+                    >
+                      <Text style={styles.useBtnText}>{isActive ? "Active" : "Use"}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeletePlan(plan.id)}>
+                      <Text style={styles.deleteBtnText}>🗑</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowManageModal(false)}>
+              <Text style={styles.modalCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
 
 /* ─── Styles ───────────────────────────────────────────────── */
 const styles = StyleSheet.create({
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  backButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  backButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
+  screenTitle: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "800", color: "#1a1a2e" },
+  manageButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary + "18",
+    borderWidth: 1,
+    borderColor: COLORS.primary + "40",
+  },
+  manageButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 13 },
 
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginHorizontal: 16,
-    marginBottom: 10,
+    marginVertical: 10,
   },
-
   statCard: {
     backgroundColor: "#fff",
     flex: 1,
-    marginHorizontal: 4,
-    paddingVertical: 14,
+    marginHorizontal: 3,
+    paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",
     shadowColor: "#000",
@@ -367,25 +461,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-
-  statValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.primary,
-  },
-
-  statLabel: {
-    fontSize: 12,
-    color: "#777",
-    marginTop: 4,
-    fontWeight: "600",
-  },
-
+  statValue: { fontSize: 16, fontWeight: "800", color: COLORS.primary },
+  statLabel: { fontSize: 11, color: "#777", marginTop: 3, fontWeight: "600" },
 
   generateButton: {
     backgroundColor: COLORS.primary,
     padding: 14,
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 6,
     borderRadius: 12,
     alignItems: "center",
     shadowColor: COLORS.primary,
@@ -395,11 +478,51 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   generateButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+
+  actionRow: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    marginBottom: 6,
+    gap: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  saveBtn: {
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  regenBtn: {
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+
+  unsavedBadge: {
+    alignSelf: "center",
+    backgroundColor: "#fff3cd",
+    borderWidth: 1,
+    borderColor: "#ffc107",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 6,
+  },
+  unsavedBadgeText: { color: "#856404", fontSize: 12, fontWeight: "600" },
+
   topBar: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#eee" },
   dayCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 2,
     borderColor: COLORS.primary,
     justifyContent: "center",
@@ -417,22 +540,7 @@ const styles = StyleSheet.create({
   },
   dayText: { color: COLORS.primary, fontWeight: "bold", fontSize: 12 },
   dayTextSelected: { color: "#fff" },
-  summaryCard: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 22,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  summaryHeading: { color: "rgba(255,255,255,0.85)", fontSize: 13, marginBottom: 10, fontWeight: "600" },
-  summaryRow: { flexDirection: "row", justifyContent: "space-between" },
-  summaryItem: { alignItems: "center", flex: 1 },
-  summaryValue: { color: "#fff", fontWeight: "800", fontSize: 20 },
-  summaryLabel: { color: "rgba(255,255,255,0.8)", fontSize: 11, marginTop: 2 },
+
   mealSection: { marginBottom: 22 },
   mealHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
   mealIcon: { fontSize: 20 },
@@ -453,27 +561,83 @@ const styles = StyleSheet.create({
   pill: { borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, alignItems: "center", minWidth: 52 },
   pillValue: { fontWeight: "700", fontSize: 13 },
   pillLabel: { fontSize: 10, opacity: 0.8 },
+
   empty: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },
   emptyIcon: { fontSize: 64, marginBottom: 14 },
   emptyTitle: { fontSize: 20, fontWeight: "800", color: "#333", marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: "#888", textAlign: "center", lineHeight: 21 },
-  headerRow: {
-    flexDirection: "row",
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "flex-end",
-    paddingHorizontal: 16,
-    paddingTop: 10,
   },
-  backButton: {
-    paddingVertical: 6,
+  modalSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 34,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#ddd",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: "#1a1a2e", marginBottom: 16 },
+  modalEmpty: { color: "#888", textAlign: "center", marginVertical: 30, fontSize: 15 },
+  planRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    gap: 10,
+  },
+  planRowTitle: { fontWeight: "700", fontSize: 14, color: "#1a1a2e" },
+  planRowDate: { fontSize: 12, color: "#888", marginTop: 2 },
+  useBtn: {
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 8,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  backButtonText: {
-    color: COLORS.primary,
-    fontWeight: "700",
-    fontSize: 14,
+  useBtnDisabled: {
+    backgroundColor: "#27ae60",
   },
+  useBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  inUseBadge: {
+    marginTop: 4,
+    alignSelf: "flex-start",
+    backgroundColor: "#e8f8ef",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  inUseBadgeText: { color: "#27ae60", fontSize: 11, fontWeight: "700" },
+  planRowActive: {
+    borderWidth: 1.5,
+    borderColor: "#27ae60",
+    backgroundColor: "#f0fdf4",
+  },
+  deleteBtn: {
+    backgroundColor: "#FFE5E5",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  deleteBtnText: { fontSize: 16 },
+  modalCloseBtn: {
+    marginTop: 16,
+    backgroundColor: "#F1F5F9",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  modalCloseBtnText: { color: "#555", fontWeight: "700", fontSize: 15 },
 });

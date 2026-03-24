@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+    import React, { useState, useEffect } from "react";
 import {
     View,
     Text,
@@ -6,7 +6,8 @@ import {
     StyleSheet,
     ScrollView,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    Image,
 } from "react-native";
 import { COLORS, SPACING, RADIUS } from "../constants/theme";
 import { ChatBubble } from "../components/ChatBubble";
@@ -15,6 +16,7 @@ import { LocalMessage } from "../services/StorageService";
 import LlamaService from "../services/LlamaService";
 import ModelService from "../services/ModelService";
 import StorageService from "../services/StorageService";
+import KnowledgeBase from "../services/KnowledgeBase";
 
 
 
@@ -26,9 +28,10 @@ interface ParsedReport {
 interface ChatPageProps {
     onBack?: () => void;
     reportData?: ParsedReport;
+    imageUri?: string | null;
 }
 
-export default function ChatPage({ onBack, reportData }: ChatPageProps) {
+export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps) {
     const [messages, setMessages] = useState<LocalMessage[]>(() => {
         const initialText = reportData
             ? `I see your report titled '${reportData.title}'. What would you like to know about it?`
@@ -39,18 +42,36 @@ export default function ChatPage({ onBack, reportData }: ChatPageProps) {
 
     const [input, setInput] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
+    const [hasAnalyzed, setHasAnalyzed] = useState(false);
+    const [hasAttemptedAutoExplain, setHasAttemptedAutoExplain] = useState(false);
+
+    const triggerAnalysis = async () => {
+        if (!reportData || hasAnalyzed || isGenerating) return;
+        setHasAnalyzed(true);
+        const autoPrompt = `I have scanned a medical report titled "${reportData.title}". Please explain the key findings, values, and what they mean for my health in simple terms.`;
+        await handleSendWithCustomText(autoPrompt);
+    };
+
+    const handleSendWithCustomText = async (text: string) => {
+        if (!text.trim() || isGenerating) return;
+        const userText = text.trim();
+        const newMsg: LocalMessage = { id: Date.now().toString(), role: "user", text: userText, timestamp: new Date() };
+        setMessages(prev => [...prev, newMsg]);
+        setIsGenerating(true);
+        await performChat(userText, [...messages, newMsg]);
+    };
 
     const handleSend = async () => {
         if (!input.trim() || isGenerating) return;
-
         const userText = input.trim();
-        // 1. User msg add kiya
         const newMsg: LocalMessage = { id: Date.now().toString(), role: "user", text: userText, timestamp: new Date() };
         setMessages(prev => [...prev, newMsg]);
         setInput("");
         setIsGenerating(true);
+        await performChat(userText, [...messages, newMsg]);
+    };
 
-
+    const performChat = async (userText: string, currentMessages: LocalMessage[]) => {
         try {
             const activeModel = await ModelService.getActiveModel();
             if (!activeModel) {
@@ -61,6 +82,10 @@ export default function ChatPage({ onBack, reportData }: ChatPageProps) {
 
             await LlamaService.loadModel(activeModel.filename);
             const profile = await StorageService.getProfile();
+
+            // Fetch RAG context
+            const ragContext = await KnowledgeBase.getRelevantContext(userText);
+             console.log("🔍 RAG Context for Chat:", ragContext ? "Found" : "Not Found");
 
             // 3. User messages ko string array mein convert kiya
             const aiMessages = messages.map(m => ({
@@ -85,11 +110,31 @@ export default function ChatPage({ onBack, reportData }: ChatPageProps) {
                 }
             };
 
+            console.log("🛠️ ChatPage: reportData status:", !!reportData);
             if (reportData) {
-                await LlamaService.reportChat(reportData, aiMessages, profile, onTokenCallback);
+                // Filter and limit lines to avoid context overflow
+                const cleanLines = reportData.lines
+                    .filter(l => (l.label + l.value).trim().length > 0)
+                    .slice(0, 40);
+
+                const optimizedReportData = {
+                    ...reportData,
+                    lines: cleanLines
+                };
+
+                await LlamaService.reportChat(
+                    optimizedReportData, 
+                    aiMessages, 
+                    profile, 
+                    ragContext || undefined, 
+                    onTokenCallback
+                );
             } else {
-                const systemPrompt = LlamaService.generateSystemPrompt(profile);
-                await LlamaService.chat(aiMessages, systemPrompt, onTokenCallback);
+                const basePrompt = LlamaService.generateSystemPrompt(profile);
+                const enhancedPrompt = ragContext 
+                    ? `${basePrompt}\n\nADDITIONAL MEDICAL CONTEXT (RAG):\n${ragContext}\n\nPlease use this context to provide more accurate and grounded advice.`
+                    : basePrompt;
+                await LlamaService.chat(aiMessages, enhancedPrompt, onTokenCallback);
             }
 
         } catch (error) {
@@ -128,6 +173,9 @@ export default function ChatPage({ onBack, reportData }: ChatPageProps) {
                             <Text style={styles.reportIcon}>📄</Text>
                             <Text style={styles.reportTitle}>{reportData.title}</Text>
                         </View>
+                        {imageUri && (
+                            <Image source={{ uri: imageUri }} style={styles.reportImagePreview} resizeMode="cover" />
+                        )}
                         <View style={styles.reportDivider} />
 
                         {reportData.lines.slice(0, 5).map((line, index) => (
@@ -144,6 +192,16 @@ export default function ChatPage({ onBack, reportData }: ChatPageProps) {
                         ))}
                         {reportData.lines.length > 5 && (
                             <Text style={styles.moreText}>+ {reportData.lines.length - 5} more lines parsed</Text>
+                        )}
+                        
+                        {!hasAnalyzed && (
+                            <TouchableOpacity 
+                                style={styles.analyzeButton} 
+                                onPress={triggerAnalysis}
+                                disabled={isGenerating}
+                            >
+                                <Text style={styles.analyzeButtonText}>✨ Analyze with MediNova AI</Text>
+                            </TouchableOpacity>
                         )}
                     </View>
                 )}
@@ -187,8 +245,8 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.border,
     },
     backBtn: { padding: SPACING.sm, marginRight: SPACING.sm },
-    backText: { color: COLORS.primary, fontWeight: "600", fontSize: 16 },
-    headerTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textHeader },
+    backText: { color: COLORS.primary, fontWeight: "800", fontSize: 16 },
+    headerTitle: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader },
 
     chatArea: {
         flex: 1,
@@ -280,5 +338,24 @@ const styles = StyleSheet.create({
     // Bottom Input
     inputArea: {
         backgroundColor: COLORS.surface,
+    },
+    analyzeButton: {
+        backgroundColor: COLORS.primary,
+        borderRadius: RADIUS.lg,
+        paddingVertical: 12,
+        alignItems: "center",
+        marginTop: SPACING.md,
+    },
+    analyzeButtonText: {
+        color: "#FFF",
+        fontWeight: "700",
+        fontSize: 15
+    },
+    reportImagePreview: {
+        width: "100%",
+        height: 150,
+        borderRadius: 8,
+        marginBottom: SPACING.md,
+        backgroundColor: "#f0f0f0",
     },
 });

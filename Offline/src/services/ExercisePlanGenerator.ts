@@ -23,6 +23,7 @@ export interface DayExercisePlan {
         intensity: string;
     };
     exercises: Exercise[];
+    notes?: string[];
 }
 
 export interface StructuredExercisePlan {
@@ -34,6 +35,51 @@ export interface StructuredExercisePlan {
 const DAY_NAMES = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 ];
+
+// Allowed exercise whitelist to prevent hallucinations
+const ALLOWED_EXERCISES = [
+    "Brisk Walking",
+    "Cycling",
+    "Light Jogging",
+    "Bodyweight Squats",
+    "Push-Ups",
+    "Lunges",
+    "Planks",
+    "Stretching",
+    "Dynamic Stretching",
+    "Arm Circles",
+    "Leg Raises"
+];
+
+// Filter invalid exercises using whitelist
+function filterInvalidExercises(day: DayExercisePlan): DayExercisePlan {
+    day.exercises.forEach(ex => {
+        ex.items = ex.items.filter(i => ALLOWED_EXERCISES.includes(i.name));
+        // If all exercises are filtered out, keep a fallback
+        if (ex.items.length === 0 && ex.type !== "Optional") {
+            ex.items.push({
+                name: "Brisk Walking",
+                duration: "10 min",
+                intensity: "Low",
+                description: "Gentle walking to raise heart rate"
+            });
+        }
+    });
+    return day;
+}
+
+function getDailyFocus(day: string): string {
+    switch (day) {
+        case "Monday": return "Cardio Focus: Use walking or cycling.";
+        case "Tuesday": return "Strength Focus: Use bodyweight squats and push-ups.";
+        case "Wednesday": return "Recovery & Mobility: Use stretching and arm circles.";
+        case "Thursday": return "Mixed Focus: Cardio and Light Resistance (Lunges).";
+        case "Friday": return "Cardio Focus: Brisk Walking or Light Jogging.";
+        case "Saturday": return "Strength Focus: Full body movements (Squats/Push-ups).";
+        case "Sunday": return "Active Recovery: Very light walking and stretching.";
+        default: return "Balanced Mix.";
+    }
+}
 
 function buildExerciseGuidelines(conditions: string): string {
     const lower = conditions.toLowerCase();
@@ -55,48 +101,74 @@ function buildExerciseDayPrompt(profile: UserProfile, day: string, medicalContex
     const age = profile.age ? `${profile.age} year old` : "adult";
     const gender = profile.gender || "person";
     const conditions = profile.conditions?.trim() || "none";
-    const guidelines = buildExerciseGuidelines(conditions)
-    return `You are a certified fitness trainer.
+    const guidelines = buildExerciseGuidelines(conditions);
+    const focus = getDailyFocus(day);
 
-Create a realistic and safe exercise plan for ${day}.
+    return `
+You are a certified fitness trainer and diabetes-safe exercise planner.
 
-USER INFORMATION
-Age: ${age}
-Gender: ${gender}
-Medical Conditions: ${conditions}
+UNIQUE DAILY FOCUS:
+${focus}
 
-EXERCISE GUIDELINES
+USER PROFILE:
+- Age: ${age}
+- Gender: ${gender}
+- Medical Conditions: ${conditions}
+
+EXERCISE GUIDELINES:
 ${guidelines}
 
-GROUND TRUTH MEDICAL KNOWLEDGE
-${medicalContext || "Standard healthy exercise principles."}
+MEDICAL CONTEXT:
+${medicalContext || "No specific medical records found."}
 
-EXERCISE RULES
-* Use real exercise names (e.g., push-ups, squats, jogging, cycling, yoga)
-* Each exercise must have duration in minutes
-* Include sets/reps if applicable
-* Include intensity (Low, Medium, High)
-* Do not repeat the same exercise on multiple days
-* Output only valid JSON
+RULES (STRICT):
+1. Warmup: 5-10 min, Low intensity ONLY.
+2. Main: Moderate cardio + resistance; NO high-intensity sprints or extreme isometric exercises.
+3. Cooldown: 5-10 min, low-intensity stretching/mobility.
+4. BE CREATIVE: Do NOT just copy the JSON example. Choose varied exercises from this list: Brisk Walking, Cycling, Light Jogging, Bodyweight Squats, Push-Ups, Lunges, Planks, Stretching, Dynamic Stretching, Arm Circles, Leg Raises.
+5. Each day MUST be different from other days.
+6. Each day MUST include safety notes:
+   - "Check blood sugar before and after exercise"
+   - "Stay hydrated"
+   - "Stop if dizzy or weak"
+7. TOTAL duration per day: 45–60 min
+8. JSON only, NO markdown, NO extra text.
 
-EXERCISES REQUIRED
-Warmup
-Main
-Cooldown
-Optional
-
-OUTPUT STRUCTURE
+OUTPUT FORMAT (JSON) - DO NOT COPY VALUES, ONLY STRUCTURE:
 {
   "day": "${day}",
-  "warmup": { "name": "", "duration": "", "intensity": "" },
-  "main": { "name": "", "duration": "", "sets": 0, "reps": 0, "intensity": "" },
-  "cooldown": { "name": "", "duration": "", "intensity": "" },
-  "optional": { "name": "", "duration": "", "intensity": "" }
-}`;
-
+  "summary": { "totalDuration": "60 min", "intensity": "Medium" },
+  "warmup": { "items": [{ "name": "<Insert Warmup name>", "duration": "5-10 min", "intensity": "Low", "description": "Brief instruction" }] },
+  "main": { "items": [{ "name": "<Insert Main Exercise name>", "duration": "15-20 min", "intensity": "Medium", "description": "Specific instruction", "sets": 3, "reps": 12 }] },
+  "cooldown": { "items": [{ "name": "<Insert Cooldown name>", "duration": "5-10 min", "intensity": "Low", "description": "Brief instruction" }] },
+  "notes": [
+    "Check blood sugar before and after exercise",
+    "Stay hydrated",
+    "Stop if dizzy or weak"
+  ]
+}
+`;
 }
 
-export async function generateExercisePlan(onProgress?: (dayName: string, index: number) => void): Promise<void> {
+/**
+ * Performs a post-generation safety check against medical guidelines.
+ */
+function verifyExerciseSafety(plan: DayExercisePlan, medicalContext: string): { safe: boolean; reason?: string } {
+    const planText = JSON.stringify(plan).toLowerCase();
+
+    if (planText.includes("exercise name")) return { safe: false, reason: "Placeholder exercise detected." };
+    if (planText.match(/plank/gi) && (planText.includes("30 min") || planText.includes("30min"))) return { safe: false, reason: "Plank duration too long." };
+    if (planText.includes("hiit") && medicalContext.toLowerCase().includes("gentle")) return { safe: false, reason: "HIIT suggested where only gentle movements recommended." };
+    if (planText.includes("high-intensity") && planText.includes("warmup")) return { safe: false, reason: "Warmup includes high-intensity exercises." };
+
+    return { safe: true };
+}
+
+export async function generateExercisePlan(
+    onProgress?: (dayName: string, index: number) => void,
+    options?: { autoSave?: boolean }
+): Promise<StructuredExercisePlan | void> {
+    const autoSave = options?.autoSave !== false; // default true
     const profile = await storageService.getProfile();
     const LlamaService = (await import("./LlamaService")).default;
 
@@ -120,7 +192,7 @@ export async function generateExercisePlan(onProgress?: (dayName: string, index:
 
     // Initialize/Query RAG
     await KnowledgeBase.initialize();
-    const query = `${profile.gender} ${profile.age} years old with ${profile.conditions || "no conditions"}`;
+    const query = `exercise plan for ${profile.gender} ${profile.age} years old with ${profile.conditions || "no conditions"}`;
     const medicalContext = await KnowledgeBase.getRelevantContext(query);
     console.log("🔍 RAG Context Retrieved for Exercise query:", query);
 
@@ -142,9 +214,15 @@ export async function generateExercisePlan(onProgress?: (dayName: string, index:
                 const response = await LlamaService.chat(messages, systemPrompt);
                 const parsedDay = parseSingleExerciseDay(response, day);
                 if (parsedDay) {
+                    const safety = verifyExerciseSafety(parsedDay, medicalContext);
+                    if (!safety.safe) {
+                        console.warn(`🚨 Safety check failed for ${day}: ${safety.reason}. Retrying...`);
+                        attempts++;
+                        continue;
+                    }
                     generatedDays.push(parsedDay);
                     success = true;
-                    console.log(`✅ ${day} generated`);
+                    console.log(`✅ ${day} generated and verified safe`);
                 } else {
                     attempts++;
                     console.warn(`⚠️ Parse failed for ${day}, retry ${attempts}/3`);
@@ -162,26 +240,31 @@ export async function generateExercisePlan(onProgress?: (dayName: string, index:
         title: "7-Day Exercise Plan",
         days: generatedDays
     };
-    await storageService.savePlan({
-        id: Date.now().toString(),
-        type: "exercise",
-        title: fullPlan.title,
-        content: JSON.stringify(fullPlan),
-        createdAt: new Date().toISOString()
-    });
-    onProgress?.("Exercise plan generated successfully", 7);
-    console.log("✅ Exercise plan saved successfully");
+
+    if (autoSave) {
+        await storageService.savePlan({
+            id: Date.now().toString(),
+            type: "exercise",
+            title: fullPlan.title,
+            content: JSON.stringify(fullPlan),
+            createdAt: new Date().toISOString()
+        });
+    }
+
+    onProgress?.("Exercise plan ready", 7);
+    console.log("✅ Exercise plan generated");
+    return fullPlan;
 }
 
 
 function parseSingleExerciseDay(raw: string, expectedDay: string): DayExercisePlan | null {
-    const cleaned = raw.replace(/```json|```/gi, "").trim();
+    const cleaned = extractJson(fixJSON(raw));
     let parsed: any = null;
     try {
         parsed = JSON.parse(cleaned);
     } catch (error) {
         try {
-            parsed = JSON.parse(cleaned + "}");
+            parsed = JSON.parse(closeJson(cleaned));
         } catch (error) {
 
         }
@@ -193,19 +276,62 @@ function parseSingleExerciseDay(raw: string, expectedDay: string): DayExercisePl
     return normaliseExerciseDay({}, expectedDay);
 }
 
+function fixJSON(text: string) {
+    let fixed = text.trim();
+    const start = fixed.indexOf("{");
+    const end = fixed.lastIndexOf("}");
+    if (start !== -1 && end !== -1) {
+        fixed = fixed.slice(start, end + 1);
+    }
+
+    // Fix unquoted durations (e.g., "duration": 30 min,)
+    fixed = fixed.replace(/:\s*(\d+\s*[a-zA-Z%]+)(?=\s*[,}\s])/g, ':"$1"');
+    
+    // Fix common trailing commas
+    fixed = fixed.replace(/,\s*([}\]])/g, '$1');
+
+    return fixed;
+}
+
+function extractJson(raw: string): string {
+    let cleaned = raw.replace(/```json|```/gi, "").trim();
+    const start = cleaned.indexOf("[") !== -1 && cleaned.indexOf("{") !== -1
+        ? Math.min(cleaned.indexOf("["), cleaned.indexOf("{"))
+        : Math.max(cleaned.indexOf("["), cleaned.indexOf("{"));
+    const end = cleaned.lastIndexOf("]") !== -1 && cleaned.lastIndexOf("}") !== -1
+        ? Math.max(cleaned.lastIndexOf("]"), cleaned.lastIndexOf("}"))
+        : Math.max(cleaned.lastIndexOf("]"), cleaned.lastIndexOf("}"));
+
+    if (start !== -1 && end !== -1 && end > start) {
+        cleaned = cleaned.substring(start, end + 1);
+    }
+    return cleaned;
+}
+
+function closeJson(s: string): string {
+    let result = s.replace(/,\s*$/, "");
+    const opens = (result.match(/\[/g) || []).length;
+    const closes = (result.match(/\]/g) || []).length;
+    const bopens = (result.match(/\{/g) || []).length;
+    const bcloses = (result.match(/\}/g) || []).length;
+    for (let i = 0; i < opens - closes; i++) result += "]";
+    for (let i = 0; i < bopens - bcloses; i++) result += "}";
+    return result;
+}
+
 
 // ─── Normalisation ─────────────────────────────────────────────────────────────
 function normaliseExerciseItem(raw: any, defaultName: string, defaultDuration = "15 min"): ExerciseItem {
-    const duration = raw?.duration || defaultDuration;
+    const duration = raw?.duration || raw?.time || defaultDuration;
     const intensity: "Low" | "Medium" | "High" =
         ["Low", "Medium", "High"].includes(raw?.intensity) ? raw.intensity : "Medium";
 
     return {
-        name: raw?.name || defaultName,
-        duration,
-        description: raw?.description || "",
-        sets: raw?.sets ?? 0,
-        reps: raw?.reps ?? 0,
+        name: raw?.name || raw?.activity || raw?.exercise || defaultName,
+        duration: String(duration),
+        description: raw?.description || raw?.reason || "",
+        sets: Number(raw?.sets ?? 0),
+        reps: Number(raw?.reps ?? 0),
         intensity,
     };
 }
@@ -214,22 +340,60 @@ const REQUIRED_EXERCISES: Exercise["type"][] = ["Warmup", "Main", "Cooldown", "O
 
 function normaliseExercise(raw: any, type: Exercise["type"]): Exercise {
     if (!raw) raw = {};
-    const items = Array.isArray(raw.items) && raw.items.length > 0
-        ? raw.items.map((i: any) => normaliseExerciseItem(i, type + " Exercise"))
-        : [normaliseExerciseItem(raw, type + " Exercise")];
+    
+    // Handle case where raw is actually the array of items
+    let items: any[] = [];
+    if (Array.isArray(raw)) {
+        items = raw;
+    } else if (Array.isArray(raw.items)) {
+        items = raw.items;
+    } else if (Array.isArray(raw.exercises)) {
+        items = raw.exercises;
+    } else if (Object.keys(raw).length > 0) {
+        // Single object fallback
+        items = [raw];
+    }
 
-    return { type, items };
+    const normalisedItems = items.length > 0
+        ? items.map((i: any) => normaliseExerciseItem(i, type + " Exercise"))
+        : (type !== "Optional" ? [normaliseExerciseItem({}, type + " Exercise")] : []);
+
+    return { type, items: normalisedItems };
 }
 
 function normaliseExerciseDay(raw: any, dayName?: string): DayExercisePlan {
     const name = dayName ?? raw.day ?? "Day";
-    const exercises: Exercise[] = REQUIRED_EXERCISES.map(t => normaliseExercise(raw[t.toLowerCase()] ?? {}, t));
+    
+    const extractCategory = (obj: any, type: string) => {
+        const lower = type.toLowerCase();
+        if (obj[lower] || obj[type]) return obj[lower] || obj[type];
 
-    return {
-        day: name,
-        summary: { totalDuration: "60 min", intensity: "Medium" },
-        exercises,
+        // Search one level deep for nested categories
+        for (const key in obj) {
+            if (typeof obj[key] === "object" && obj[key] !== null && !Array.isArray(obj[key])) {
+                if (obj[key][lower] || obj[key][type]) return obj[key][lower] || obj[key][type];
+            }
+        }
+        return {};
     };
+
+    const exercises: Exercise[] = REQUIRED_EXERCISES.map(t => normaliseExercise(extractCategory(raw, t), t));
+
+    const dayPlan: DayExercisePlan = {
+        day: name,
+        summary: { 
+            totalDuration: raw.summary?.totalDuration || "60 min", 
+            intensity: raw.summary?.intensity || "Medium" 
+        },
+        exercises,
+        notes: raw.notes || [
+            "Check blood sugar before and after exercise",
+            "Stay hydrated",
+            "Stop if dizzy or weak"
+        ],
+    };
+
+    return filterInvalidExercises(dayPlan);
 }
 
 // ─── Load Latest Exercise Plan ────────────────────────────────────────────────

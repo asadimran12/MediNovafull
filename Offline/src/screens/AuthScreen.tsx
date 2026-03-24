@@ -10,21 +10,32 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Animated,
 } from "react-native";
+import { useRef } from "react";
 import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import AuthService, { UserAccount } from "../services/AuthService";
 
 interface AuthScreenProps {
   onLogin: (user: UserAccount) => void;
   onForgetPassword: () => void;
+  onRestore: () => void;
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPassword }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPassword, onRestore }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
+  };
 
   const handleAuth = async () => {
     if (!username.trim() || !password.trim()) {
@@ -143,6 +154,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
                 <Text style={styles.toggleText}>Forgot Password?</Text>
               </TouchableOpacity>
 
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], alignSelf: 'center' }}>
+                <TouchableOpacity 
+                  onPressIn={handlePressIn}
+                  onPressOut={handlePressOut}
+                  onPress={onRestore}
+                  style={styles.restoreButton}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.restoreIcon}>📁</Text>
+                  <Text style={styles.restoreText}>Restore from Backup</Text>
+                </TouchableOpacity>
+              </Animated.View>
+
 
             </View>
           </View>
@@ -260,9 +284,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   toggleText: {
-    color: COLORS.primary,
     fontSize: 14,
     fontWeight: "600",
+  },
+  restoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    alignSelf: 'center',
+    ...SHADOWS.light,
+  },
+  restoreIcon: {
+    fontSize: 16,
+    marginRight: SPACING.sm,
+  },
+  restoreText: {
+    color: COLORS.textMain,
+    fontSize: 14,
+    fontWeight: "700",
   },
   footer: {
     marginTop: SPACING.xl,

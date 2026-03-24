@@ -13,17 +13,20 @@ import { launchImageLibrary, launchCamera } from "react-native-image-picker";
 import { pick } from "@react-native-documents/picker";
 import TextRecognition from "@react-native-ml-kit/text-recognition";
 import { COLORS, SPACING } from "../constants/theme";
+import KnowledgeBase from "../services/KnowledgeBase";
 
 const { PdfToImageModule } = NativeModules;
 
 interface ParsedReport {
     title: string;
     lines: { label: string; value: string }[];
+    rawText: string;
 }
 
 interface ImageUploaderProps {
-    onNavigate: (report: ParsedReport | null) => void;
+    onNavigate: (report: ParsedReport | null, imageUri?: string) => void;
     onBack?: () => void;
+    initialMode?: 'gallery' | 'pdf' | 'camera';
 }
 
 function parseReportText(raw: string): ParsedReport {
@@ -46,17 +49,28 @@ function parseReportText(raw: string): ParsedReport {
         return { label: "", value: line };
     });
 
-    return { title, lines: parsed };
+    return { title, lines: parsed, rawText: raw };
 }
 
-export default function ImageUploader({ onNavigate, onBack }: ImageUploaderProps) {
+export default function ImageUploader({ onNavigate, onBack, initialMode }: ImageUploaderProps) {
     // ✅ All hooks at top — unconditional, same order every render
     const [image, setImage] = useState<string | null>(null);
     const [report, setReport] = useState<ParsedReport | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    console.log("report", report);
+    React.useEffect(() => {
+        if (initialMode === 'gallery') {
+            pickImage();
+        } else if (initialMode === 'pdf') {
+            pickPdf();
+        } else if (initialMode === 'camera') {
+            captureImage();
+        }
+    }, [initialMode]);
+
+
+
     const captureImage = async () => {
         try {
             const result = await launchCamera({ mediaType: "photo" });
@@ -72,6 +86,9 @@ export default function ImageUploader({ onNavigate, onBack }: ImageUploaderProps
             const recognizedText = await TextRecognition.recognize(uri);
             const parsed = parseReportText(recognizedText.text);
             setReport(parsed);
+
+            // Index for RAG
+            await KnowledgeBase.addDynamicKnowledge(recognizedText.text, "Medical Report", parsed.title);
         } catch (err) {
             setError("Could not read text from camera image. Please try again.");
         } finally {
@@ -94,6 +111,10 @@ export default function ImageUploader({ onNavigate, onBack }: ImageUploaderProps
             const recognizedText = await TextRecognition.recognize(uri);
             const parsed = parseReportText(recognizedText.text);
             setReport(parsed);
+
+            // Index for RAG
+            await KnowledgeBase.addDynamicKnowledge(recognizedText.text, "Medical Report", parsed.title);
+
         } catch (err) {
             setError("Could not read text from image. Please try again.");
         } finally {
@@ -144,6 +165,8 @@ export default function ImageUploader({ onNavigate, onBack }: ImageUploaderProps
             if (fullText) {
                 const parsed = parseReportText(fullText);
                 setReport(parsed);
+                // Index for RAG
+                await KnowledgeBase.addDynamicKnowledge(fullText, "Medical Report", parsed.title);
             } else {
                 setError("No text recognized from PDF.");
             }
@@ -158,6 +181,15 @@ export default function ImageUploader({ onNavigate, onBack }: ImageUploaderProps
         }
     };
 
+    // Labels and retry handler based on mode
+    const modeLabel = initialMode === 'gallery'
+        ? { icon: '🖼️', title: 'Gallery', action: pickImage }
+        : initialMode === 'pdf'
+        ? { icon: '📄', title: 'PDF Document', action: pickPdf }
+        : initialMode === 'camera'
+        ? { icon: '📸', title: 'Camera', action: captureImage }
+        : null;
+
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -167,31 +199,35 @@ export default function ImageUploader({ onNavigate, onBack }: ImageUploaderProps
                         <Text style={styles.backText}>← Back</Text>
                     </TouchableOpacity>
                 )}
-                <Text style={styles.headerTitle}>Upload Report</Text>
+                <Text style={styles.headerTitle}>
+                    {modeLabel ? `Upload via ${modeLabel.title}` : 'Upload Report'}
+                </Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.subtitle}>
-                    Select or capture a medical report to analyze it.
-                </Text>
 
-                {/* Upload Options Grid */}
-                <View style={styles.grid}>
-                    <TouchableOpacity style={styles.gridCard} onPress={captureImage}>
-                        <Text style={styles.cardIcon}>📷</Text>
-                        <Text style={styles.cardText}>Take Photo</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.gridCard} onPress={pickImage}>
-                        <Text style={styles.cardIcon}>🖼</Text>
-                        <Text style={styles.cardText}>Gallery</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.gridCard} onPress={pickPdf}>
-                        <Text style={styles.cardIcon}>📄</Text>
-                        <Text style={styles.cardText}>Upload PDF</Text>
-                    </TouchableOpacity>
-                </View>
+                {/* Show 3-button grid only when no mode is pre-selected */}
+                {!initialMode && (
+                    <>
+                        <Text style={styles.subtitle}>
+                            Select or capture a medical report to analyze it.
+                        </Text>
+                        <View style={styles.grid}>
+                            <TouchableOpacity style={styles.gridCard} onPress={captureImage}>
+                                <Text style={styles.cardIcon}>📷</Text>
+                                <Text style={styles.cardText}>Take Photo</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.gridCard} onPress={pickImage}>
+                                <Text style={styles.cardIcon}>🖼</Text>
+                                <Text style={styles.cardText}>Gallery</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.gridCard} onPress={pickPdf}>
+                                <Text style={styles.cardIcon}>📄</Text>
+                                <Text style={styles.cardText}>Upload PDF</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                )}
 
                 {/* Loading State */}
                 {loading && (
@@ -201,11 +237,29 @@ export default function ImageUploader({ onNavigate, onBack }: ImageUploaderProps
                     </View>
                 )}
 
-                {/* Error Box */}
+                {/* Error Box with retry */}
                 {error && !loading && (
-                    <View style={styles.errorBox}>
-                        <Text style={styles.errorIcon}>⚠️</Text>
-                        <Text style={styles.errorText}>{error}</Text>
+                    <View>
+                        <View style={styles.errorBox}>
+                            <Text style={styles.errorIcon}>⚠️</Text>
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                        {modeLabel && (
+                            <TouchableOpacity style={styles.retryButton} onPress={modeLabel.action}>
+                                <Text style={styles.retryButtonText}>🔄 Try Again</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+
+                {/* Idle state — no action taken yet and mode is set (picker was dismissed) */}
+                {!loading && !error && !report && !image && modeLabel && (
+                    <View style={styles.idleContainer}>
+                        <Text style={styles.idleIcon}>{modeLabel.icon}</Text>
+                        <Text style={styles.idleText}>No file selected yet.</Text>
+                        <TouchableOpacity style={styles.retryButton} onPress={modeLabel.action}>
+                            <Text style={styles.retryButtonText}>Open {modeLabel.title}</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -249,8 +303,8 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.border,
     },
     backBtn: { padding: SPACING.sm, marginRight: SPACING.sm },
-    backText: { color: COLORS.primary, fontWeight: "600", fontSize: 16 },
-    headerTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textHeader },
+    backText: { color: COLORS.primary, fontWeight: "800", fontSize: 16 },
+    headerTitle: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader },
     
     scrollContent: {
         padding: SPACING.lg,
@@ -346,6 +400,34 @@ const styles = StyleSheet.create({
         height: 300,
         borderRadius: 12,
         resizeMode: "cover",
+    },
+
+    retryButton: {
+        alignSelf: "center",
+        marginTop: SPACING.md,
+        backgroundColor: COLORS.primary,
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.xl,
+        borderRadius: 10,
+    },
+    retryButtonText: {
+        color: "#fff",
+        fontSize: 15,
+        fontWeight: "700",
+    },
+    idleContainer: {
+        alignItems: "center",
+        marginTop: 60,
+        padding: SPACING.xl,
+    },
+    idleIcon: {
+        fontSize: 56,
+        marginBottom: SPACING.md,
+    },
+    idleText: {
+        fontSize: 15,
+        color: COLORS.textMuted,
+        marginBottom: SPACING.lg,
     },
 
     bottomBar: {

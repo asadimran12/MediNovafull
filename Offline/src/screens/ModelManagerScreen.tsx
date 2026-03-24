@@ -84,6 +84,13 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   };
 
   const handleDownload = async (model: AIModel) => {
+    if (!model.downloadUrl) {
+      Alert.alert(
+        "Manual Setup Required", 
+        `This is a custom model. Please push '${model.filename}' to your device's Documents folder manually using ADB or a file manager.`
+      );
+      return;
+    }
     setDownloadingId(model.id);
     setProgress(0);
     setIsPaused(false);

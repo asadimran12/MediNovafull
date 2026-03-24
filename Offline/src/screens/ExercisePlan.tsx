@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
     View,
     Text,
@@ -6,10 +6,12 @@ import {
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
+    Modal,
+    Alert,
 } from "react-native";
 
 import { COLORS } from "../constants/theme";
-
+import storageService, { HealthPlan } from "../services/StorageService";
 import {
     StructuredExercisePlan,
     ExerciseItem,
@@ -25,7 +27,6 @@ const EXERCISE_ICONS: Record<string, string> = {
     Cooldown: "🛀",
     Optional: "✨",
 };
-
 function getExerciseIcon(type: string): string {
     return EXERCISE_ICONS[type] ?? "🏋️‍♂️";
 }
@@ -43,44 +44,119 @@ const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => (
     </View>
 );
 
+function formatDate(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 interface ExercisePlansScreenProps {
     onBack?: () => void;
 }
 
 export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack }) => {
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-    const [plan, setPlan] = useState<StructuredExercisePlan | null>(null);
+    const [activePlan, setActivePlan] = useState<StructuredExercisePlan | null>(null);
+    const [activePlanId, setActivePlanId] = useState<string | null>(null);
+    const [pendingPlan, setPendingPlan] = useState<StructuredExercisePlan | null>(null);
     const [loading, setLoading] = useState(false);
     const [progressDay, setProgressDay] = useState("");
     const [completedItems, setCompletedItems] = useState<string[]>([]);
+    const [savedPlans, setSavedPlans] = useState<HealthPlan[]>([]);
+    const [showManageModal, setShowManageModal] = useState(false);
 
-    /* Load latest plan */
-    useEffect(() => {
-        (async () => {
+    /* Load plans */
+    const loadPlans = useCallback(async () => {
+        const all = await storageService.getPlans("exercise");
+        setSavedPlans(all);
+        if (all.length > 0 && !activePlan) {
             const latest = await loadLatestExercisePlan();
-            if (latest?.days?.length) setPlan(latest);
-        })();
-    }, []);
+            if (latest?.days?.length) {
+                setActivePlan(latest);
+                setActivePlanId(all[0].id);
+            }
+        }
+    }, [activePlan]);
+
+    useEffect(() => { loadPlans(); }, []);
 
     /* Reset completion when day changes */
-    useEffect(() => {
-        setCompletedItems([]);
-    }, [selectedDayIndex]);
+    useEffect(() => { setCompletedItems([]); }, [selectedDayIndex]);
 
-    const days = plan?.days ?? [];
+    /* Generate (no auto-save) */
+    const handleGeneratePlan = async () => {
+        setLoading(true);
+        setPendingPlan(null);
+        setProgressDay("Starting...");
+        try {
+            const result = await generateExercisePlan(
+                (dayName, index) => setProgressDay(`Generating ${dayName} (${index + 1}/7)...`),
+                { autoSave: false }
+            );
+            if (result) {
+                setPendingPlan(result as StructuredExercisePlan);
+                setSelectedDayIndex(0);
+            }
+        } catch (err: any) {
+            Alert.alert("Generation Failed", err?.message ?? "Please try again.");
+        } finally {
+            setLoading(false);
+            setProgressDay("");
+        }
+    };
+
+    /* Save pending plan */
+    const handleSavePlan = async () => {
+        if (!pendingPlan) return;
+        const id = Date.now().toString();
+        await storageService.savePlan({
+            id,
+            type: "exercise",
+            title: pendingPlan.title,
+            content: JSON.stringify(pendingPlan),
+            createdAt: new Date().toISOString(),
+        });
+        setActivePlan(pendingPlan);
+        setActivePlanId(id);
+        setPendingPlan(null);
+        await loadPlans();
+        Alert.alert("Saved!", "Your exercise plan has been saved.");
+    };
+
+    /* Delete a saved plan */
+    const handleDeletePlan = (id: string) => {
+        Alert.alert("Delete Plan", "Remove this saved plan?", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Delete", style: "destructive",
+                onPress: async () => {
+                    await storageService.deletePlan(id);
+                    await loadPlans();
+                },
+            },
+        ]);
+    };
+
+    /* Use a saved plan */
+    const handleUsePlan = (plan: HealthPlan) => {
+        try {
+            const parsed = JSON.parse(plan.content) as StructuredExercisePlan;
+            setActivePlan(parsed);
+            setActivePlanId(plan.id);
+            setPendingPlan(null);
+            setSelectedDayIndex(0);
+        } catch { /* ignore */ }
+        setShowManageModal(false);
+    };
+
+    /* Derived */
+    const displayPlan = pendingPlan ?? activePlan;
+    const days = displayPlan?.days ?? [];
     const currentDay = days[selectedDayIndex];
 
-    /* Progress calculation */
     const totalItems =
-        currentDay?.exercises?.reduce(
-            (acc, section) => acc + (section.items?.length ?? 0),
-            0
-        ) ?? 0;
-
+        currentDay?.exercises?.reduce((acc, section) => acc + (section.items?.length ?? 0), 0) ?? 0;
     const progress =
-        totalItems === 0
-            ? 0
-            : Math.round((completedItems.length / totalItems) * 100);
+        totalItems === 0 ? 0 : Math.round((completedItems.length / totalItems) * 100);
 
     const toggleItem = (si: number, ii: number) => {
         const key = `${si}-${ii}`;
@@ -89,56 +165,55 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
         );
     };
 
-    /* Generate exercise plan */
-    const handleGeneratePlan = async () => {
-        setLoading(true);
-        setProgressDay("Starting...");
-        try {
-            await generateExercisePlan((dayName, index) => {
-                setProgressDay(`Generating ${dayName} (${index + 1}/7)...`);
-            });
-
-            const latest = await loadLatestExercisePlan();
-            if (latest?.days?.length) setPlan(latest);
-
-            setSelectedDayIndex(0);
-        } catch (err) {
-            console.error("Failed to generate exercise plan", err);
-        } finally {
-            setLoading(false);
-            setProgressDay("");
-        }
-    };
-
     return (
         <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
-            {/* Header with Back Button */}
-            {onBack && (
-                <View style={styles.headerRow}>
+
+            {/* ── Header ── */}
+            <View style={styles.headerRow}>
+                {onBack && (
                     <TouchableOpacity onPress={onBack} style={styles.backButton}>
                         <Text style={styles.backButtonText}>← Back</Text>
                     </TouchableOpacity>
+                )}
+                <Text style={styles.screenTitle}>Exercise Plan</Text>
+                <TouchableOpacity onPress={() => setShowManageModal(true)} style={styles.manageButton}>
+                    <Text style={styles.manageButtonText}>📋 Manage</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* ── Action Buttons ── */}
+            {pendingPlan ? (
+                <View style={styles.actionRow}>
+                    <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleSavePlan}>
+                        <Text style={styles.actionBtnText}>💾 Save Plan</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.actionBtn, styles.regenBtn]} onPress={handleGeneratePlan} disabled={loading}>
+                        <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>🔄 Generate Another</Text>
+                    </TouchableOpacity>
                 </View>
+            ) : (
+                <TouchableOpacity
+                    style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
+                    onPress={handleGeneratePlan}
+                    disabled={loading}
+                    activeOpacity={0.85}
+                >
+                    {loading ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                            <ActivityIndicator color="#fff" size="small" />
+                            <Text style={styles.generateButtonText}>{progressDay}</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.generateButtonText}>✨ Generate Exercise Plan</Text>
+                    )}
+                </TouchableOpacity>
             )}
 
-            {/* Generate Button */}
-            <TouchableOpacity
-                style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
-                onPress={handleGeneratePlan}
-                disabled={loading}
-                activeOpacity={0.85}
-            >
-                {loading ? (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                        <ActivityIndicator color="#fff" size="small" />
-                        <Text style={styles.generateButtonText}>{progressDay}</Text>
-                    </View>
-                ) : (
-                    <Text style={styles.generateButtonText}>
-                        ✨ Generate Exercise Plan
-                    </Text>
-                )}
-            </TouchableOpacity>
+            {pendingPlan && (
+                <View style={styles.unsavedBadge}>
+                    <Text style={styles.unsavedBadgeText}>⚠️ Preview — not saved yet</Text>
+                </View>
+            )}
 
             {days.length > 0 ? (
                 <>
@@ -147,10 +222,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 10,
-                            }}
+                            contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10 }}
                         >
                             {days.map((day, index) => {
                                 const isSelected = selectedDayIndex === index;
@@ -158,17 +230,9 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                                     <TouchableOpacity
                                         key={index}
                                         onPress={() => setSelectedDayIndex(index)}
-                                        style={[
-                                            styles.dayCircle,
-                                            isSelected && styles.dayCircleSelected,
-                                        ]}
+                                        style={[styles.dayCircle, isSelected && styles.dayCircleSelected]}
                                     >
-                                        <Text
-                                            style={[
-                                                styles.dayText,
-                                                isSelected && styles.dayTextSelected,
-                                            ]}
-                                        >
+                                        <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>
                                             {day.day?.substring(0, 3) ?? `D${index + 1}`}
                                         </Text>
                                     </TouchableOpacity>
@@ -178,67 +242,41 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                     </View>
 
                     {/* Day Content */}
-                    <ScrollView
-                        style={{ flex: 1 }}
-                        contentContainerStyle={{ padding: 20, paddingBottom: 50 }}
-                    >
+                    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 50 }}>
                         {/* Progress */}
                         <View style={styles.progressContainer}>
                             <Text style={styles.progressTitle}>Today's Workout Progress</Text>
-
                             <View style={styles.progressBarBackground}>
-                                <View
-                                    style={[
-                                        styles.progressBarFill,
-                                        { width: `${progress}%` },
-                                    ]}
-                                />
+                                <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
                             </View>
-
                             <Text style={styles.progressPercent}>{progress}% Completed</Text>
                         </View>
 
                         {/* Exercise Sections */}
                         {currentDay?.exercises.map((section: Exercise, si: number) => {
-                            const completed =
+                            const sectionDone =
                                 section.items.length > 0 &&
-                                section.items.every((_, ii) =>
-                                    completedItems.includes(`${si}-${ii}`)
-                                );
-
+                                section.items.every((_, ii) => completedItems.includes(`${si}-${ii}`));
                             return (
                                 <View
                                     key={si}
-                                    style={[
-                                        styles.mealSection,
-                                        completed && styles.sectionCompleted,
-                                    ]}
+                                    style={[styles.mealSection, sectionDone && styles.sectionCompleted]}
                                 >
                                     <View style={styles.mealHeader}>
-                                        <Text style={styles.mealIcon}>
-                                            {getExerciseIcon(section.type)}
-                                        </Text>
-
+                                        <Text style={styles.mealIcon}>{getExerciseIcon(section.type)}</Text>
                                         <Text style={styles.mealTitle}>{section.type}</Text>
-
-                                        {completed && <Text style={styles.check}>✔</Text>}
+                                        {sectionDone && <Text style={styles.check}>✔</Text>}
                                     </View>
-
                                     {section.items.map((item, ii) => {
-                                        const completed = completedItems.includes(`${si}-${ii}`);
-
+                                        const done = completedItems.includes(`${si}-${ii}`);
                                         return (
                                             <View key={ii} style={styles.exerciseItemWrapper}>
                                                 <ExerciseItemCard item={item} />
-
                                                 <TouchableOpacity
-                                                    style={[
-                                                        styles.circle,
-                                                        completed && styles.circleCompleted
-                                                    ]}
+                                                    style={[styles.circle, done && styles.circleCompleted]}
                                                     onPress={() => toggleItem(si, ii)}
                                                 >
-                                                    {completed && <Text style={styles.tick}>✓</Text>}
+                                                    {done && <Text style={styles.tick}>✓</Text>}
                                                 </TouchableOpacity>
                                             </View>
                                         );
@@ -253,17 +291,91 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                     <Text style={styles.emptyIcon}>🏋️‍♂️</Text>
                     <Text style={styles.emptyTitle}>No Exercise Plan Yet</Text>
                     <Text style={styles.emptySubtitle}>
-                        Tap "Generate Exercise Plan" above to create a personalised 7-day
-                        plan.
+                        Tap "Generate Exercise Plan" above to create a personalised 7-day plan.
                     </Text>
                 </View>
             )}
+
+            {/* ── Manage Plans Modal ── */}
+            <Modal visible={showManageModal} transparent animationType="slide" onRequestClose={() => setShowManageModal(false)}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowManageModal(false)}>
+                    <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>📋 Saved Exercise Plans</Text>
+                        {savedPlans.length === 0 ? (
+                            <Text style={styles.modalEmpty}>No saved plans yet.</Text>
+                        ) : (
+                            <ScrollView style={{ maxHeight: 400 }}>
+                                {savedPlans.map((plan) => {
+                                    const isActive = plan.id === activePlanId;
+                                    return (
+                                        <View key={plan.id} style={[styles.planRow, isActive && styles.planRowActive]}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.planRowTitle}>{plan.title}</Text>
+                                                <Text style={styles.planRowDate}>{formatDate(plan.createdAt)}</Text>
+                                                {isActive && (
+                                                    <View style={styles.inUseBadge}>
+                                                        <Text style={styles.inUseBadgeText}>● In Use</Text>
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.useBtn, isActive && styles.useBtnDisabled]}
+                                                onPress={() => !isActive && handleUsePlan(plan)}
+                                                disabled={isActive}
+                                            >
+                                                <Text style={styles.useBtnText}>{isActive ? "Active" : "Use"}</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeletePlan(plan.id)}>
+                                                <Text style={styles.deleteBtnText}>🗑</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    );
+                                })}
+                            </ScrollView>
+                        )}
+                        <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowManageModal(false)}>
+                            <Text style={styles.modalCloseBtnText}>Close</Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
         </View>
     );
 };
 
 /* ─── Styles ────────────────────────────────────────────── */
 const styles = StyleSheet.create({
+    headerRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 8,
+        backgroundColor: "#fff",
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    backButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: "#F1F5F9",
+        borderWidth: 1,
+        borderColor: "#E2E8F0",
+    },
+    backButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
+    screenTitle: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "800", color: "#1a1a2e" },
+    manageButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: COLORS.primary + "18",
+        borderWidth: 1,
+        borderColor: COLORS.primary + "40",
+    },
+    manageButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 13 },
+
     generateButton: {
         backgroundColor: COLORS.primary,
         padding: 14,
@@ -276,23 +388,47 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 5,
     },
+    generateButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 
-    generateButtonText: {
-        color: "#fff",
-        fontWeight: "bold",
-        fontSize: 16,
+    actionRow: {
+        flexDirection: "row",
+        marginHorizontal: 16,
+        marginVertical: 10,
+        gap: 10,
     },
-
-    topBar: {
+    actionBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: "center" },
+    saveBtn: {
+        backgroundColor: COLORS.primary,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    regenBtn: {
         backgroundColor: "#fff",
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
+        borderWidth: 1.5,
+        borderColor: COLORS.primary,
     },
+    actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
+    unsavedBadge: {
+        alignSelf: "center",
+        backgroundColor: "#fff3cd",
+        borderWidth: 1,
+        borderColor: "#ffc107",
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        marginBottom: 6,
+    },
+    unsavedBadgeText: { color: "#856404", fontSize: 12, fontWeight: "600" },
+
+    topBar: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#eee" },
     dayCircle: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
         borderWidth: 2,
         borderColor: COLORS.primary,
         justifyContent: "center",
@@ -300,71 +436,22 @@ const styles = StyleSheet.create({
         marginRight: 10,
         backgroundColor: "#fff",
     },
+    dayCircleSelected: { backgroundColor: COLORS.primary },
+    dayText: { color: COLORS.primary, fontWeight: "bold", fontSize: 12 },
+    dayTextSelected: { color: "#fff" },
 
-    dayCircleSelected: {
-        backgroundColor: COLORS.primary,
-    },
+    progressContainer: { backgroundColor: "#fff", padding: 16, borderRadius: 12, marginBottom: 20 },
+    progressTitle: { fontWeight: "700", marginBottom: 10 },
+    progressBarBackground: { height: 12, backgroundColor: "#eee", borderRadius: 6, overflow: "hidden" },
+    progressBarFill: { height: "100%", backgroundColor: "#27ae60" },
+    progressPercent: { marginTop: 6, fontWeight: "600", textAlign: "right" },
 
-    dayText: {
-        color: COLORS.primary,
-        fontWeight: "bold",
-        fontSize: 12,
-    },
-
-    dayTextSelected: {
-        color: "#fff",
-    },
-
-    progressContainer: {
-        backgroundColor: "#fff",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 20,
-    },
-
-    progressTitle: {
-        fontWeight: "700",
-        marginBottom: 10,
-    },
-
-    progressBarBackground: {
-        height: 12,
-        backgroundColor: "#eee",
-        borderRadius: 6,
-        overflow: "hidden",
-    },
-
-    progressBarFill: {
-        height: "100%",
-        backgroundColor: "#27ae60",
-    },
-
-    progressPercent: {
-        marginTop: 6,
-        fontWeight: "600",
-        textAlign: "right",
-    },
-
-    mealSection: {
-        marginBottom: 22,
-    },
-
-    mealHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 10,
-        gap: 8,
-    },
-
-    mealIcon: {
-        fontSize: 20,
-    },
-
-    mealTitle: {
-        fontWeight: "800",
-        fontSize: 17,
-        color: "#222",
-    },
+    mealSection: { marginBottom: 22 },
+    mealHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
+    mealIcon: { fontSize: 20 },
+    mealTitle: { fontWeight: "800", fontSize: 17, color: "#222" },
+    sectionCompleted: { opacity: 0.5 },
+    check: { marginLeft: "auto", fontSize: 16, color: "#27ae60", fontWeight: "bold" },
 
     exerciseItemWrapper: {
         flexDirection: "row",
@@ -374,96 +461,63 @@ const styles = StyleSheet.create({
         padding: 14,
         marginBottom: 10,
     },
-
-    exerciseCard: {
-        flex: 1,
-    },
-
-    exerciseName: {
-        fontWeight: "700",
-        fontSize: 15,
-        marginBottom: 6,
-    },
-
-    exerciseDetails: {
-        fontSize: 13,
-        color: "#555",
-    },
-
+    exerciseCard: { flex: 1 },
+    exerciseName: { fontWeight: "700", fontSize: 15, marginBottom: 6 },
+    exerciseDetails: { fontSize: 13, color: "#555" },
     circle: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        borderWidth: 2,
-        borderColor: "#ddd",
-        justifyContent: "center",
-        alignItems: "center",
-        marginLeft: 12,
+        width: 28, height: 28, borderRadius: 14,
+        borderWidth: 2, borderColor: "#ddd",
+        justifyContent: "center", alignItems: "center", marginLeft: 12,
     },
+    circleCompleted: { backgroundColor: "#27ae60", borderColor: "#27ae60" },
+    tick: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 
-    circleCompleted: {
-        backgroundColor: "#27ae60",
+    empty: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },
+    emptyIcon: { fontSize: 64, marginBottom: 14 },
+    emptyTitle: { fontSize: 20, fontWeight: "800", color: "#333", marginBottom: 8 },
+    emptySubtitle: { fontSize: 14, color: "#888", textAlign: "center" },
+
+    // Modal
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+    modalSheet: {
+        backgroundColor: "#fff",
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        paddingBottom: 34,
+    },
+    modalHandle: {
+        width: 40, height: 4, backgroundColor: "#ddd",
+        borderRadius: 2, alignSelf: "center", marginBottom: 16,
+    },
+    modalTitle: { fontSize: 18, fontWeight: "800", color: "#1a1a2e", marginBottom: 16 },
+    modalEmpty: { color: "#888", textAlign: "center", marginVertical: 30, fontSize: 15 },
+    planRow: {
+        flexDirection: "row", alignItems: "center",
+        backgroundColor: "#F8F9FA", borderRadius: 12,
+        padding: 14, marginBottom: 10, gap: 10,
+    },
+    planRowTitle: { fontWeight: "700", fontSize: 14, color: "#1a1a2e" },
+    planRowDate: { fontSize: 12, color: "#888", marginTop: 2 },
+    useBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+    useBtnDisabled: { backgroundColor: "#27ae60" },
+    useBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+    inUseBadge: {
+        marginTop: 4,
+        alignSelf: "flex-start",
+        backgroundColor: "#e8f8ef",
+        borderRadius: 6,
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+    },
+    inUseBadgeText: { color: "#27ae60", fontSize: 11, fontWeight: "700" },
+    planRowActive: {
+        borderWidth: 1.5,
         borderColor: "#27ae60",
+        backgroundColor: "#f0fdf4",
     },
-
-    tick: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "bold",
-    },
-
-    sectionCompleted: {
-        opacity: 0.5,
-    },
-
-    check: {
-        marginLeft: "auto",
-        fontSize: 16,
-        color: "#27ae60",
-        fontWeight: "bold",
-    },
-
-    empty: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 40,
-    },
-
-    emptyIcon: {
-        fontSize: 64,
-        marginBottom: 14,
-    },
-
-    emptyTitle: {
-        fontSize: 20,
-        fontWeight: "800",
-        color: "#333",
-        marginBottom: 8,
-    },
-
-    emptySubtitle: {
-        fontSize: 14,
-        color: "#888",
-        textAlign: "center",
-    },
-    headerRow: {
-        flexDirection: "row",
-        justifyContent: "flex-end",
-        paddingHorizontal: 16,
-        paddingTop: 10,
-    },
-    backButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: COLORS.surface,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-    },
-    backButtonText: {
-        color: COLORS.primary,
-        fontWeight: "700",
-        fontSize: 14,
-    },
+    deleteBtn: { backgroundColor: "#FFE5E5", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
+    deleteBtnText: { fontSize: 16 },
+    modalCloseBtn: { marginTop: 16, backgroundColor: "#F1F5F9", padding: 14, borderRadius: 12, alignItems: "center" },
+    modalCloseBtnText: { color: "#555", fontWeight: "700", fontSize: 15 },
 });

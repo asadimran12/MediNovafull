@@ -1,62 +1,67 @@
 import React from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity, Alert, Share } from "react-native";
 import { COLORS, SPACING } from "../constants/theme";
 import storageService from "../services/StorageService";
 
 interface SettingsScreenProps {
   onClearAll: () => void;
   onManageModels: () => void;
+  onManageProfile: () => void;
   onBack?: () => void;
   onLogout?: () => void;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onManageModels, onBack, onLogout }) => {
-
-  const handleExportOnCloud = () => {
-    Alert.alert(
-      "Export on Cloud",
-      "Export on Cloud pressed"
-    );
-  };
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({
+  onClearAll,
+  onManageModels,
+  onManageProfile,
+  onBack,
+  onLogout,
+}) => {
 
   const handleExportLocally = async () => {
     try {
       const exportPath = await storageService.exportAllDataLocally();
-      Alert.alert(
-        "Export Successful",
-        `All your data (chats, plans, profile, and login credentials) has been exported to:\n\n${exportPath}`
-      );
+
+      // Try Android/iOS Share sheet first
+      try {
+        await Share.share({
+          title: "MediNova Backup",
+          message: `MediNova backup file saved at:\n${exportPath}`,
+          url: `file://${exportPath}`,
+        });
+      } catch {
+        // Fallback: just show the path
+        Alert.alert(
+          "Export Successful",
+          `Your data has been exported to:\n\n${exportPath}\n\nYou can use a file manager to copy it.`
+        );
+      }
     } catch (error) {
       console.error("Export failed", error);
-      Alert.alert("Export Failed", "Failed to export data locally. Please try again.");
+      Alert.alert("Export Failed", "Failed to export data. Please try again.");
     }
   };
 
-
+  const handleExportOnCloud = () => {
+    Alert.alert(
+      "Coming Soon",
+      "Cloud backup will be available in a future update. For now, please use Export Locally to save your data to your device."
+    );
+  };
 
   const handleExportData = () => {
     Alert.alert(
       "Export Data",
-      "Choose an export method",
+      "Choose where to save your backup:",
       [
-
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-
-        {
-          text: "Export on Cloud",
-          onPress: handleExportOnCloud,
-        },
-
-        {
-          text: "Export Locally",
-          onPress: handleExportLocally,
-        },
+        { text: "Cancel", style: "cancel" },
+        { text: "☁️ Export on Cloud", onPress: handleExportOnCloud },
+        { text: "📱 Export Locally", onPress: handleExportLocally },
       ]
     );
   };
+
   return (
     <View style={styles.sectionView}>
       {onBack && (
@@ -74,17 +79,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClearAll, onMa
       </View>
 
       <View style={styles.settingItem}>
-        <Text style={styles.settingLabel}>Export Data</Text>
-        <TouchableOpacity
-          onPress={handleExportData}
-        >
+        <Text style={styles.settingLabel}>Your Profile</Text>
+        <TouchableOpacity onPress={onManageProfile}>
           <Text style={styles.settingAction}>Manage</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.settingItem}>
+        <Text style={styles.settingLabel}>Export Data</Text>
+        <TouchableOpacity onPress={handleExportData}>
+          <Text style={styles.settingAction}>Export</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.settingItem}>
         <Text style={styles.settingLabel}>Model Context</Text>
         <Text style={styles.settingValue}>4096 Tokens</Text>
       </View>
+
       <View style={styles.settingItem}>
         <Text style={styles.settingLabel}>Clear All History</Text>
         <TouchableOpacity onPress={onClearAll}>

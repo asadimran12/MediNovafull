@@ -31,7 +31,21 @@ const DAY_NAMES = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
 ];
 
-// ─── Condition Guidelines ──────────────────────────────────────────────────────
+// ─── Variety Helpers ──────────────────────────────────────────────────────
+
+function getDietaryFocus(day: string): string {
+    switch (day) {
+        case "Monday": return "Theme: Mediterranean. Focus on olive oil, fish, whole grains, and fresh vegetables.";
+        case "Tuesday": return "Theme: Asian Fusion (Halal). Focus on stir-fry, lean poultry, ginger, and garlic.";
+        case "Wednesday": return "Theme: Hearty Grills. Focus on grilled chicken/turkey, roasted roots, and legumes.";
+        case "Thursday": return "Theme: Plant-Power. Focus on chickpeas, lentils, tofu (if halal), and leafy greens.";
+        case "Friday": return "Theme: Middle Eastern. Focus on hummus, grilled skewers, tabbouleh, and quinoa.";
+        case "Saturday": return "Theme: Seafood & Citrus. Focus on steamed fish, citrus marinades, and brown rice.";
+        case "Sunday": return "Theme: Light Comfort. Focus on clear broths, poached proteins, and baked vegetables.";
+        default: return "Balanced nutrition.";
+    }
+}
+
 function buildConditionGuidelines(conditions: string): string {
     const lower = conditions.toLowerCase();
     const rules: string[] = [];
@@ -54,97 +68,81 @@ function buildDayPrompt(profile: UserProfile, day: string, medicalContext: strin
     const gender = profile.gender || "person";
     const conditions = profile.conditions?.trim() || "none";
     const guidelines = buildConditionGuidelines(conditions);
+    const focus = getDietaryFocus(day);
 
     return `You are a certified clinical nutritionist and halal diet expert.
 
-Create a realistic and healthy halal diet plan for ${day}.
+PATIENT PROFILE:
+- Age: ${age}
+- Gender: ${gender}
+- Medical Conditions: ${conditions}
 
-PATIENT INFORMATION
-Age: ${age}
-Gender: ${gender}
-Medical Conditions: ${conditions}
+MANDATORY DAILY THEME:
+${focus}
 
-MEDICAL DIET GUIDELINES
+MEDICAL DIET GUIDELINES:
 ${guidelines}
 
-GROUND TRUTH MEDICAL KNOWLEDGE
-${medicalContext || "Standard healthy nutrition principles."}
+MEDICAL CONTEXT (RAG):
+${medicalContext || "No specific medical records found for this profile."}
 
-DIET RULES
-* All food must be halal
-* Meals must use real food names
-* Never use the words Breakfast, Lunch, Dinner, or Snacks as dish names
-* Each meal must contain a specific dish name
-* Meals should be common healthy foods
-* Avoid repeating the same meal on multiple days
-* All meals must have protein greater than 5g
-* Macros must always include grams (example: 25g)
+RULES (STRICT):
+1. You MUST follow the "MEDICAL CONTEXT" provided above. It is your absolute priority.
+2. BE DIVERSE: Every day of the week must have completely different food items.
+3. REAL NAMES ONLY: Use specific real food names that match the DAILY THEME. NEVER write "e.g." or any placeholder text.
+4. HALAL: All suggestions must be halal.
+5. Response MUST be a single JSON object. No extra text, no markdown, no "e.g." prefix anywhere.
 
-MEALS REQUIRED
-Breakfast
-Lunch
-Dinner
-Snacks
-
-CALORIE TARGET PER DAY
-Total daily calories should be around 1800.
-
-MEAL CALORIE RANGES
-Breakfast: 300-400 calories
-Lunch: 450-550 calories
-Dinner: 500-650 calories
-Snacks: 200-300 calories
-
-MACRO FORMAT
-protein: number + g
-carbs: number + g
-fat: number + g
-
-IMPORTANT RULES
-* Use realistic food names like: omelette, oatmeal, grilled chicken, rice, lentils, yogurt, fruit, nuts, fish, salad
-* Never leave any field empty
-* Every meal must have a real dish name
-* Output must be valid JSON only
-
-OUTPUT STRUCTURE
+RESPONSE FORMAT (JSON) - FOLLOW THIS STRUCTURE WITH YOUR OWN REAL FOOD CHOICES:
 {
-"day": "${day}",
-"breakfast": {
-"name": "",
-"calories": 0,
-"protein": "",
-"carbs": "",
-"fat": ""
-},
-"lunch": {
-"name": "",
-"calories": 0,
-"protein": "",
-"carbs": "",
-"fat": ""
-},
-"dinner": {
-"name": "",
-"calories": 0,
-"protein": "",
-"carbs": "",
-"fat": ""
-},
-"snacks": {
-"name": "",
-"calories": 0,
-"protein": "",
-"carbs": "",
-"fat": ""
-}
+  "day": "${day}",
+  "summary": { "calories": 2000, "protein": "100g", "carbs": "250g", "fat": "70g" },
+  "breakfast": { "items": [{ "name": "Scrambled Eggs with Sauteed Spinach", "calories": 350, "protein": "25g", "carbs": "5g", "fat": "20g" }] },
+  "lunch": { "items": [{ "name": "Grilled Chicken Breast with Brown Rice", "calories": 550, "protein": "45g", "carbs": "40g", "fat": "15g" }] },
+  "dinner": { "items": [{ "name": "Baked Salmon with Steamed Broccoli", "calories": 450, "protein": "40g", "carbs": "10g", "fat": "12g" }] },
+  "snacks": { "items": [{ "name": "Handful of Unsalted Almonds", "calories": 150, "protein": "6g", "carbs": "5g", "fat": "14g" }] }
 }`;
 }
+
+/**
+ * Performs a post-generation safety check against medical guidelines.
+ */
+function verifyDietSafety(plan: DayPlan, medicalContext: string): { safe: boolean; reason?: string } {
+    const lowerContext = medicalContext.toLowerCase();
+    const planText = JSON.stringify(plan).toLowerCase();
+
+    // Heuristics for common medical contradictions
+    if (lowerContext.includes("avoid simple sugars") || lowerContext.includes("zero sugar")) {
+        const forbidden = ["sugar", "honey", "syrup", "dessert", "cake", "candy"];
+        for (const term of forbidden) {
+            if (planText.includes(term)) return { safe: false, reason: `Found forbidden ingredient: ${term}` };
+        }
+    }
+
+    if (lowerContext.includes("low sodium") || lowerContext.includes("salt")) {
+        const forbidden = ["salt", "soy sauce", "pickle", "processed meat", "canned soup"];
+        for (const term of forbidden) {
+            if (planText.includes(term)) return { safe: false, reason: `Found high-sodium item: ${term}` };
+        }
+    }
+
+    if (lowerContext.includes("low potassium")) {
+        const forbidden = ["banana", "spinach", "potato", "avocado"];
+        for (const term of forbidden) {
+            if (planText.includes(term)) return { safe: false, reason: `Found high-potassium item: ${term}` };
+        }
+    }
+
+    return { safe: true };
+}
+
 // ─── Diet Plan Generator ───────────────────────────────────────────────────────
 
 export async function generateDietPlan(
-    onProgress?: (dayName: string, index: number) => void
-): Promise<void> {
-
+    onProgress?: (dayName: string, index: number) => void,
+    options?: { autoSave?: boolean }
+): Promise<StructuredDietPlan | void> {
+    const autoSave = options?.autoSave !== false; // default true
     const profile = await storageService.getProfile();
     const LlamaService = (await import("./LlamaService")).default;
 
@@ -168,7 +166,7 @@ export async function generateDietPlan(
 
     // Initialize/Query RAG
     await KnowledgeBase.initialize();
-    const query = `${profile.gender} ${profile.age} years old with ${profile.conditions || "no conditions"}`;
+    const query = `diet plan for ${profile.gender} ${profile.age} years old with ${profile.conditions || "no conditions"}`;
     const medicalContext = await KnowledgeBase.getRelevantContext(query);
     console.log("🔍 RAG Context Retrieved for query:", query);
 
@@ -202,9 +200,15 @@ export async function generateDietPlan(
                 const parsedDay = parseSingleDay(response, day);
 
                 if (parsedDay) {
+                    const safety = verifyDietSafety(parsedDay, medicalContext);
+                    if (!safety.safe) {
+                        console.warn(`🚨 Safety check failed for ${day}: ${safety.reason}. Retrying...`);
+                        attempts++;
+                        continue;
+                    }
                     generatedDays.push(parsedDay);
                     success = true;
-                    console.log(`✅ ${day} generated`);
+                    console.log(`✅ ${day} generated and verified safe`);
                 } else {
                     attempts++;
                     console.warn(`⚠️ Parse failed for ${day}, retry ${attempts}/3`);
@@ -226,27 +230,38 @@ export async function generateDietPlan(
         days: generatedDays
     };
 
-    await storageService.savePlan({
-        id: Date.now().toString(),
-        type: "diet",
-        title: fullPlan.title,
-        content: JSON.stringify(fullPlan),
-        createdAt: new Date().toISOString(),
-    });
+    if (autoSave) {
+        await storageService.savePlan({
+            id: Date.now().toString(),
+            type: "diet",
+            title: fullPlan.title,
+            content: JSON.stringify(fullPlan),
+            createdAt: new Date().toISOString(),
+        });
+    }
 
     onProgress?.("Done", 7);
+    return fullPlan;
 }
+
 // ─── JSON Helpers ──────────────────────────────────────────────────────────────
 
 function fixJSON(text: string) {
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
+    let fixed = text.trim();
+    const start = fixed.indexOf("{");
+    const end = fixed.lastIndexOf("}");
 
     if (start !== -1 && end !== -1) {
-        return text.slice(start, end + 1);
+        fixed = fixed.slice(start, end + 1);
     }
 
-    return text;
+    // Fix unquoted values like: "calories": 300 kcal,
+    fixed = fixed.replace(/:\s*(\d+\s*[a-zA-Z%]+)(?=\s*[,}\s])/g, ':"$1"');
+
+    // Fix common trailing commas
+    fixed = fixed.replace(/,\s*([}\]])/g, '$1');
+
+    return fixed;
 }
 
 
@@ -285,7 +300,13 @@ function normaliseMealItem(raw: any, defaultName: string, defaultCals: number): 
     if (isNaN(cals) || cals <= 0) cals = defaultCals;
 
     let name = raw?.name;
-    if (!name || typeof name !== 'string' || name.trim() === "" || name === "FOOD NAME HERE") {
+    if (
+        !name ||
+        typeof name !== 'string' ||
+        name.trim() === "" ||
+        name === "FOOD NAME HERE" ||
+        name.toLowerCase().startsWith("e.g")
+    ) {
         name = defaultName;
     }
 
@@ -326,18 +347,27 @@ function normaliseMeal(raw: any, expectedType: Meal["type"]): Meal {
     else if (mealType === "Dinner") { defaultCals = 600; defaultName = "Baked Fish with Veggies"; }
     else if (mealType === "Snacks") { defaultCals = 250; defaultName = "Mixed Nuts & Fruit"; }
 
-    const isBadName = (n: any) => !n || typeof n !== 'string' || n === "FOOD NAME HERE" || n.toLowerCase() === mealType.toLowerCase() || n.trim() === "";
+    const isBadName = (n: any) => !n || typeof n !== 'string' || n === "FOOD NAME HERE" || n.toLowerCase().startsWith("e.g") || n.toLowerCase() === mealType.toLowerCase() || n.trim() === "";
+
+    if (Array.isArray(raw)) {
+        const items = raw.map((i: any) => {
+            let n = i.name || i.food || i.item;
+            if (isBadName(n)) n = defaultName;
+            return normaliseMealItem(i, n, Math.round(defaultCals / raw.length));
+        });
+        return { type: mealType, items };
+    }
 
     if (Array.isArray(raw.items) && raw.items.length > 0) {
         const items = raw.items.map((i: any) => {
-            let n = i.name;
+            let n = i.name || i.food || i.item;
             if (isBadName(n)) n = defaultName;
             return normaliseMealItem(i, n, Math.round(defaultCals / raw.items.length));
         });
         return { type: mealType, items };
     }
 
-    let n = raw.name;
+    let n = raw.name || raw.food || raw.item;
     if (isBadName(n)) n = defaultName;
 
     return {
@@ -350,16 +380,29 @@ function normaliseDay(raw: any, dayName?: string): DayPlan {
     if (!raw) raw = {};
     const name = dayName ?? raw.day ?? "Day";
 
-    const extractMeal = (type: Meal["type"]) => {
+    const extractMeal = (obj: any, type: Meal["type"]) => {
         const lowerType = type.toLowerCase();
-        return raw[lowerType] ?? raw.meals?.find((m: any) => m.type === type || (m.type ?? "").toLowerCase() === lowerType);
+        if (obj[lowerType] || obj[type]) return obj[lowerType] || obj[type];
+
+        if (Array.isArray(obj.meals)) {
+            const found = obj.meals.find((m: any) => m.type === type || (m.type ?? "").toLowerCase() === lowerType);
+            if (found) return found;
+        }
+
+        // Search one level deep for nested meals
+        for (const key in obj) {
+            if (typeof obj[key] === "object" && obj[key] !== null && !Array.isArray(obj[key])) {
+                if (obj[key][lowerType] || obj[key][type]) return obj[key][lowerType] || obj[key][type];
+            }
+        }
+        return {};
     };
 
     const meals: Meal[] = [
-        normaliseMeal(extractMeal("Breakfast"), "Breakfast"),
-        normaliseMeal(extractMeal("Lunch"), "Lunch"),
-        normaliseMeal(extractMeal("Dinner"), "Dinner"),
-        normaliseMeal(extractMeal("Snacks"), "Snacks")
+        normaliseMeal(extractMeal(raw, "Breakfast"), "Breakfast"),
+        normaliseMeal(extractMeal(raw, "Lunch"), "Lunch"),
+        normaliseMeal(extractMeal(raw, "Dinner"), "Dinner"),
+        normaliseMeal(extractMeal(raw, "Snacks"), "Snacks")
     ];
 
     return {
@@ -454,8 +497,40 @@ export function safeParseDietPlan(raw: string): StructuredDietPlan | null {
 
 // ─── Load Latest Diet Plan ────────────────────────────────────────────────────
 
+const MEAL_DEFAULTS: Record<string, { name: string; cals: number }> = {
+    Breakfast: { name: "Oatmeal with Eggs", cals: 350 },
+    Lunch:     { name: "Grilled Chicken Salad", cals: 500 },
+    Dinner:    { name: "Baked Fish with Vegetables", cals: 600 },
+    Snacks:    { name: "Mixed Nuts and Fruit", cals: 250 },
+};
+
+export function sanitisePlan(plan: StructuredDietPlan): StructuredDietPlan {
+    return {
+        ...plan,
+        days: plan.days.map(day => ({
+            ...day,
+            meals: day.meals.map(meal => ({
+                ...meal,
+                items: meal.items.map(item => {
+                    const isPlaceholder =
+                        !item.name ||
+                        item.name.trim() === "" ||
+                        item.name.toLowerCase().startsWith("e.g") ||
+                        item.name === "FOOD NAME HERE";
+                    if (isPlaceholder) {
+                        const def = MEAL_DEFAULTS[meal.type] ?? { name: "Healthy Meal", cals: 400 };
+                        return { ...item, name: def.name, calories: item.calories > 0 ? item.calories : def.cals };
+                    }
+                    return item;
+                })
+            }))
+        }))
+    };
+}
+
 export async function loadLatestDietPlan(): Promise<StructuredDietPlan | null> {
     const plans = await storageService.getPlans("diet");
     if (plans.length === 0) return null;
-    return safeParseDietPlan(plans[0].content);
+    const parsed = safeParseDietPlan(plans[0].content);
+    return parsed ? sanitisePlan(parsed) : null;
 }

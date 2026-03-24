@@ -34,7 +34,11 @@ class VectorService {
         }
     }
 
-    async save() {
+    getEntryCount(): number {
+    return this.entries.length;
+  }
+
+  async save() {
         const path = this.getPath();
         try {
             await ReactNativeFS.writeFile(path, JSON.stringify(this.entries));
@@ -55,8 +59,12 @@ class VectorService {
         await this.save();
     }
 
-    async clear() {
-        this.entries = [];
+    async clear(filter?: (entry: VectorEntry) => boolean) {
+        if (filter) {
+            this.entries = this.entries.filter(e => !filter(e));
+        } else {
+            this.entries = [];
+        }
         await this.save();
     }
 
