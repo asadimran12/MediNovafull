@@ -47,6 +47,7 @@ import ImageUploader from "./src/screens/ImageUploader";
 import ModelService from "./src/services/ModelService";
 import ChatPage from "./src/screens/ChatPage";
 import { ForgetPassword } from "./src/screens/ForgetPassword";
+import NotificationService from "./src/services/NotificationService";
 
 type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore";
 
@@ -79,6 +80,8 @@ export default function App() {
 
   // --- Initialization & Lifecycle ---
   useEffect(() => {
+    NotificationService.init().catch(e => console.error("[Notifee] Init error:", e));
+
     (async () => {
       try {
         setStatus("Syncing Health Data");
@@ -557,7 +560,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        {currentUser && currentView !== "model_setup" && currentView !== "dashboard" && currentView !== "settings" && currentView !== "profile" && (
+        {currentUser && currentView !== "model_setup" && currentView !== "dashboard" && currentView !== "settings" && currentView !== "profile" && currentView !== "diet_plans" && currentView !== "exercise_plans" && (
           <>
             <Sidebar
               isOpen={isSidebarOpen}
@@ -575,7 +578,7 @@ export default function App() {
             />
             <View style={styles.header}>
               <TouchableOpacity onPress={toggleSidebar} style={styles.menuIcon}><Text style={{ fontSize: 24 }}>☰</Text></TouchableOpacity>
-              {currentView !== "chat" && currentView !== "chat_page" && currentView !== "report_analysis" && currentView !== "image_uploader" && currentView !== "diet_plans" && currentView !== "exercise_plans" && currentView !== "model_manager" ? (
+              {currentView !== "chat" && currentView !== "chat_page" && currentView !== "report_analysis" && currentView !== "image_uploader" && currentView !== "model_manager" ? (
                 <View style={styles.logoContainer}>
                   <View style={styles.imageContainer}>
                     <Image

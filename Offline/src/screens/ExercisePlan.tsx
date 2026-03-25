@@ -8,7 +8,11 @@ import {
     ActivityIndicator,
     Modal,
     Alert,
+    Switch,
+    TextInput,
 } from "react-native";
+
+import NotificationService, { ReminderTimes } from "../services/NotificationService";
 
 import { COLORS } from "../constants/theme";
 import storageService, { HealthPlan } from "../services/StorageService";
@@ -63,6 +67,51 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     const [completedItems, setCompletedItems] = useState<string[]>([]);
     const [savedPlans, setSavedPlans] = useState<HealthPlan[]>([]);
     const [showManageModal, setShowManageModal] = useState(false);
+    const [showReminderModal, setShowReminderModal] = useState(false);
+    
+    type UIConfig = { exercise: { enabled: boolean; hour: string; minute: string } };
+    const [reminders, setReminders] = useState<UIConfig | null>(null);
+
+    useEffect(() => {
+        NotificationService.getReminders().then(res => {
+            setReminders({
+                exercise: { enabled: res.exercise.enabled, hour: res.exercise.hour.toString().padStart(2, '0'), minute: res.exercise.minute.toString().padStart(2, '0') }
+            });
+        });
+    }, []);
+
+    const handleSaveReminders = async () => {
+        if (reminders) {
+            const currentObj = await NotificationService.getReminders();
+            const finalConfig: ReminderTimes = {
+                ...currentObj,
+                exercise: {
+                    enabled: reminders.exercise.enabled,
+                    hour: Math.max(0, Math.min(23, parseInt(reminders.exercise.hour) || 0)),
+                    minute: Math.max(0, Math.min(59, parseInt(reminders.exercise.minute) || 0))
+                }
+            };
+
+            await NotificationService.applyReminderConfig(finalConfig);
+
+            setReminders({
+                exercise: { enabled: finalConfig.exercise.enabled, hour: finalConfig.exercise.hour.toString().padStart(2, '0'), minute: finalConfig.exercise.minute.toString().padStart(2, '0') }
+            });
+
+            setShowReminderModal(false);
+            Alert.alert("Saved", "Exercise reminder updated successfully");
+        }
+    };
+
+    const updateExerciseReminder = (field: 'enabled'|'hour'|'minute', value: any) => {
+        if (field === 'hour' || field === 'minute') {
+            value = value.replace(/[^0-9]/g, ''); // only allow digits
+        }
+        setReminders(prev => prev ? {
+            ...prev,
+            exercise: { ...prev.exercise, [field]: value }
+        } : null);
+    };
 
     /* Load plans */
     const loadPlans = useCallback(async () => {
@@ -168,17 +217,26 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     return (
         <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
 
-            {/* ── Header ── */}
-            <View style={styles.headerRow}>
-                {onBack && (
-                    <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                        <Text style={styles.backButtonText}>← Back</Text>
+            {/* ── Professional Green Header ── */}
+            <View style={styles.headerContainer}>
+                <View style={styles.headerTopRow}>
+                    {onBack ? (
+                        <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                            <Text style={styles.backButtonText}>← Back</Text>
+                        </TouchableOpacity>
+                    ) : <View style={{ width: 70 }} />}
+                    <Text style={styles.screenTitle}>Exercise Plan</Text>
+                    <View style={{ width: 70 }} />
+                </View>
+
+                <View style={styles.headerActionRow}>
+                    <TouchableOpacity onPress={() => setShowReminderModal(true)} style={styles.headerActionBtn}>
+                        <Text style={styles.headerActionBtnText}>🔔 Reminders</Text>
                     </TouchableOpacity>
-                )}
-                <Text style={styles.screenTitle}>Exercise Plan</Text>
-                <TouchableOpacity onPress={() => setShowManageModal(true)} style={styles.manageButton}>
-                    <Text style={styles.manageButtonText}>📋 Manage</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowManageModal(true)} style={styles.headerActionBtn}>
+                        <Text style={styles.headerActionBtnText}>📋 Manage Plans</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* ── Action Buttons ── */}
@@ -340,41 +398,108 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                     </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
+
+            {/* ── Reminder Modal ── */}
+            <Modal visible={showReminderModal} transparent animationType="fade" onRequestClose={() => setShowReminderModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalSheet}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>🔔 Exercise Reminder</Text>
+
+                        {reminders && (
+                            <View style={styles.reminderRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.reminderTitle}>Daily Workout</Text>
+                                </View>
+                                <View style={styles.timeInputContainer}>
+                                    <TextInput
+                                        style={styles.timeInput}
+                                        keyboardType="number-pad"
+                                        maxLength={2}
+                                        selectTextOnFocus
+                                        value={reminders.exercise.hour}
+                                        onChangeText={t => updateExerciseReminder('hour', t)}
+                                    />
+                                    <Text style={{ fontWeight: 'bold' }}>:</Text>
+                                    <TextInput
+                                        style={styles.timeInput}
+                                        keyboardType="number-pad"
+                                        maxLength={2}
+                                        selectTextOnFocus
+                                        value={reminders.exercise.minute}
+                                        onChangeText={t => updateExerciseReminder('minute', t)}
+                                    />
+                                </View>
+                                <Switch
+                                    value={reminders.exercise.enabled}
+                                    onValueChange={v => updateExerciseReminder('enabled', v)}
+                                    trackColor={{ false: "#ddd", true: COLORS.primary }}
+                                />
+                            </View>
+                        )}
+
+                        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveReminders}>
+                            <Text style={[styles.useBtnText, { textAlign: 'center' }]}>💾 Save Reminder</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.modalCloseBtn, { marginTop: 10 }]} onPress={() => setShowReminderModal(false)}>
+                            <Text style={styles.modalCloseBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
 
 /* ─── Styles ────────────────────────────────────────────── */
 const styles = StyleSheet.create({
-    headerRow: {
+    headerContainer: {
+        backgroundColor: COLORS.primary,
+        paddingTop: 16,
+        paddingBottom: 20,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 8,
+        marginBottom: 4,
+    },
+    headerTopRow: {
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "space-between",
         paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 8,
-        backgroundColor: "#fff",
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
+        marginBottom: 16,
     },
     backButton: {
-        paddingVertical: 6,
+        paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 8,
-        backgroundColor: "#F1F5F9",
-        borderWidth: 1,
-        borderColor: "#E2E8F0",
+        backgroundColor: "rgba(255,255,255,0.2)",
     },
-    backButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
-    screenTitle: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "800", color: "#1a1a2e" },
-    manageButton: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: COLORS.primary + "18",
-        borderWidth: 1,
-        borderColor: COLORS.primary + "40",
+    backButtonText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+    screenTitle: { fontSize: 22, fontWeight: "800", color: "#fff", textAlign: "center" },
+    headerActionRow: {
+        flexDirection: "row",
+        justifyContent: "center",
+        gap: 12,
     },
-    manageButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 13 },
+    headerActionBtn: {
+        backgroundColor: "#fff",
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        flexDirection: "row",
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    headerActionBtnText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
 
     generateButton: {
         backgroundColor: COLORS.primary,
@@ -520,4 +645,10 @@ const styles = StyleSheet.create({
     deleteBtnText: { fontSize: 16 },
     modalCloseBtn: { marginTop: 16, backgroundColor: "#F1F5F9", padding: 14, borderRadius: 12, alignItems: "center" },
     modalCloseBtnText: { color: "#555", fontWeight: "700", fontSize: 15 },
+
+    // Reminders
+    reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: "#F8F9FA", padding: 12, borderRadius: 10 },
+    reminderTitle: { fontWeight: "700", fontSize: 16, color: "#1a1a2e" },
+    timeInputContainer: { flexDirection: "row", alignItems: "center", marginRight: 15 },
+    timeInput: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd", borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, fontSize: 16, fontWeight: "600", textAlign: "center", minWidth: 40, marginHorizontal: 4 },
 });

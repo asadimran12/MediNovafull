@@ -8,7 +8,11 @@ import {
   ActivityIndicator,
   Modal,
   Alert,
+  Switch,
+  TextInput,
 } from "react-native";
+
+import NotificationService, { ReminderTimes } from "../services/NotificationService";
 
 import { COLORS } from "../constants/theme";
 import storageService, { HealthPlan } from "../services/StorageService";
@@ -127,6 +131,63 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   const [planNumbers, setPlanNumbers] = useState({ totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 });
   const [savedPlans, setSavedPlans] = useState<HealthPlan[]>([]);
   const [showManageModal, setShowManageModal] = useState(false);
+  const [completedMeals, setCompletedMeals] = useState<number[]>([]);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  
+  type UIConfig = Record<'breakfast'|'lunch'|'snack'|'dinner', { enabled: boolean; hour: string; minute: string }>;
+  const [reminders, setReminders] = useState<UIConfig | null>(null);
+
+  useEffect(() => {
+    NotificationService.getReminders().then(res => {
+      setReminders({
+        breakfast: { enabled: res.breakfast.enabled, hour: res.breakfast.hour.toString().padStart(2, '0'), minute: res.breakfast.minute.toString().padStart(2, '0') },
+        lunch: { enabled: res.lunch.enabled, hour: res.lunch.hour.toString().padStart(2, '0'), minute: res.lunch.minute.toString().padStart(2, '0') },
+        snack: { enabled: res.snack.enabled, hour: res.snack.hour.toString().padStart(2, '0'), minute: res.snack.minute.toString().padStart(2, '0') },
+        dinner: { enabled: res.dinner.enabled, hour: res.dinner.hour.toString().padStart(2, '0'), minute: res.dinner.minute.toString().padStart(2, '0') },
+      });
+    });
+  }, []);
+
+  const handleSaveReminders = async () => {
+    if (reminders) {
+      const finalConfig: ReminderTimes = {
+        breakfast: { enabled: reminders.breakfast.enabled, hour: parseInt(reminders.breakfast.hour) || 0, minute: parseInt(reminders.breakfast.minute) || 0 },
+        lunch: { enabled: reminders.lunch.enabled, hour: parseInt(reminders.lunch.hour) || 0, minute: parseInt(reminders.lunch.minute) || 0 },
+        snack: { enabled: reminders.snack.enabled, hour: parseInt(reminders.snack.hour) || 0, minute: parseInt(reminders.snack.minute) || 0 },
+        dinner: { enabled: reminders.dinner.enabled, hour: parseInt(reminders.dinner.hour) || 0, minute: parseInt(reminders.dinner.minute) || 0 },
+        exercise: (await NotificationService.getReminders()).exercise // preserve exercise
+      };
+      
+      const sanitizeTime = (val: number, max: number) => Math.max(0, Math.min(max, val));
+      for (const m of ['breakfast', 'lunch', 'snack', 'dinner'] as const) {
+        finalConfig[m].hour = sanitizeTime(finalConfig[m].hour, 23);
+        finalConfig[m].minute = sanitizeTime(finalConfig[m].minute, 59);
+      }
+
+      await NotificationService.applyReminderConfig(finalConfig);
+      
+      // Update UI state with sanitized values
+      setReminders({
+        breakfast: { enabled: finalConfig.breakfast.enabled, hour: finalConfig.breakfast.hour.toString().padStart(2, '0'), minute: finalConfig.breakfast.minute.toString().padStart(2, '0') },
+        lunch: { enabled: finalConfig.lunch.enabled, hour: finalConfig.lunch.hour.toString().padStart(2, '0'), minute: finalConfig.lunch.minute.toString().padStart(2, '0') },
+        snack: { enabled: finalConfig.snack.enabled, hour: finalConfig.snack.hour.toString().padStart(2, '0'), minute: finalConfig.snack.minute.toString().padStart(2, '0') },
+        dinner: { enabled: finalConfig.dinner.enabled, hour: finalConfig.dinner.hour.toString().padStart(2, '0'), minute: finalConfig.dinner.minute.toString().padStart(2, '0') },
+      });
+
+      setShowReminderModal(false);
+      Alert.alert("Saved", "Meal reminders updated successfully");
+    }
+  };
+
+  const updateMealReminder = (meal: keyof UIConfig, field: 'enabled'|'hour'|'minute', value: any) => {
+    if (field === 'hour' || field === 'minute') {
+      value = value.replace(/[^0-9]/g, ''); // only allow digits
+    }
+    setReminders(prev => prev ? {
+      ...prev,
+      [meal]: { ...prev[meal], [field]: value }
+    } : null);
+  };
 
   /* ─── Load latest plan and all saved plans on mount ─ */
   const loadPlans = useCallback(async () => {
@@ -235,6 +296,19 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 
   const normalizedMeals = currentDay ? normalizeMeals(currentDay.meals ?? []) : [];
 
+  /* Reset meal ticks when day changes */
+  useEffect(() => { setCompletedMeals([]); }, [selectedDayIndex]);
+
+  /* Meal progress */
+  const totalMeals = normalizedMeals.length;
+  const mealProgress = totalMeals === 0 ? 0 : Math.round((completedMeals.length / totalMeals) * 100);
+
+  const toggleMeal = (mi: number) => {
+    setCompletedMeals(prev =>
+      prev.includes(mi) ? prev.filter(i => i !== mi) : [...prev, mi]
+    );
+  };
+
   /* ─── Exercise fallback ───────────────────────────────── */
   if (type === "exercise") {
     return (
@@ -248,17 +322,26 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   return (
     <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
 
-      {/* ── Header ── */}
-      <View style={styles.headerRow}>
-        {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
+      {/* ── Professional Green Header ── */}
+      <View style={styles.headerContainer}>
+        <View style={styles.headerTopRow}>
+          {onBack ? (
+            <TouchableOpacity onPress={onBack} style={styles.backButton}>
+              <Text style={styles.backButtonText}>← Back</Text>
+            </TouchableOpacity>
+          ) : <View style={{ width: 70 }} />}
+          <Text style={styles.screenTitle}>Diet Plan</Text>
+          <View style={{ width: 70 }} />
+        </View>
+
+        <View style={styles.headerActionRow}>
+          <TouchableOpacity onPress={() => setShowReminderModal(true)} style={styles.headerActionBtn}>
+            <Text style={styles.headerActionBtnText}>🔔 Reminders</Text>
           </TouchableOpacity>
-        )}
-        <Text style={styles.screenTitle}>Diet Plan</Text>
-        <TouchableOpacity onPress={() => setShowManageModal(true)} style={styles.manageButton}>
-          <Text style={styles.manageButtonText}>📋 Manage</Text>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowManageModal(true)} style={styles.headerActionBtn}>
+            <Text style={styles.headerActionBtnText}>📋 Manage Plans</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ── Stats Row ── */}
@@ -340,13 +423,34 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
           </View>
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 50 }}>
+
+            {/* ── Meal Progress ── */}
+            {totalMeals > 0 && (
+              <View style={styles.progressContainer}>
+                <Text style={styles.progressTitle}>Today's Meal Progress</Text>
+                <View style={styles.progressBarBackground}>
+                  <View style={[styles.progressBarFill, { width: `${mealProgress}%` }]} />
+                </View>
+                <Text style={styles.progressPercent}>{completedMeals.length}/{totalMeals} meals · {mealProgress}% done</Text>
+              </View>
+            )}
+
             {normalizedMeals.map((items, mi) => {
               const title = currentDay?.meals?.[mi]?.type ?? "Meal";
+              const done = completedMeals.includes(mi);
               return (
-                <View key={mi} style={styles.mealSection}>
+                <View key={mi} style={[styles.mealSection, done && styles.mealSectionDone]}>
                   <View style={styles.mealHeader}>
                     <Text style={styles.mealIcon}>{getMealIcon(title)}</Text>
                     <Text style={styles.mealTitle}>{title}</Text>
+                    {done && <Text style={styles.mealDoneCheck}>✔</Text>}
+                    {/* Tick button */}
+                    <TouchableOpacity
+                      style={[styles.mealCircle, done && styles.mealCircleDone]}
+                      onPress={() => toggleMeal(mi)}
+                    >
+                      {done && <Text style={styles.mealTick}>✓</Text>}
+                    </TouchableOpacity>
                   </View>
                   {items.map((item, ii) => <FoodItemCard key={ii} item={item} />)}
                 </View>
@@ -406,41 +510,108 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* ── Reminder Modal ── */}
+      <Modal visible={showReminderModal} transparent animationType="fade" onRequestClose={() => setShowReminderModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>🔔 Meal Reminders</Text>
+
+            {reminders && (['breakfast', 'lunch', 'snack', 'dinner'] as const).map(meal => (
+              <View key={meal} style={styles.reminderRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.reminderTitle}>{meal.charAt(0).toUpperCase() + meal.slice(1)}</Text>
+                </View>
+                <View style={styles.timeInputContainer}>
+                  <TextInput
+                    style={styles.timeInput}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    selectTextOnFocus
+                    value={reminders[meal].hour}
+                    onChangeText={t => updateMealReminder(meal, 'hour', t)}
+                  />
+                  <Text style={{ fontWeight: 'bold' }}>:</Text>
+                  <TextInput
+                    style={styles.timeInput}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    selectTextOnFocus
+                    value={reminders[meal].minute}
+                    onChangeText={t => updateMealReminder(meal, 'minute', t)}
+                  />
+                </View>
+                <Switch
+                  value={reminders[meal].enabled}
+                  onValueChange={v => updateMealReminder(meal, 'enabled', v)}
+                  trackColor={{ false: "#ddd", true: COLORS.primary }}
+                />
+              </View>
+            ))}
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveReminders}>
+              <Text style={styles.useBtnText}>💾 Save Reminders</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.modalCloseBtn, { marginTop: 10 }]} onPress={() => setShowReminderModal(false)}>
+              <Text style={styles.modalCloseBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 /* ─── Styles ───────────────────────────────────────────────── */
 const styles = StyleSheet.create({
-  headerRow: {
+  headerContainer: {
+    backgroundColor: COLORS.primary,
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    marginBottom: 4,
+  },
+  headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    marginBottom: 16,
   },
   backButton: {
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: "#F1F5F9",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
-  backButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
-  screenTitle: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "800", color: "#1a1a2e" },
-  manageButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary + "18",
-    borderWidth: 1,
-    borderColor: COLORS.primary + "40",
+  backButtonText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  screenTitle: { fontSize: 22, fontWeight: "800", color: "#fff", textAlign: "center" },
+  headerActionRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
   },
-  manageButtonText: { color: COLORS.primary, fontWeight: "700", fontSize: 13 },
+  headerActionBtn: {
+    backgroundColor: "#fff",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerActionBtnText: { color: COLORS.primary, fontWeight: "700", fontSize: 14 },
 
   statsContainer: {
     flexDirection: "row",
@@ -541,7 +712,15 @@ const styles = StyleSheet.create({
   dayText: { color: COLORS.primary, fontWeight: "bold", fontSize: 12 },
   dayTextSelected: { color: "#fff" },
 
+  // Progress bar
+  progressContainer: { backgroundColor: "#fff", padding: 16, borderRadius: 12, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  progressTitle: { fontWeight: "700", fontSize: 14, color: "#333", marginBottom: 10 },
+  progressBarBackground: { height: 12, backgroundColor: "#eee", borderRadius: 6, overflow: "hidden" },
+  progressBarFill: { height: "100%", backgroundColor: "#27ae60", borderRadius: 6 },
+  progressPercent: { marginTop: 6, fontWeight: "600", fontSize: 13, textAlign: "right", color: "#27ae60" },
+
   mealSection: { marginBottom: 22 },
+  mealSectionDone: { opacity: 0.5 },
   mealHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
   mealIcon: { fontSize: 20 },
   mealTitle: { fontWeight: "800", fontSize: 17, color: "#222" },
@@ -557,6 +736,14 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   foodName: { fontWeight: "700", fontSize: 15, color: "#222", marginBottom: 10 },
+  mealDoneCheck: { marginLeft: "auto", fontSize: 15, color: "#27ae60", fontWeight: "bold" },
+  mealCircle: {
+    width: 28, height: 28, borderRadius: 14,
+    borderWidth: 2, borderColor: "#ddd",
+    justifyContent: "center", alignItems: "center", marginLeft: "auto",
+  },
+  mealCircleDone: { backgroundColor: "#27ae60", borderColor: "#27ae60" },
+  mealTick: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   pillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   pill: { borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, alignItems: "center", minWidth: 52 },
   pillValue: { fontWeight: "700", fontSize: 13 },
@@ -640,4 +827,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalCloseBtnText: { color: "#555", fontWeight: "700", fontSize: 15 },
+
+  // Reminders
+  reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: "#F8F9FA", padding: 12, borderRadius: 10 },
+  reminderTitle: { fontWeight: "700", fontSize: 16, color: "#1a1a2e" },
+  timeInputContainer: { flexDirection: "row", alignItems: "center", marginRight: 15 },
+  timeInput: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd", borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, fontSize: 16, fontWeight: "600", textAlign: "center", minWidth: 40, marginHorizontal: 4 },
 });
