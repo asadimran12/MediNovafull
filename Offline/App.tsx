@@ -70,6 +70,8 @@ export default function App() {
   const [scannedReport, setScannedReport] = useState<any>(null);
   const [scannedImage, setScannedImage] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'gallery' | 'pdf' | 'camera' | undefined>();
+  const [cloudData, setCloudData] = useState<any>(null);
+
 
   const MAX_MESSAGES = 40;
   const isChatFull = messages.length >= MAX_MESSAGES;
@@ -210,7 +212,7 @@ export default function App() {
     setMessages([
       {
         id: "initial-greeting",
-          text: "Hello! I am MediNova. Ask me anything about diabetes, cardiovascular diseases, or other general health questions. I can also provide diet and exercise guidance!",
+        text: "Hello! I am MediNova. Ask me anything about diabetes, cardiovascular diseases, or other general health questions. I can also provide diet and exercise guidance!",
         role: "assistant",
         timestamp: new Date(),
       },
@@ -446,12 +448,12 @@ export default function App() {
       case "about":
         return <AboutScreen />;
       case "settings":
-        return <SettingsScreen 
-          onClearAll={handleClearAll} 
-          onManageModels={() => setCurrentView("model_manager")} 
+        return <SettingsScreen
+          onClearAll={handleClearAll}
+          onManageModels={() => setCurrentView("model_manager")}
           onManageProfile={() => setCurrentView("profile")}
-          onBack={() => setCurrentView("dashboard")} 
-          onLogout={handleLogout} 
+          onBack={() => setCurrentView("dashboard")}
+          onLogout={handleLogout}
         />;
       case "profile":
         return <ProfileScreen onSave={handleSaveProfile} onClose={handleCloseProfile} />;
@@ -460,13 +462,13 @@ export default function App() {
       case "model_manager":
         return <ModelManagerScreen onBack={() => setCurrentView("settings")} />;
       case "report_analysis":
-        return <ReportAnalysisScreen 
-          onBack={() => setCurrentView("dashboard")} 
+        return <ReportAnalysisScreen
+          onBack={() => setCurrentView("dashboard")}
           onNavigateToUpload={(mode) => {
             setUploadMode(mode);
             setCurrentView("image_uploader");
-          }} 
-          onNavigateToChat={() => setCurrentView("chat_page")} 
+          }}
+          onNavigateToChat={() => setCurrentView("chat_page")}
         />;
       case "image_uploader":
         return <ImageUploader
@@ -482,13 +484,13 @@ export default function App() {
           }}
         />;
       case "chat_page":
-        return <ChatPage 
+        return <ChatPage
           onBack={() => {
             setScannedReport(null);
             setScannedImage(null);
             setCurrentView("report_analysis");
-          }} 
-          reportData={scannedReport} 
+          }}
+          reportData={scannedReport}
           imageUri={scannedImage}
         />;
       case "forget_password":
@@ -497,6 +499,7 @@ export default function App() {
         return (
           <ImportData
             onSkip={() => setCurrentView("dashboard")}
+            onCloudDataFetched={setCloudData}
             onImportSuccess={async () => {
               const userId = await AuthService.getCurrentUserId();
               if (userId) {
@@ -615,10 +618,11 @@ export default function App() {
             ) : currentView === "forget_password" ? (
               <ForgetPassword onBack={() => setCurrentView("chat")} />
             ) : (
-              <AuthScreen 
-                onLogin={handleLogin} 
-                onForgetPassword={() => setCurrentView("forget_password")} 
+              <AuthScreen
+                onLogin={handleLogin}
+                onForgetPassword={() => setCurrentView("forget_password")}
                 onRestore={() => setCurrentView("restore")}
+                cloudData={cloudData}
               />
             )
           ) : (

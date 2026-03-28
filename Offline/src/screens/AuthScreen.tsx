@@ -15,20 +15,24 @@ import {
 import { useRef } from "react";
 import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import AuthService, { UserAccount } from "../services/AuthService";
+import StorageService from "../services/StorageService";
+import * as ReactNativeFS from "react-native-fs";
 
 interface AuthScreenProps {
   onLogin: (user: UserAccount) => void;
   onForgetPassword: () => void;
   onRestore: () => void;
+  cloudData?: any;
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPassword, onRestore }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPassword, onRestore, cloudData }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  console.log("cloudData", cloudData);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();
@@ -37,15 +41,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
     Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
   };
 
+
+
+
   const handleAuth = async () => {
     if (!username.trim() || !password.trim()) {
       Alert.alert("Error", "Please fill in all fields.");
       return;
     }
 
+
     setIsLoading(true);
     try {
       if (isRegistering) {
+        // ── Normal registration (local only) ───────────────────────────────
         const user = await AuthService.register(username, password);
         if (user) {
           Alert.alert("Success", "Account created! You can now login.");
@@ -54,7 +63,46 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
         } else {
           Alert.alert("Error", "Username already exists.");
         }
+
+      } else if (cloudData && Array.isArray(cloudData.auth.users)) {
+        // ── Cloud login: check credentials against cloud data ──────────────
+        const matchedUser = cloudData.auth.users.find(
+          (u: any) =>
+            u.username?.toLowerCase() === username.toLowerCase() &&
+            u.passwordHash === password
+        );
+        console.log("matchedUser", matchedUser);
+
+        if (matchedUser) {
+
+          const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
+          if (!(await ReactNativeFS.exists(authDir))) await ReactNativeFS.mkdir(authDir);
+          await ReactNativeFS.writeFile(`${authDir}/users.json`, JSON.stringify(cloudData.auth.users), "utf8");
+          await ReactNativeFS.writeFile(`${authDir}/session.json`, JSON.stringify({ userId: matchedUser.id }), "utf8");
+          await StorageService.setUser(matchedUser.id);
+
+          if (cloudData.profile) {
+            await StorageService.saveProfile(cloudData.profile);
+          }
+          if (Array.isArray(cloudData.chats)) {
+            for (const chat of cloudData.chats) {
+              await StorageService.saveChat(chat);
+            }
+          }
+
+          if (Array.isArray(cloudData.plans)) {
+            for (const plan of cloudData.plans) {
+              await StorageService.savePlan(plan);
+            }
+          }
+
+          onLogin(matchedUser);
+        } else {
+          Alert.alert("Error", "Username or password does not match the cloud backup.");
+        }
+
       } else {
+        // ── Normal local login ─────────────────────────────────────────────
         const user = await AuthService.login(username, password);
         if (user) {
           onLogin(user);
@@ -155,7 +203,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
               </TouchableOpacity>
 
               <Animated.View style={{ transform: [{ scale: scaleAnim }], alignSelf: 'center' }}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPressIn={handlePressIn}
                   onPressOut={handlePressOut}
                   onPress={onRestore}

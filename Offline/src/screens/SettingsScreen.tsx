@@ -23,31 +23,35 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     try {
       const exportPath = await storageService.exportAllDataLocally();
 
-      // Try Android/iOS Share sheet first
-      try {
-        await Share.share({
-          title: "MediNova Backup",
-          message: `MediNova backup file saved at:\n${exportPath}`,
-          url: `file://${exportPath}`,
-        });
-      } catch {
-        // Fallback: just show the path
-        Alert.alert(
-          "Export Successful",
-          `Your data has been exported to:\n\n${exportPath}\n\nYou can use a file manager to copy it.`
-        );
-      }
+      // Share the export path via the Share sheet
+      await Share.share({
+        title: "MediNova Backup",
+        message: `MediNova backup file saved at:\n${exportPath}`,
+        url: `file://${exportPath}`,
+      });
+
+      // Also show an alert so the user knows exactly where the file is
+      Alert.alert(
+        "Export Successful",
+        `Your data has been exported to:\n\n${exportPath}\n\nYou can use a file manager to copy it.`
+      );
     } catch (error) {
       console.error("Export failed", error);
       Alert.alert("Export Failed", "Failed to export data. Please try again.");
     }
   };
 
-  const handleExportOnCloud = () => {
-    Alert.alert(
-      "Coming Soon",
-      "Cloud backup will be available in a future update. For now, please use Export Locally to save your data to your device."
-    );
+  const handleExportOnCloud = async () => {
+    try {
+      await storageService.exportAllDataOnCloud();
+      Alert.alert(
+        "Export Successful",
+        `Your data has been exported to the cloud.`
+      );
+    } catch (error) {
+      console.error("Export failed", error);
+      Alert.alert("Export Failed", "Failed to export data. Please try again.");
+    }
   };
 
   const handleExportData = () => {

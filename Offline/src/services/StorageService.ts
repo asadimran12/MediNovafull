@@ -1,4 +1,4 @@
-import ReactNativeFS from "react-native-fs";
+import * as ReactNativeFS from "react-native-fs";
 
 export interface LocalMessage {
   id: string;
@@ -96,6 +96,44 @@ class StorageService {
     await ReactNativeFS.writeFile(exportPath, JSON.stringify(exportData, null, 2), "utf8");
     console.log(`Exported ${exportData.chats.length} chats, ${exportData.plans.length} plans to: ${exportPath}`);
     return exportPath;
+  }
+
+  async exportAllDataOnCloud() {
+    try {
+      const exportData: any = {
+        timestamp: new Date().toISOString(),
+        profile: await this.getProfile(),
+        chats: await this.getAllChats(),
+        plans: await this.getPlans(),
+        auth: {
+          users: [],
+          session: {}
+        }
+      };
+      const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
+      try {
+        if (await ReactNativeFS.exists(`${authDir}/users.json`)) {
+          exportData.auth.users = JSON.parse(await ReactNativeFS.readFile(`${authDir}/users.json`, "utf8"));
+        }
+        if (await ReactNativeFS.exists(`${authDir}/session.json`)) {
+          exportData.auth.session = JSON.parse(await ReactNativeFS.readFile(`${authDir}/session.json`, "utf8"));
+        }
+      } catch (e) {
+        console.error("Failed to read auth data for export", e);
+      }
+      const response = await fetch("http://10.0.2.2:8000/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(exportData),
+      });
+      const data = await response.json();
+      console.log("Exported to cloud:", data);
+    } catch (error) {
+      console.error("Failed to export to cloud", error);
+      throw error;
+    }
   }
 
 

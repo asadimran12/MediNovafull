@@ -7,9 +7,10 @@ import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
 interface ImportDataProps {
     onSkip: () => void;
     onImportSuccess?: () => void;
+    onCloudDataFetched: (data: any) => void;
 }
 
-export default function ImportData({ onSkip, onImportSuccess }: ImportDataProps) {
+export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched }: ImportDataProps) {
 
     const handleImport = async () => {
         try {
@@ -31,6 +32,24 @@ export default function ImportData({ onSkip, onImportSuccess }: ImportDataProps)
                 console.error("Import error:", error);
                 Alert.alert("Import Error", "An unexpected error occurred. Please try again.");
             }
+        }
+    }
+
+
+    const handleimportfromcloud = async () => {
+        try {
+            const response = await fetch("http://10.0.2.2:8000/users/GetAllData", {
+                method: "GET",
+            });
+            const data = await response.json();
+            if (data) {
+                onCloudDataFetched(data);
+                onSkip();
+
+            }
+        } catch (error) {
+            console.error("Failed to import from cloud", error);
+            throw error;
         }
     }
 
@@ -65,6 +84,21 @@ export default function ImportData({ onSkip, onImportSuccess }: ImportDataProps)
                     onPress={handleImport}
                 >
                     <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>📂 Select Backup File</Text>
+                </TouchableOpacity>
+
+
+                <TouchableOpacity
+                    style={{
+                        backgroundColor: COLORS.primary,
+                        paddingVertical: SPACING.md,
+                        borderRadius: RADIUS.lg,
+                        alignItems: 'center',
+                        ...SHADOWS.light,
+                        marginBottom: SPACING.md,
+                    }}
+                    onPress={handleimportfromcloud}
+                >
+                    <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>Import from Cloud</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={onSkip} style={{ alignItems: 'center', padding: SPACING.sm }}>
