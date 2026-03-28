@@ -37,6 +37,8 @@ export interface UserProfile {
 // ─── Storage Service ───────────────────────────────────────────────────────────
 
 class StorageService {
+
+  private readonly BACKEND_URL = process.env.BACKEND_URL;
   private userId: string | null = null;
   private readonly USERS_BASE_DIR = `${ReactNativeFS.DocumentDirectoryPath}/users`;
 
@@ -121,7 +123,7 @@ class StorageService {
       } catch (e) {
         console.error("Failed to read auth data for export", e);
       }
-      const response = await fetch("http://10.0.2.2:8000/upload", {
+      const response = await fetch(`${this.BACKEND_URL}/upload`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
