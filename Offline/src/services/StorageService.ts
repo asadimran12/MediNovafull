@@ -1,4 +1,5 @@
 import * as ReactNativeFS from "react-native-fs";
+import { BACKEND_URL } from "@env";
 
 export interface LocalMessage {
   id: string;
@@ -38,7 +39,7 @@ export interface UserProfile {
 
 class StorageService {
 
-  private readonly BACKEND_URL = process.env.BACKEND_URL;
+  private readonly BACKEND_URL = BACKEND_URL;
   private userId: string | null = null;
   private readonly USERS_BASE_DIR = `${ReactNativeFS.DocumentDirectoryPath}/users`;
 
@@ -130,6 +131,7 @@ class StorageService {
         },
         body: JSON.stringify(exportData),
       });
+      console.log(response);
       const data = await response.json();
       console.log("Exported to cloud:", data);
     } catch (error) {

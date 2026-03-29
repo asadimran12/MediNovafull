@@ -3,6 +3,7 @@ import { View, Text, Alert, TouchableOpacity } from 'react-native'
 import { pick } from "@react-native-documents/picker";
 import storageService from '../services/StorageService'
 import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { BACKEND_URL } from "@env";
 
 interface ImportDataProps {
     onSkip: () => void;
@@ -38,7 +39,7 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
 
     const handleimportfromcloud = async () => {
         try {
-            const response = await fetch(`${process.env.BACKEND_URL}/users/GetAllData`, {
+            const response = await fetch(`${BACKEND_URL}/users/GetAllData`, {
                 method: "GET",
             });
             const data = await response.json();
