@@ -32,7 +32,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  console.log("cloudData", cloudData);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start();

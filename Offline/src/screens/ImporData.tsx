@@ -39,6 +39,7 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
 
     const handleimportfromcloud = async () => {
         try {
+
             const response = await fetch(`${BACKEND_URL}/users/GetAllData`, {
                 method: "GET",
             });
