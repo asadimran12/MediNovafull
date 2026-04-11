@@ -133,8 +133,8 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   const [showManageModal, setShowManageModal] = useState(false);
   const [completedMeals, setCompletedMeals] = useState<number[]>([]);
   const [showReminderModal, setShowReminderModal] = useState(false);
-  
-  type UIConfig = Record<'breakfast'|'lunch'|'snack'|'dinner', { enabled: boolean; hour: string; minute: string }>;
+
+  type UIConfig = Record<'breakfast' | 'lunch' | 'snack' | 'dinner', { enabled: boolean; hour: string; minute: string }>;
   const [reminders, setReminders] = useState<UIConfig | null>(null);
 
   useEffect(() => {
@@ -157,7 +157,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
         dinner: { enabled: reminders.dinner.enabled, hour: parseInt(reminders.dinner.hour) || 0, minute: parseInt(reminders.dinner.minute) || 0 },
         exercise: (await NotificationService.getReminders()).exercise // preserve exercise
       };
-      
+
       const sanitizeTime = (val: number, max: number) => Math.max(0, Math.min(max, val));
       for (const m of ['breakfast', 'lunch', 'snack', 'dinner'] as const) {
         finalConfig[m].hour = sanitizeTime(finalConfig[m].hour, 23);
@@ -165,7 +165,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       }
 
       await NotificationService.applyReminderConfig(finalConfig);
-      
+
       // Update UI state with sanitized values
       setReminders({
         breakfast: { enabled: finalConfig.breakfast.enabled, hour: finalConfig.breakfast.hour.toString().padStart(2, '0'), minute: finalConfig.breakfast.minute.toString().padStart(2, '0') },
@@ -179,7 +179,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
     }
   };
 
-  const updateMealReminder = (meal: keyof UIConfig, field: 'enabled'|'hour'|'minute', value: any) => {
+  const updateMealReminder = (meal: keyof UIConfig, field: 'enabled' | 'hour' | 'minute', value: any) => {
     if (field === 'hour' || field === 'minute') {
       value = value.replace(/[^0-9]/g, ''); // only allow digits
     }
@@ -327,7 +327,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
         <View style={styles.headerTopRow}>
           {onBack ? (
             <TouchableOpacity onPress={onBack} style={styles.backButton}>
-              <Text style={styles.backButtonText}>← Back</Text>
+              <Text style={styles.backButtonText}>←</Text>
             </TouchableOpacity>
           ) : <View style={{ width: 70 }} />}
           <Text style={styles.screenTitle}>Diet Plan</Text>
@@ -477,31 +477,31 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
             ) : (
               <ScrollView style={{ maxHeight: 400 }}>
                 {savedPlans.map((plan) => {
-                const isActive = plan.id === activePlanId;
-                return (
-                  <View key={plan.id} style={[styles.planRow, isActive && styles.planRowActive]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.planRowTitle}>{plan.title}</Text>
-                      <Text style={styles.planRowDate}>{formatDate(plan.createdAt)}</Text>
-                      {isActive && (
-                        <View style={styles.inUseBadge}>
-                          <Text style={styles.inUseBadgeText}>● In Use</Text>
-                        </View>
-                      )}
+                  const isActive = plan.id === activePlanId;
+                  return (
+                    <View key={plan.id} style={[styles.planRow, isActive && styles.planRowActive]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.planRowTitle}>{plan.title}</Text>
+                        <Text style={styles.planRowDate}>{formatDate(plan.createdAt)}</Text>
+                        {isActive && (
+                          <View style={styles.inUseBadge}>
+                            <Text style={styles.inUseBadgeText}>● In Use</Text>
+                          </View>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.useBtn, isActive && styles.useBtnDisabled]}
+                        onPress={() => !isActive && handleUsePlan(plan)}
+                        disabled={isActive}
+                      >
+                        <Text style={styles.useBtnText}>{isActive ? "Active" : "Use"}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeletePlan(plan.id)}>
+                        <Text style={styles.deleteBtnText}>🗑</Text>
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity
-                      style={[styles.useBtn, isActive && styles.useBtnDisabled]}
-                      onPress={() => !isActive && handleUsePlan(plan)}
-                      disabled={isActive}
-                    >
-                      <Text style={styles.useBtnText}>{isActive ? "Active" : "Use"}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeletePlan(plan.id)}>
-                      <Text style={styles.deleteBtnText}>🗑</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
+                  );
+                })}
               </ScrollView>
             )}
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowManageModal(false)}>
@@ -586,12 +586,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 44,
+    height: 44,
+    borderRadius: 22, // perfect circle for a modern look
+    backgroundColor: "rgba(255,255,255,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  backButtonText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  backButtonText: {
+    color: "#fff",
+    fontWeight: "900",
+    fontSize: 22,
+    marginTop: -8 // optically balance the arrow inside the circle
+  },
   screenTitle: { fontSize: 22, fontWeight: "800", color: "#fff", textAlign: "center" },
   headerActionRow: {
     flexDirection: "row",

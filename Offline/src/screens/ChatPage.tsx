@@ -1,4 +1,4 @@
-    import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
     View,
     Text,
@@ -85,7 +85,7 @@ export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps
 
             // Fetch RAG context
             const ragContext = await KnowledgeBase.getRelevantContext(userText);
-             console.log("🔍 RAG Context for Chat:", ragContext ? "Found" : "Not Found");
+            console.log("🔍 RAG Context for Chat:", ragContext ? "Found" : "Not Found");
 
             // 3. User messages ko string array mein convert kiya
             const aiMessages = messages.map(m => ({
@@ -123,15 +123,15 @@ export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps
                 };
 
                 await LlamaService.reportChat(
-                    optimizedReportData, 
-                    aiMessages, 
-                    profile, 
-                    ragContext || undefined, 
+                    optimizedReportData,
+                    aiMessages,
+                    profile,
+                    ragContext || undefined,
                     onTokenCallback
                 );
             } else {
                 const basePrompt = LlamaService.generateSystemPrompt(profile);
-                const enhancedPrompt = ragContext 
+                const enhancedPrompt = ragContext
                     ? `${basePrompt}\n\nADDITIONAL MEDICAL CONTEXT (RAG):\n${ragContext}\n\nPlease use this context to provide more accurate and grounded advice.`
                     : basePrompt;
                 await LlamaService.chat(aiMessages, enhancedPrompt, onTokenCallback);
@@ -155,14 +155,6 @@ export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps
             style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-            <View style={styles.header}>
-                {onBack && (
-                    <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                        <Text style={styles.backText}>← Back</Text>
-                    </TouchableOpacity>
-                )}
-                <Text style={styles.headerTitle}>Analysis Chat</Text>
-            </View>
 
             <ScrollView style={styles.chatArea} contentContainerStyle={styles.scrollContent}>
 
@@ -193,10 +185,10 @@ export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps
                         {reportData.lines.length > 5 && (
                             <Text style={styles.moreText}>+ {reportData.lines.length - 5} more lines parsed</Text>
                         )}
-                        
+
                         {!hasAnalyzed && (
-                            <TouchableOpacity 
-                                style={styles.analyzeButton} 
+                            <TouchableOpacity
+                                style={styles.analyzeButton}
                                 onPress={triggerAnalysis}
                                 disabled={isGenerating}
                             >

@@ -68,7 +68,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     const [savedPlans, setSavedPlans] = useState<HealthPlan[]>([]);
     const [showManageModal, setShowManageModal] = useState(false);
     const [showReminderModal, setShowReminderModal] = useState(false);
-    
+
     type UIConfig = { exercise: { enabled: boolean; hour: string; minute: string } };
     const [reminders, setReminders] = useState<UIConfig | null>(null);
 
@@ -103,7 +103,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
         }
     };
 
-    const updateExerciseReminder = (field: 'enabled'|'hour'|'minute', value: any) => {
+    const updateExerciseReminder = (field: 'enabled' | 'hour' | 'minute', value: any) => {
         if (field === 'hour' || field === 'minute') {
             value = value.replace(/[^0-9]/g, ''); // only allow digits
         }
@@ -222,7 +222,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                 <View style={styles.headerTopRow}>
                     {onBack ? (
                         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                            <Text style={styles.backButtonText}>← Back</Text>
+                            <Text style={styles.backButtonText}>←</Text>
                         </TouchableOpacity>
                     ) : <View style={{ width: 70 }} />}
                     <Text style={styles.screenTitle}>Exercise Plan</Text>
@@ -474,12 +474,19 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     backButton: {
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 8,
-        backgroundColor: "rgba(255,255,255,0.2)",
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: "rgba(255,255,255,0.25)",
+        justifyContent: "center",
+        alignItems: "center",
     },
-    backButtonText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+    backButtonText: {
+        color: "#fff",
+        fontWeight: "900",
+        fontSize: 22,
+        marginTop: -8
+    },
     screenTitle: { fontSize: 22, fontWeight: "800", color: "#fff", textAlign: "center" },
     headerActionRow: {
         flexDirection: "row",

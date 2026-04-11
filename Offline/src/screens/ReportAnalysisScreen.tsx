@@ -14,12 +14,6 @@ export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBa
   }
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Analyse Report</Text>
-      </View>
 
       <Text style={styles.subtitle}>Choose your report format to begin analysis</Text>
 

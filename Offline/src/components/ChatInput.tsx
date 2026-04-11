@@ -27,6 +27,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isGenerating,
   disabled,
 }) => {
+  const isSendDisabled = disabled || !inputText.trim();
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -35,28 +37,27 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <TextInput
           style={styles.input}
           placeholder="Ask MediNova..."
+          placeholderTextColor={COLORS.textMuted}
           value={inputText}
           onChangeText={setInputText}
           multiline
           editable={!disabled}
         />
+
         {isGenerating ? (
           <TouchableOpacity
             style={[styles.sendButton, styles.stopButton]}
             onPress={onStop}
           >
-            <Text style={styles.sendButtonText}>Stop</Text>
+            <Text style={styles.sendButtonText}>■</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (disabled || !inputText.trim()) && styles.sendButtonDisabled,
-            ]}
+            style={[styles.sendButton, isSendDisabled && styles.sendButtonDisabled]}
             onPress={onSend}
-            disabled={disabled || !inputText.trim()}
+            disabled={isSendDisabled}
           >
-            <Text style={styles.sendButtonText}>Send</Text>
+            <Text style={styles.sendButtonText}>↑</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -67,8 +68,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    padding: SPACING.md,
+    alignItems: "flex-end",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
@@ -76,19 +78,32 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     maxHeight: 100,
+    minHeight: 44,
     paddingHorizontal: 15,
+    paddingVertical: 10,
     backgroundColor: "#F1F5F9",
     borderRadius: 20,
     fontSize: 15,
+    color: COLORS.textMain,
   },
   sendButton: {
-    marginLeft: 12,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: RADIUS.lg,
+    marginLeft: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: COLORS.button,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  sendButtonDisabled: { backgroundColor: COLORS.textMuted },
-  stopButton: { backgroundColor: COLORS.danger },
-  sendButtonText: { color: COLORS.surface, fontWeight: "600" },
+  sendButtonDisabled: {
+    backgroundColor: COLORS.textMuted,
+  },
+  stopButton: {
+    backgroundColor: COLORS.danger,
+  },
+  sendButtonText: {
+    color: COLORS.surface,
+    fontWeight: "600",
+    fontSize: 28,
+  },
 });

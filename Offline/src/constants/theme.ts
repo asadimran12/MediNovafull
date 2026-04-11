@@ -16,6 +16,7 @@ export const COLORS = {
   background: "#F2F2F7",   // Light Grayish Blue
   surface: "#FFFFFF",
   card: "#FFFFFF",
+  button: "#59AA6F",
 
   // Text
   textHeader: "#1C1C1E",   // Dark Gray

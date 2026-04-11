@@ -202,8 +202,12 @@ export default function App() {
   };
 
   const navigateTo = (view: AppView) => {
-    setCurrentView(view);
-    toggleSidebar();
+    if (isSidebarOpen) {
+      toggleSidebar();
+      setTimeout(() => setCurrentView(view), 300);
+    } else {
+      setCurrentView(view);
+    }
   };
 
   const startNewChat = () => {
@@ -518,15 +522,7 @@ export default function App() {
       default:
         return (
           <View style={{ flex: 1 }}>
-            <View style={styles.chatHeader}>
-              <TouchableOpacity onPress={() => setCurrentView("dashboard")} style={styles.backButton}>
-                <Text style={styles.backIcon}>←</Text>
-              </TouchableOpacity>
-              <View>
-                <Text style={styles.chatTitle}>Health Assistant</Text>
-                <Text style={styles.chatSubtitle}>General Consultation & Guidance</Text>
-              </View>
-            </View>
+
             <FlatList
               ref={flatListRef}
               data={messages}
@@ -580,7 +576,7 @@ export default function App() {
               currentUser={currentUser}
             />
             <View style={styles.header}>
-              <TouchableOpacity onPress={toggleSidebar} style={styles.menuIcon}><Text style={{ fontSize: 24 }}>☰</Text></TouchableOpacity>
+              <TouchableOpacity onPress={toggleSidebar} style={[styles.menuIcon, { zIndex: 10 }]}><Text style={{ fontSize: 24 }}>☰</Text></TouchableOpacity>
               {currentView !== "chat" && currentView !== "chat_page" && currentView !== "report_analysis" && currentView !== "image_uploader" && currentView !== "model_manager" ? (
                 <View style={styles.logoContainer}>
                   <View style={styles.imageContainer}>
@@ -591,6 +587,7 @@ export default function App() {
                     />
                   </View>
 
+
                   <Text
                     style={[
                       styles.statusText,
@@ -600,8 +597,22 @@ export default function App() {
                     ● {isReady ? "Ready & Private" : status}
                   </Text>
                 </View>
+              ) : currentView === "chat" ? (
+                <View style={[styles.chatHeader, { flex: 1, borderBottomWidth: 0, padding: 0, marginLeft: 10 }]}>
+                  <View>
+                    <Text style={styles.chatTitle}>Health Assistant</Text>
+                    <Text style={styles.chatSubtitle}>General Consultation & Guidance</Text>
+                  </View>
+                </View>
               ) : (
-                <View style={{ flex: 1 }} />
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginRight: 40 }}>
+                  <Text style={[styles.headerTitle, { fontSize: 18, color: COLORS.textHeader, fontWeight: '800' }]}>
+                    {currentView === "report_analysis" ? "Report Analysis" : 
+                     currentView === "image_uploader" ? "Upload Report" : 
+                     currentView === "model_manager" ? "Manage Models" : 
+                     currentView === "chat_page" ? "Analysis Results" : ""}
+                  </Text>
+                </View>
               )}
               {currentView === "chat" && (
                 <TouchableOpacity onPress={startNewChat}>
