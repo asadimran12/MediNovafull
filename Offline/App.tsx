@@ -49,7 +49,9 @@ import ChatPage from "./src/screens/ChatPage";
 import { ForgetPassword } from "./src/screens/ForgetPassword";
 import NotificationService from "./src/services/NotificationService";
 import { ChatHistoryPage } from "./src/screens/ChatHistoryPage";
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history";
+import { CloudRestoreLoginScreen } from "./src/screens/CloudRestoreLoginScreen";
+
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history" | "cloud_restore_login";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
@@ -511,6 +513,7 @@ export default function App() {
           <ImportData
             onSkip={() => setCurrentView("dashboard")}
             onCloudDataFetched={setCloudData}
+            onCloudRestoreReady={() => setCurrentView("cloud_restore_login")}
             onImportSuccess={async () => {
               const userId = await AuthService.getCurrentUserId();
               if (userId) {
@@ -524,6 +527,16 @@ export default function App() {
               }
               setCurrentView("dashboard");
             }}
+          />
+        );
+      case "cloud_restore_login":
+        return (
+          <CloudRestoreLoginScreen
+            cloudData={cloudData}
+            onRestoreSuccess={async (user) => {
+              await handleLogin(user);
+            }}
+            onBack={() => setCurrentView("restore")}
           />
         );
       default:
@@ -632,6 +645,8 @@ export default function App() {
         <View style={{ flex: 1 }}>
           {!currentUser ? (
             currentView === "restore" ? (
+              renderCurrentView()
+            ) : currentView === "cloud_restore_login" ? (
               renderCurrentView()
             ) : currentView === "forget_password" ? (
               <ForgetPassword onBack={() => setCurrentView("chat")} />

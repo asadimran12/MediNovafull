@@ -7,24 +7,26 @@ import {
     Modal,
     ActivityIndicator,
     StyleSheet,
+    TextInput,
 } from 'react-native'
 import { pick } from "@react-native-documents/picker";
 import storageService from '../services/StorageService'
 import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
-import { BACKEND_URL } from "@env";
 
 interface ImportDataProps {
     onSkip: () => void;
     onImportSuccess?: () => void;
     onCloudDataFetched: (data: any) => void;
+    onCloudRestoreReady: () => void;
 }
 
-export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched }: ImportDataProps) {
+export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched, onCloudRestoreReady }: ImportDataProps) {
 
     const [isImporting, setIsImporting] = useState(false);
     const [importingLabel, setImportingLabel] = useState("Importing...");
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
+    const [cloudUsername, setCloudUsername] = useState('');
 
     const triggerSuccess = (message: string) => {
         setSuccessMessage(message);
@@ -55,24 +57,42 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
     };
 
     const handleImportFromCloud = async () => {
+        if (!cloudUsername.trim()) {
+            Alert.alert('Username Required', 'Please enter your MediNova username to find your cloud backup.');
+            return;
+        }
+
         try {
             setImportingLabel("Fetching from Cloud...");
             setIsImporting(true);
-
-            const response = await fetch(`${BACKEND_URL}/users/GetAllData`, {
-                method: "GET",
-            });
+            
+            const baseUrl = 'https://medinovafull-2.onrender.com';
+            const url = `${baseUrl}/users/GetAllData?username=${encodeURIComponent(cloudUsername.trim())}`;
+            const response = await fetch(url, { method: "GET" });
+            
+            if (response.status === 404) {
+                setIsImporting(false);
+                Alert.alert('Not Found', `No cloud backup found for username "${cloudUsername.trim()}". Please check the username and try again.`);
+                return;
+            }
+            if (!response.ok) {
+                setIsImporting(false);
+                Alert.alert('Server Error', `The server returned an error (${response.status}). Please try again later.`);
+                return;
+            }
             const data = await response.json();
             setIsImporting(false);
 
             if (data) {
                 onCloudDataFetched(data);
-                triggerSuccess("Your cloud backup has been restored successfully.");
+                onCloudRestoreReady();
+            } else {
+                Alert.alert('No Data', 'No backup data found on the cloud server.');
             }
         } catch (error) {
             setIsImporting(false);
-            console.error("Failed to import from cloud", error);
-            Alert.alert("Cloud Import Failed", "Could not fetch data from the cloud. Please try again.");
+            console.error('Failed to import from cloud', error);
+            Alert.alert('Connection Failed', 'Could not reach the cloud server. Please check your internet connection and try again.');
         }
     };
 
@@ -133,9 +153,33 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
                 {/* Divider */}
                 <View style={styles.dividerRow}>
                     <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>or</Text>
+                    <Text style={styles.dividerText}>or restore from cloud</Text>
                     <View style={styles.dividerLine} />
                 </View>
+
+                {/* ── Username input for cloud ── */}
+                <Text style={{ fontSize: 13, fontWeight: '600', color: COLORS.textMain, marginBottom: SPACING.xs }}>
+                    Your MediNova Username
+                </Text>
+                <TextInput
+                    style={{
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: RADIUS.md,
+                        paddingHorizontal: SPACING.md,
+                        paddingVertical: SPACING.sm,
+                        color: COLORS.textMain,
+                        fontSize: 15,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        marginBottom: SPACING.md,
+                    }}
+                    placeholder="e.g. john_doe"
+                    placeholderTextColor={COLORS.textSub}
+                    value={cloudUsername}
+                    onChangeText={setCloudUsername}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                />
 
                 {/* Cloud Import */}
                 <TouchableOpacity style={styles.cloudBtn} activeOpacity={0.85} onPress={handleImportFromCloud}>
@@ -226,109 +270,110 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // Cloud button
+    // Cloud Button
     cloudBtn: {
-        borderWidth: 1.5,
-        borderColor: COLORS.primary,
+        backgroundColor: "rgba(0,122,255,0.1)",
         paddingVertical: 14,
         borderRadius: RADIUS.lg,
         alignItems: 'center',
-        marginBottom: SPACING.md,
+        marginBottom: SPACING.lg,
+        borderWidth: 1,
+        borderColor: "rgba(0,122,255,0.2)",
     },
     cloudBtnText: {
-        color: COLORS.primary,
+        color: "#007AFF",
         fontSize: 16,
         fontWeight: '700',
     },
 
-    // Cancel
+    // Cancel Button
     cancelBtn: {
         alignItems: 'center',
-        paddingVertical: SPACING.sm,
+        paddingVertical: SPACING.xs,
     },
     cancelBtnText: {
-        color: COLORS.textMuted,
+        color: COLORS.textSub,
         fontSize: 15,
-        fontWeight: '500',
+        fontWeight: '600',
     },
 
-    // Loading Overlay
+    // Overlay
     overlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
+        padding: SPACING.xl,
     },
+
+    // Loading Box
     loadingBox: {
         backgroundColor: COLORS.surface,
-        borderRadius: RADIUS.lg,
-        padding: 32,
+        padding: SPACING.xl,
+        borderRadius: RADIUS.xl,
         alignItems: 'center',
-        gap: 12,
-        width: '75%',
-        ...SHADOWS.light,
+        width: '80%',
+        ...SHADOWS.large,
     },
     loadingText: {
-        fontSize: 17,
-        fontWeight: '800',
+        fontSize: 16,
+        fontWeight: '700',
         color: COLORS.textHeader,
-        marginTop: 4,
+        marginTop: SPACING.md,
     },
     loadingSubText: {
-        fontSize: 12,
+        fontSize: 13,
         color: COLORS.textSub,
+        marginTop: SPACING.xs,
         textAlign: 'center',
     },
 
-    // Success Modal
+    // Success Box
     successBox: {
-        width: '82%',
         backgroundColor: COLORS.surface,
-        borderRadius: RADIUS.lg,
-        padding: 32,
+        padding: SPACING.xl,
+        borderRadius: RADIUS.xl,
         alignItems: 'center',
-        gap: 10,
-        ...SHADOWS.light,
+        width: '90%',
+        ...SHADOWS.large,
     },
     successIconCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: 'rgba(52,199,89,0.12)',
-        borderWidth: 2,
-        borderColor: 'rgba(52,199,89,0.4)',
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(52, 199, 89, 0.1)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 4,
+        marginBottom: SPACING.md,
     },
     successIcon: {
-        fontSize: 34,
-        color: '#34C759',
-        fontWeight: '900',
+        fontSize: 32,
+        color: COLORS.success,
+        fontWeight: 'bold',
     },
     successTitle: {
         fontSize: 20,
         fontWeight: '800',
         color: COLORS.textHeader,
-        textAlign: 'center',
+        marginBottom: SPACING.sm,
     },
     successMessage: {
-        fontSize: 13,
+        fontSize: 15,
         color: COLORS.textSub,
         textAlign: 'center',
-        lineHeight: 20,
-        marginBottom: 8,
+        lineHeight: 22,
+        marginBottom: SPACING.xl,
     },
     successBtn: {
-        backgroundColor: '#34C759',
-        paddingVertical: 13,
-        paddingHorizontal: 32,
+        backgroundColor: COLORS.success,
+        paddingVertical: 12,
+        paddingHorizontal: SPACING.xl,
         borderRadius: RADIUS.pill,
-        marginTop: 4,
+        ...SHADOWS.light,
     },
     successBtnText: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#fff',
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });

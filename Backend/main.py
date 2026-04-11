@@ -21,11 +21,12 @@ app.include_router(router)      # ← This was the critical missing line
 
 # ── Request model ─────────────────────────────────────────────────────────────
 class UploadPayload(BaseModel):
-    timestamp: Optional[str] = None
-    profile:   Optional[Any] = None
-    chats:     Optional[Any] = None
-    plans:     Optional[Any] = None
-    auth:      Optional[Any] = None
+    primary_username: Optional[str] = None  # Top-level field for fast lookup
+    timestamp:        Optional[str] = None
+    profile:          Optional[Any] = None
+    chats:            Optional[Any] = None
+    plans:            Optional[Any] = None
+    auth:             Optional[Any] = None
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 @app.get("/")
@@ -44,11 +45,24 @@ def checkDB():
 def upload(payload: UploadPayload):
     try:
         client, db = get_database()
-        result = db.collection.insert_one(payload.model_dump())
-        return {
-            "message": "Upload successful!",
-            "id": str(result.inserted_id),   # Return the inserted doc ID
-        }
+        data = payload.model_dump()
+
+        if payload.primary_username:
+            # Upsert: update existing doc for this user or insert new one
+            result = db.collection.update_one(
+                {"primary_username": {"$regex": f"^{payload.primary_username}$", "$options": "i"}},
+                {"$set": data},
+                upsert=True,
+            )
+            updated = result.matched_count > 0
+            return {
+                "message": "Updated successfully!" if updated else "Upload successful!",
+                "updated": updated,
+            }
+        else:
+            # Fallback: plain insert (old clients without primary_username)
+            result = db.collection.insert_one(data)
+            return {"message": "Upload successful!", "id": str(result.inserted_id), "updated": False}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -39,7 +39,7 @@ export interface UserProfile {
 
 class StorageService {
 
-  private readonly BACKEND_URL = BACKEND_URL;
+  private readonly BACKEND_URL = 'https://medinovafull-2.onrender.com';
   private userId: string | null = null;
   private readonly USERS_BASE_DIR = `${ReactNativeFS.DocumentDirectoryPath}/users`;
 
