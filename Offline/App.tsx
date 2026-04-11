@@ -48,7 +48,6 @@ import ModelService from "./src/services/ModelService";
 import ChatPage from "./src/screens/ChatPage";
 import { ForgetPassword } from "./src/screens/ForgetPassword";
 import NotificationService from "./src/services/NotificationService";
-
 type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore";
 
 export default function App() {
@@ -474,6 +473,7 @@ export default function App() {
           }}
           onNavigateToChat={() => setCurrentView("chat_page")}
         />;
+
       case "image_uploader":
         return <ImageUploader
           initialMode={uploadMode}
@@ -607,10 +607,10 @@ export default function App() {
               ) : (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginRight: 40 }}>
                   <Text style={[styles.headerTitle, { fontSize: 18, color: COLORS.textHeader, fontWeight: '800' }]}>
-                    {currentView === "report_analysis" ? "Report Analysis" : 
-                     currentView === "image_uploader" ? "Upload Report" : 
-                     currentView === "model_manager" ? "Manage Models" : 
-                     currentView === "chat_page" ? "Analysis Results" : ""}
+                    {currentView === "report_analysis" ? "Report Analysis" :
+                      currentView === "image_uploader" ? "Upload Report" :
+                        currentView === "model_manager" ? "Manage Models" :
+                          currentView === "chat_page" ? "Analysis Results" : ""}
                   </Text>
                 </View>
               )}

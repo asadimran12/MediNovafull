@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SPACING, RADIUS } from "../constants/theme";
 import { ChatSession } from "../services/StorageService";
 
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore";
+
 const { width } = Dimensions.get("window");
 const SIDEBAR_WIDTH = width * 0.8;
 
@@ -20,8 +22,8 @@ interface SidebarProps {
   isOpen: boolean;
   sidebarAnim: Animated.Value;
   toggleSidebar: () => void;
-  currentView: string;
-  navigateTo: (view: string) => void;
+  currentView: AppView;
+  navigateTo: (view: AppView) => void;
   sessions: ChatSession[];
   currentSessionId: string | null;
   loadSession: (id: string) => void;

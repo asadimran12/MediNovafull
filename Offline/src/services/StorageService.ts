@@ -131,9 +131,7 @@ class StorageService {
         },
         body: JSON.stringify(exportData),
       });
-      console.log(response);
       const data = await response.json();
-      console.log("Exported to cloud:", data);
     } catch (error) {
       console.error("Failed to export to cloud", error);
       throw error;

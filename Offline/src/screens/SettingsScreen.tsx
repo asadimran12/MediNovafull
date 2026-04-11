@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   View,
@@ -7,6 +7,8 @@ import {
   Alert,
   Share,
   ScrollView,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import storageService from "../services/StorageService";
@@ -27,26 +29,49 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onLogout,
 }) => {
 
+
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState<{ visible: boolean; message: string }>({
+    visible: false,
+    message: "",
+  });
+
+  const showSuccess = (message: string) => {
+    setExportSuccess({ visible: true, message });
+  };
   const handleExportLocally = async () => {
+    setIsExporting(true);
     try {
       const exportPath = await storageService.exportAllDataLocally();
-      await Share.share({
-        title: "MediNova Backup",
-        message: `MediNova backup file saved at:\n${exportPath}`,
-        url: `file://${exportPath}`,
-      });
-      Alert.alert("Export Successful", `Your data has been exported to:\n\n${exportPath}`);
+      try {
+        const response = await Share.share({
+          title: "MediNova Backup",
+          message: `MediNova backup file saved at:\n${exportPath}`,
+          url: `file://${exportPath}`,
+        });
+        console.log(response);
+      } catch (error) {
+        console.log(error);
+      }
+      showSuccess(`Your data has been exported to:\n${exportPath}`);
     } catch (error) {
       Alert.alert("Export Failed", "Failed to export data. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
   const handleExportOnCloud = async () => {
+    setIsExporting(true);
     try {
       await storageService.exportAllDataOnCloud();
-      Alert.alert("Export Successful", "Your data has been exported to the cloud.");
+      showSuccess("Your data has been backed up to the cloud successfully.");
     } catch (error) {
       Alert.alert("Export Failed", "Failed to export data. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -60,6 +85,117 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   return (
     <View style={styles.container}>
+
+      {/* ── Logout Confirmation Modal ───────────────────── */}
+      <Modal transparent visible={showLogoutModal} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.logoutModalBox}>
+            <View style={styles.logoutModalIconCircle}>
+              <Text style={styles.logoutModalIcon}>🚪</Text>
+            </View>
+            <Text style={styles.logoutModalTitle}>Logout</Text>
+            <Text style={styles.logoutModalSubtitle}>
+              Are you sure you want to sign out? You'll need to log in again to access your data.
+            </Text>
+            <TouchableOpacity
+              style={styles.logoutModalBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                setShowLogoutModal(false);
+                onLogout?.();
+              }}
+            >
+              <Text style={styles.logoutModalBtnText}>Yes, Logout</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.logoutModalCancelBtn}
+              activeOpacity={0.8}
+              onPress={() => setShowLogoutModal(false)}
+            >
+              <Text style={styles.logoutModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Export Success Modal ───────────────────────────── */}
+      <Modal transparent visible={exportSuccess.visible} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.successBox}>
+            <View style={styles.successIconCircle}>
+              <Text style={styles.successIcon}>✓</Text>
+            </View>
+            <Text style={styles.successTitle}>Export Successful!</Text>
+            <Text style={styles.successMessage}>{exportSuccess.message}</Text>
+            <TouchableOpacity
+              style={styles.successBtn}
+              activeOpacity={0.85}
+              onPress={() => setExportSuccess({ visible: false, message: "" })}
+            >
+              <Text style={styles.successBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Exporting Loading Overlay ──────────────────────── */}
+      <Modal transparent visible={isExporting} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Exporting...</Text>
+            <Text style={styles.loadingSubText}>Please wait, do not close the app</Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Export Modal ────────────────────────────────────── */}
+      <Modal
+        transparent
+        visible={showExportModal}
+        animationType="fade"
+        onRequestClose={() => setShowExportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Export Data</Text>
+            <Text style={styles.modalSubtitle}>Choose where to save your backup</Text>
+
+            <TouchableOpacity
+              style={styles.modalBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                setShowExportModal(false);
+                handleExportLocally();
+              }}
+            >
+              <Text style={styles.modalBtnText}>📱  Export Locally</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                setShowExportModal(false);
+                handleExportOnCloud();
+              }}
+            >
+              <Text style={styles.modalBtnText}>☁️  Export to Cloud</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalCancelBtn]}
+              activeOpacity={0.8}
+              onPress={() => setShowExportModal(false)}
+            >
+              <Text style={[styles.modalBtnText, { color: COLORS.danger }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+
+
       {/* ── Page Header ───────────────────────────── */}
       <View style={styles.pageHeader}>
         {onBack && (
@@ -118,7 +254,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             title="Export Data"
             subtitle="Save backup locally or to cloud"
             actionLabel="Export"
-            onAction={handleExportData}
+            onAction={() => setShowExportModal(true)}
           />
           <View style={styles.divider} />
           <SettingRow
@@ -143,12 +279,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <TouchableOpacity
               style={styles.logoutCard}
               activeOpacity={0.8}
-              onPress={() =>
-                Alert.alert("Logout", "Are you sure you want to logout?", [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Logout", style: "destructive", onPress: onLogout },
-                ])
-              }
+              onPress={() => setShowLogoutModal(true)}
             >
               <Text style={styles.logoutIcon}>🚪</Text>
               <View style={{ flex: 1 }}>
@@ -378,5 +509,187 @@ const styles = StyleSheet.create({
     marginTop: 36,
     marginBottom: 10,
     fontWeight: "500",
+  },
+
+  // Export Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    width: "82%",
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: 24,
+    ...SHADOWS.light,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSub,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  modalBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 13,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  modalCancelBtn: {
+    backgroundColor: "rgba(255,59,48,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,59,48,0.2)",
+  },
+  modalBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#fff",
+  },
+
+  // Exporting loading box
+  loadingBox: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: 32,
+    alignItems: "center",
+    gap: 12,
+    ...SHADOWS.light,
+  },
+  loadingText: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    marginTop: 4,
+  },
+  loadingSubText: {
+    fontSize: 12,
+    color: COLORS.textSub,
+    textAlign: "center",
+  },
+
+  // Export Success Modal
+  successBox: {
+    width: "82%",
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: 32,
+    alignItems: "center",
+    gap: 10,
+    ...SHADOWS.light,
+  },
+  successIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "rgba(52,199,89,0.12)",
+    borderWidth: 2,
+    borderColor: "rgba(52,199,89,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  successIcon: {
+    fontSize: 34,
+    color: "#34C759",
+    fontWeight: "900",
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    textAlign: "center",
+  },
+  successMessage: {
+    fontSize: 13,
+    color: COLORS.textSub,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  successBtn: {
+    backgroundColor: "#34C759",
+    paddingVertical: 13,
+    paddingHorizontal: 48,
+    borderRadius: RADIUS.pill,
+    marginTop: 4,
+  },
+  successBtnText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#fff",
+  },
+
+  // Logout Confirmation Modal
+  logoutModalBox: {
+    width: "82%",
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: 28,
+    alignItems: "center",
+    gap: 10,
+    ...SHADOWS.light,
+  },
+  logoutModalIconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "rgba(255,59,48,0.08)",
+    borderWidth: 2,
+    borderColor: "rgba(255,59,48,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  logoutModalIcon: {
+    fontSize: 32,
+  },
+  logoutModalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    textAlign: "center",
+  },
+  logoutModalSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSub,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  logoutModalBtn: {
+    width: "100%",
+    backgroundColor: COLORS.danger,
+    paddingVertical: 14,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+  },
+  logoutModalBtnText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  logoutModalCancelBtn: {
+    width: "100%",
+    paddingVertical: 13,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  logoutModalCancelText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.textSub,
   },
 });
