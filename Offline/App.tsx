@@ -80,6 +80,8 @@ function MainApp() {
   const [downloadProgress, setDownloadProgress] = useState<number | undefined>(undefined);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+  const [hasModel, setHasModel] = useState(false);
+  const [recommendedModelName, setRecommendedModelName] = useState("");
   const [scannedReport, setScannedReport] = useState<any>(null);
   const [scannedImage, setScannedImage] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'gallery' | 'pdf' | 'camera' | undefined>();
@@ -111,6 +113,7 @@ function MainApp() {
             await handleLogin(user);
           }
         }
+        await checkModelStatus();
 
         setIsReady(true);
         setStatus("Ready");
@@ -168,6 +171,16 @@ function MainApp() {
   const fetchPlans = async () => {
     const allPlans = await StorageService.getPlans();
     setPlans(allPlans);
+  };
+
+  const checkModelStatus = async () => {
+    const downloaded = await ModelService.getDownloadedModels();
+    setHasModel(downloaded.length > 0);
+    
+    const recId = await ModelService.getRecommendedModelId();
+    const models = await ModelService.getAvailableModels();
+    const recommended = models.find(m => m.id === recId);
+    if (recommended) setRecommendedModelName(recommended.name.split(' ')[0] + " AI");
   };
 
   // --- Persistence ---
@@ -419,6 +432,7 @@ function MainApp() {
   };
 
   const handleModelSetupComplete = async () => {
+    await checkModelStatus();
     const profile = await StorageService.getProfile();
     if (!profile.isSet) {
       setCurrentView("profile");
@@ -456,6 +470,8 @@ function MainApp() {
             userName={currentUser?.username || ""}
             onNavigate={(view) => setCurrentView(view)}
             onOpenSettings={() => setCurrentView("settings")}
+            hasModel={hasModel}
+            recommendedModelName={recommendedModelName}
           />
         );
       case "diet_plans":

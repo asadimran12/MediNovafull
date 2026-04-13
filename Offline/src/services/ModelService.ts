@@ -1,3 +1,4 @@
+import DeviceInfo from "react-native-device-info";
 import ReactNativeFS from "react-native-fs";
 import StorageService from "./StorageService";
 
@@ -119,6 +120,23 @@ class ModelService {
       if (active?.id === modelId) {
         await StorageService.setItem("active_model_id", "");
       }
+    }
+  }
+
+  async getRecommendedModelId(): Promise<string> {
+    try {
+      const totalMemory = await DeviceInfo.getTotalMemory(); // in bytes
+      const ramGB = totalMemory / (1024 * 1024 * 1024);
+      
+      console.log(`[ModelService] Detected ${ramGB.toFixed(2)} GB RAM`);
+
+      if (ramGB < 3.5) {
+        return "qwen-0.5b"; // Ultra fast for budget devices
+      } else {
+        return "qwen-1.5b"; // Balanced for mid/high range
+      }
+    } catch (e) {
+      return "qwen-0.5b"; // Safe fallback
     }
   }
 

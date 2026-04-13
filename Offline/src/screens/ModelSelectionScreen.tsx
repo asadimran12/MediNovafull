@@ -32,10 +32,17 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
   const [guideVisible, setGuideVisible] = useState(false);
 
   const [isPaused, setIsPaused] = useState(false);
+  const [recommendedId, setRecommendedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadModels();
+    fetchRecommendation();
   }, []);
+
+  const fetchRecommendation = async () => {
+    const recId = await ModelService.getRecommendedModelId();
+    setRecommendedId(recId);
+  };
 
   const loadModels = async () => {
     const available = await ModelService.getAvailableModels();
@@ -94,7 +101,14 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
   const renderModel = ({ item }: { item: AIModel }) => (
     <View style={styles.modelCard}>
       <View style={styles.modelInfo}>
-        <Text style={styles.modelName}>{item.name}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
+          {recommendedId === item.id && (
+            <View style={styles.recommendedBadge}>
+              <Text style={styles.recommendedBadgeText}>⭐ BEST CHOICE</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.modelSize}>{item.size}</Text>
         <Text style={styles.modelDesc}>{item.description}</Text>
       </View>
@@ -152,6 +166,16 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
       <Text style={styles.subtitle}>
         To provide 100% private medical guidance offline, we need to download an AI model directly to your device.
       </Text>
+
+      {recommendedId && (
+        <View style={styles.recommendationBanner}>
+          <Text style={styles.recommendationText}>
+            💡 Based on your phone's hardware, we recommend the 
+            <Text style={{ fontWeight: '800' }}> {models.find(m => m.id === recommendedId)?.name} </Text> 
+            for the best experience.
+          </Text>
+        </View>
+      )}
 
       <FlatList
         data={models}
@@ -253,6 +277,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginBottom: SPACING.xl,
     lineHeight: 20,
   },
+  recommendationBanner: {
+    backgroundColor: COLORS.primary + "15",
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary + "30",
+  },
+  recommendationText: {
+    color: COLORS.textMain,
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
   list: {
     gap: SPACING.md,
   },
@@ -271,7 +309,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: COLORS.textMain,
-    marginBottom: 4,
+    flex: 1,
+  },
+  recommendedBadge: { 
+    backgroundColor: "#FFB020", 
+    paddingHorizontal: 10, 
+    paddingVertical: 5, 
+    borderRadius: RADIUS.pill || 20,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  recommendedBadgeText: { 
+    color: "#FFF", 
+    fontSize: 10, 
+    fontWeight: "900" 
   },
   modelSize: {
     fontSize: 12,

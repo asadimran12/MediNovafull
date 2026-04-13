@@ -29,9 +29,11 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   const [progress, setProgress] = useState<number>(0);
 
   const [isPaused, setIsPaused] = useState(false);
+  const [recommendedId, setRecommendedId] = useState<string | null>(null);
 
   useEffect(() => {
     loadStatus();
+    fetchRecommendation();
     reAttachActiveDownloads();
 
     return () => {
@@ -86,6 +88,11 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     
     setModels(enriched);
     setLoading(false);
+  };
+
+  const fetchRecommendation = async () => {
+    const recId = await ModelService.getRecommendedModelId();
+    setRecommendedId(recId);
   };
 
   const handleDownload = async (model: AIModel) => {
@@ -175,15 +182,22 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   const renderModel = ({ item }: { item: typeof models[0] }) => (
     <View style={[styles.modelCard, item.isActive && styles.activeCard]}>
       <View style={styles.cardHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.modelName}>{item.name}</Text>
+        <View style={{ flex: 1, marginRight: 8 }}>
+          <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.modelSize}>{item.size}</Text>
         </View>
-        {item.isActive && (
-          <View style={styles.activeBadge}>
-            <Text style={styles.activeBadgeText}>ACTIVE</Text>
-          </View>
-        )}
+        <View style={styles.badgeContainer}>
+          {item.isActive && (
+            <View style={styles.activeBadge}>
+              <Text style={styles.activeBadgeText}>ACTIVE</Text>
+            </View>
+          )}
+          {recommendedId === item.id && (
+            <View style={styles.recommendedBadge}>
+              <Text style={styles.activeBadgeText}>⭐ RECOMMENDED</Text>
+            </View>
+          )}
+        </View>
       </View>
       
       <Text style={styles.modelDesc}>{item.description}</Text>
@@ -261,9 +275,21 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
-            <Text style={styles.infoText}>
-              You can have multiple models downloaded and switch between them. Active model is used for all AI features.
-            </Text>
+            <View>
+              <Text style={styles.infoText}>
+                You can have multiple models downloaded and switch between them. Active model is used for all AI features.
+              </Text>
+              {recommendedId && (
+                <View style={[styles.infoText, { backgroundColor: COLORS.primary + '11', padding: 12, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#FFB020' }]}>
+                  <Text style={{ fontWeight: 'bold', color: COLORS.textHeader, marginBottom: 4 }}>💡 Device Optimization Hint</Text>
+                  <Text style={{ fontSize: 13, color: COLORS.textSub }}>
+                    Based on your {Math.round(1)} GB detected RAM, we recommend using the 
+                    <Text style={{ fontWeight: 'bold' }}> {models.find(m => m.id === recommendedId)?.name.split('-')[0]} </Text> 
+                    for smooth performance.
+                  </Text>
+                </View>
+              )}
+            </View>
           }
         />
       )}
@@ -301,10 +327,26 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderColor: COLORS.border,
   },
   activeCard: { borderColor: COLORS.primary, borderWidth: 2 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: SPACING.xs },
-  modelName: { fontSize: 16, fontWeight: "700", color: COLORS.textMain },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: SPACING.xs },
+  badgeContainer: { flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "40%" },
+  modelName: { fontSize: 16, fontWeight: "700", color: COLORS.textMain, flex: 1 },
   modelSize: { fontSize: 12, fontWeight: "600", color: COLORS.primary },
-  activeBadge: { backgroundColor: COLORS.primary, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 },
+  activeBadge: { 
+    backgroundColor: COLORS.success || "#27AE60", 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: RADIUS.pill || 20,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  recommendedBadge: { 
+    backgroundColor: "#FFB020", 
+    paddingHorizontal: 8, 
+    paddingVertical: 4, 
+    borderRadius: RADIUS.pill || 20,
+    flexDirection: "row",
+    alignItems: "center"
+  },
   activeBadgeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
   modelDesc: { fontSize: 13, color: COLORS.textMuted, marginBottom: SPACING.md, lineHeight: 18 },
   actions: { flexDirection: "row", gap: SPACING.sm },

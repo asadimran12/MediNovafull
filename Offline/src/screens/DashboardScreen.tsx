@@ -17,12 +17,14 @@ interface DashboardScreenProps {
   onNavigate: (view: any) => void;
   onOpenSettings: () => void;
   userName: string;
+  hasModel: boolean;
+  recommendedModelName?: string;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
-  const { onNavigate, onOpenSettings, userName } = props;
+  const { onNavigate, onOpenSettings, userName, hasModel, recommendedModelName } = props;
 
   const modules = [
     { id: "chat", title: "Health Chat", desc: "Instant AI guidance", icon: "💬", color: "#4A90E2", bgColor: "#EBF4FF" },
@@ -46,6 +48,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
           <Text style={styles.settingsIcon}>⚙️</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ── MODEL RECOMMENDATION BANNER ── */}
+      {!hasModel && (
+        <TouchableOpacity 
+          style={styles.setupBanner} 
+          onPress={() => onNavigate("model_manager")}
+          activeOpacity={0.9}
+        >
+          <View style={styles.setupBannerContent}>
+            <Text style={styles.setupBannerEmoji}>🤖</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.setupBannerTitle}>Setup Recommendation</Text>
+              <Text style={styles.setupBannerSubtitle}>
+                Download <Text style={{ fontWeight: 'bold' }}>{recommendedModelName || "Fast AI Model"}</Text> for best experience.
+              </Text>
+            </View>
+            <Text style={styles.setupBannerArrow}>→</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* ── HERO CARD ── */}
       <View style={styles.heroCard}>
@@ -173,6 +195,38 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   settingsIcon: {
     fontSize: 20,
+  },
+  setupBanner: {
+    backgroundColor: "#FFB02022",
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: "#FFB02066",
+  },
+  setupBannerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  setupBannerEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  setupBannerTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#D97706",
+    marginBottom: 2,
+  },
+  setupBannerSubtitle: {
+    fontSize: 12,
+    color: "#92400E",
+  },
+  setupBannerArrow: {
+    fontSize: 18,
+    color: "#D97706",
+    fontWeight: "900",
+    marginLeft: 8,
   },
 
   /* ── WELCOME ── */

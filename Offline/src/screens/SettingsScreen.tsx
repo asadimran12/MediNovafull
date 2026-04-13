@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import DeviceInfo from "react-native-device-info";
 import storageService from "../services/StorageService";
 import { useTheme, ThemeMode } from "../context/ThemeContext";
 
@@ -42,6 +43,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     visible: false,
     message: "",
   });
+  const [showDeviceInfoModal, setShowDeviceInfoModal] = useState(false);
+  const [deviceData, setDeviceData] = useState<any>(null);
+
+  const fetchDeviceInfo = async () => {
+    const data = {
+      brand: DeviceInfo.getBrand(),
+      model: DeviceInfo.getModel(),
+      systemName: DeviceInfo.getSystemName(),
+      systemVersion: DeviceInfo.getSystemVersion(),
+      appVersion: DeviceInfo.getVersion(),
+      buildNumber: DeviceInfo.getBuildNumber(),
+      totalMemory: await DeviceInfo.getTotalMemory(),
+      totalDiskSpace: await DeviceInfo.getTotalDiskCapacity(),
+      freeDiskSpace: await DeviceInfo.getFreeDiskStorage(),
+    };
+    setDeviceData(data);
+    setShowDeviceInfoModal(true);
+  };
 
   const showSuccess = (message: string) => {
     setExportSuccess({ visible: true, message });
@@ -181,6 +200,58 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </View>
       </Modal>
 
+      {/* ── Device Info Modal ───────────────────────────────── */}
+      <Modal transparent visible={showDeviceInfoModal} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.deviceInfoBox}>
+            <View style={styles.deviceInfoIconCircle}>
+              <Text style={styles.deviceInfoIcon}>📱</Text>
+            </View>
+            <Text style={styles.deviceInfoTitle}>Device Details</Text>
+            
+            <View style={styles.infoScroll}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Device</Text>
+                <Text style={styles.infoValue}>{deviceData?.brand} {deviceData?.model}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>System</Text>
+                <Text style={styles.infoValue}>{deviceData?.systemName} {deviceData?.systemVersion}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>App Version</Text>
+                <Text style={styles.infoValue}>{deviceData?.appVersion} ({deviceData?.buildNumber})</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Total RAM</Text>
+                <Text style={styles.infoValue}>
+                  {deviceData?.totalMemory ? (deviceData.totalMemory / (1024 * 1024 * 1024)).toFixed(2) : "N/A"} GB
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Storage</Text>
+                <Text style={styles.infoValue}>
+                  {deviceData?.freeDiskSpace 
+                    ? ((deviceData.freeDiskSpace) / (1024 * 1024 * 1024)).toFixed(1) + " GB / "
+                    : ""}
+                  {deviceData?.totalDiskSpace 
+                    ? ((deviceData.totalDiskSpace) / (1024 * 1024 * 1024)).toFixed(0) + " GB Free"
+                    : "N/A"}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.deviceInfoBtn}
+              activeOpacity={0.85}
+              onPress={() => setShowDeviceInfoModal(false)}
+            >
+              <Text style={styles.deviceInfoBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Export Modal ────────────────────────────────────── */}
       <Modal
         transparent
@@ -306,6 +377,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             subtitle="Mission, privacy & version info"
             actionLabel="View"
             onAction={onAbout}
+          />
+          <View style={styles.divider} />
+          <SettingRow
+            icon="📱"
+            title="Device Information"
+            subtitle="Phone model, OS and memory"
+            actionLabel="View"
+            onAction={fetchDeviceInfo}
           />
         </View>
 
@@ -760,6 +839,70 @@ function createStyles(COLORS: any) {
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.textSub,
+  },
+  
+  // Device Info Modal
+  deviceInfoBox: {
+    width: "85%",
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.xl,
+    padding: 24,
+    alignItems: "center",
+    ...SHADOWS.medium,
+  },
+  deviceInfoIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(0,122,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  deviceInfoIcon: {
+    fontSize: 28,
+  },
+  deviceInfoTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    marginBottom: 20,
+  },
+  infoScroll: {
+    width: "100%",
+    marginBottom: 24,
+  },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: COLORS.textSub,
+    fontWeight: "600",
+  },
+  infoValue: {
+    fontSize: 14,
+    color: COLORS.textHeader,
+    fontWeight: "700",
+    textAlign: "right",
+    flex: 1,
+    marginLeft: 16,
+  },
+  deviceInfoBtn: {
+    width: "100%",
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+  },
+  deviceInfoBtnText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#fff",
   },
 });
 }
