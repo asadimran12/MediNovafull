@@ -33,77 +33,131 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Ask MediNova..."
-          placeholderTextColor={COLORS.textMuted}
-          value={inputText}
-          onChangeText={setInputText}
-          multiline
-          editable={!disabled}
-        />
+      <View style={styles.wrapper}>
+        <View style={styles.inputRow}>
+          {/* Text Input */}
+          <TextInput
+            style={styles.input}
+            placeholder="Ask MediNova anything…"
+            placeholderTextColor="#A0AEC0"
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            editable={!disabled}
+          />
 
-        {isGenerating ? (
-          <TouchableOpacity
-            style={[styles.sendButton, styles.stopButton]}
-            onPress={onStop}
-          >
-            <Text style={styles.sendButtonText}>■</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.sendButton, isSendDisabled && styles.sendButtonDisabled]}
-            onPress={onSend}
-            disabled={isSendDisabled}
-          >
-            <Text style={styles.sendButtonText}>↑</Text>
-          </TouchableOpacity>
-        )}
+          {/* Stop Button */}
+          {isGenerating ? (
+            <TouchableOpacity style={styles.stopBtn} onPress={onStop} activeOpacity={0.8}>
+              <View style={styles.stopIcon} />
+            </TouchableOpacity>
+          ) : (
+            /* Send Button */
+            <TouchableOpacity
+              style={[styles.sendBtn, isSendDisabled && styles.sendBtnDisabled]}
+              onPress={onSend}
+              disabled={isSendDisabled}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.sendArrow}>↑</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Hint text */}
+        <Text style={styles.hint}>MediNova AI • Offline & Private</Text>
       </View>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+  wrapper: {
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: Platform.OS === "ios" ? SPACING.lg : SPACING.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    paddingLeft: 18,
+    paddingRight: 6,
+    paddingVertical: 6,
+    minHeight: 52,
   },
   input: {
     flex: 1,
-    maxHeight: 100,
-    minHeight: 44,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: "#F1F5F9",
-    borderRadius: 20,
+    maxHeight: 110,
+    minHeight: 38,
     fontSize: 15,
     color: COLORS.textMain,
+    paddingTop: Platform.OS === "ios" ? 6 : 4,
+    paddingBottom: 4,
+    lineHeight: 22,
   },
-  sendButton: {
-    marginLeft: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.button,
     alignItems: "center",
     justifyContent: "center",
+    marginLeft: 6,
+    shadowColor: COLORS.button,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  sendButtonDisabled: {
-    backgroundColor: COLORS.textMuted,
+  sendBtnDisabled: {
+    backgroundColor: "#CBD5E0",
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  stopButton: {
+  sendArrow: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 24,
+    marginTop: -1,
+  },
+  stopBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: COLORS.danger,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 6,
+    shadowColor: COLORS.danger,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  sendButtonText: {
-    color: COLORS.surface,
-    fontWeight: "600",
-    fontSize: 28,
+  stopIcon: {
+    width: 13,
+    height: 13,
+    borderRadius: 3,
+    backgroundColor: "#FFFFFF",
+  },
+  hint: {
+    textAlign: "center",
+    fontSize: 10,
+    color: "#A0AEC0",
+    marginTop: 6,
+    letterSpacing: 0.3,
   },
 });

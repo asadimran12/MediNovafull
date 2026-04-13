@@ -48,7 +48,8 @@ import ModelService from "./src/services/ModelService";
 import ChatPage from "./src/screens/ChatPage";
 import { ForgetPassword } from "./src/screens/ForgetPassword";
 import NotificationService from "./src/services/NotificationService";
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore";
+import { ChatHistoryPage } from "./src/screens/ChatHistoryPage";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
@@ -231,7 +232,7 @@ export default function App() {
       setMessages(session.messages);
     }
     setCurrentView("chat");
-    toggleSidebar();
+    if (isSidebarOpen) { toggleSidebar(); }
   };
 
   const deleteSession = (id: string) => {
@@ -473,6 +474,12 @@ export default function App() {
           }}
           onNavigateToChat={() => setCurrentView("chat_page")}
         />;
+
+      case "chat_history":
+        return <ChatHistoryPage onSelectChat={(id) => {
+          loadSession(id);
+          setCurrentView("chat");
+        }} />;
 
       case "image_uploader":
         return <ImageUploader

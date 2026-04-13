@@ -86,21 +86,29 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        {/* HEADER */}
         <View style={styles.header}>
-          <Text style={styles.title}>Personal Health Profile</Text>
+          <View style={styles.headerIconBox}>
+             <Text style={styles.headerIcon}>👤</Text>
+          </View>
+          <Text style={styles.title}>Health Profile</Text>
           <Text style={styles.subtitle}>
-            Tell us more about yourself to get personalized health insights. All data is stored locally and securely.
+            Tell us about yourself to receive highly personalized AI guidance. All data stays offline.
           </Text>
         </View>
 
-        <View style={styles.form}>
+        {/* BASIC INFO */}
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>Basic Details</Text>
+          
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Age</Text>
             <TextInput
               style={styles.input}
               placeholder="e.g. 30"
-              placeholderTextColor={COLORS.textSub}
+              placeholderTextColor={COLORS.textMuted}
               keyboardType="numeric"
               value={age}
               onChangeText={setAge}
@@ -110,34 +118,35 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Gender</Text>
             <View style={styles.optionsRow}>
-              {GENDERS.map((g) => (
-                <TouchableOpacity
-                  key={g}
-                  style={[
-                    styles.optionButton,
-                    gender === g && styles.selectedOption,
-                  ]}
-                  onPress={() => setGender(g as UserProfile["gender"])}
-                >
-                  <Text
-                    style={[
-                      styles.optionTag,
-                      gender === g && styles.selectedOptionText,
-                    ]}
+              {GENDERS.map((g) => {
+                const isSelected = gender === g;
+                return (
+                  <TouchableOpacity
+                    key={g}
+                    activeOpacity={0.8}
+                    style={[styles.optionBtn, isSelected && styles.optionBtnActive]}
+                    onPress={() => setGender(g as UserProfile["gender"])}
                   >
-                    {g}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text style={[styles.optionText, isSelected && styles.optionTextActive]}>
+                      {g}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
+        </View>
 
+        {/* MEDICAL INFO */}
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>Medical History</Text>
+          
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Medical Conditions</Text>
+            <Text style={styles.label}>Existing Conditions</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="e.g. Hypertension, Diabetes, Asthma"
-              placeholderTextColor={COLORS.textSub}
+              placeholderTextColor={COLORS.textMuted}
               multiline
               numberOfLines={3}
               textAlignVertical="top"
@@ -147,75 +156,83 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Severity level of conditions (if any)</Text>
+            <Text style={styles.label}>Severity Level</Text>
             <View style={styles.optionsRow}>
-              {SEVERITIES.map((s) => (
-                <TouchableOpacity
-                  key={s}
-                  style={[
-                    styles.optionButton,
-                    severity === s && styles.selectedOption,
-                  ]}
-                  onPress={() => setSeverity(s as UserProfile["severity"])}
-                >
-                  <Text
-                    style={[
-                      styles.optionTag,
-                      severity === s && styles.selectedOptionText,
-                    ]}
+              {SEVERITIES.map((s) => {
+                const isSelected = severity === s;
+                return (
+                  <TouchableOpacity
+                    key={s}
+                    activeOpacity={0.8}
+                    style={[styles.optionBtn, isSelected && styles.optionBtnActive]}
+                    onPress={() => setSeverity(s as UserProfile["severity"])}
                   >
-                    {s}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.securityContainer}>
-            <Text style={styles.sectionTitle}>🔐 Security Question</Text>
-            <Text style={styles.sectionSubtitle}>
-              This will help you recover your account if you forget your password.
-            </Text>
-
-            {/* Question Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Security Question</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. What is your pet's name?"
-                placeholderTextColor={COLORS.textSub}
-                value={forgetPasswordQuestion}
-                onChangeText={setForgetPasswordQuestion}
-              />
-            </View>
-
-            {/* Answer Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Answer</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your answer"
-                placeholderTextColor={COLORS.textSub}
-                value={forgetPasswordAnswer}
-                onChangeText={setForgetPasswordAnswer}
-              />
-
+                    <Text style={[styles.optionText, isSelected && styles.optionTextActive]}>
+                      {s}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </View>
 
+        {/* SECURITY SETTINGS */}
+        <View style={styles.securityCard}>
+          <View style={styles.securityHeader}>
+             <Text style={styles.securityIcon}>🔐</Text>
+             <View>
+               <Text style={styles.securityTitle}>Account Security</Text>
+               <Text style={styles.securitySubtitle}>Used for password recovery</Text>
+             </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Security Question</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. What is your pet's name?"
+              placeholderTextColor={COLORS.textMuted}
+              value={forgetPasswordQuestion}
+              onChangeText={setForgetPasswordQuestion}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Your Answer</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your hidden answer"
+              placeholderTextColor={COLORS.textMuted}
+              value={forgetPasswordAnswer}
+              onChangeText={setForgetPasswordAnswer}
+            />
+          </View>
+        </View>
+
+        {/* FOOTER ACTIONS */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>Save Details</Text>
+          <TouchableOpacity 
+             style={styles.primaryButton} 
+             onPress={handleSave}
+             activeOpacity={0.8}
+          >
+            <Text style={styles.primaryButtonText}>
+               {isSet ? "Update Profile" : "Save Profile"}
+            </Text>
           </TouchableOpacity>
-          {(age || conditions || gender) ? (
-            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-              <Text style={styles.deleteButtonText}>Delete My Data</Text>
+          
+          <View style={styles.secondaryActions}>
+            <TouchableOpacity onPress={onClose} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+              <Text style={styles.skipText}>{isSet ? "Go Back" : "Skip setup"}</Text>
             </TouchableOpacity>
-          ) : null}
-          <TouchableOpacity style={styles.skipButton} onPress={onClose}>
-            <Text style={styles.skipButtonText}>{isSet ? "Back to Chat" : "Skip for now"}</Text>
-          </TouchableOpacity>
+
+            {(age || conditions || gender) && (
+              <TouchableOpacity onPress={handleDelete} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+                <Text style={styles.deleteText}>Delete Data</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -223,139 +240,181 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
 };
 
 const styles = StyleSheet.create({
-
-  securityContainer: {
-    marginTop: SPACING.lg,
-    padding: SPACING.md,
-    backgroundColor: "#F8FAFC",
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.textHeader,
-    marginBottom: 4,
-  },
-
-  sectionSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSub,
-    marginBottom: SPACING.md,
-  },
-
-  inputGroup: {
-    marginBottom: SPACING.md,
-  },
-
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textMain,
-    marginBottom: 4,
-  },
-
-  input: {
-    backgroundColor: "#FFF",
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    fontSize: 15,
-    color: COLORS.textMain,
-  },
-
-
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
   scrollContent: {
-    padding: SPACING.lg,
-    paddingTop: SPACING.xl * 2,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xxl * 2,
   },
+  
+  // Header
   header: {
+    alignItems: "center",
     marginBottom: SPACING.xl,
+  },
+  headerIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(89, 170, 111, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.md,
+  },
+  headerIcon: {
+    fontSize: 32,
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: COLORS.primary,
-    marginBottom: SPACING.xs,
+    fontSize: 26,
+    fontWeight: "900",
+    color: COLORS.textHeader,
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: COLORS.textSub,
-    lineHeight: 20,
+    textAlign: "center",
+    lineHeight: 18,
+    paddingHorizontal: SPACING.lg,
   },
-  form: {
-    gap: SPACING.lg,
-  },
-  textArea: {
-    minHeight: 100,
-    paddingTop: SPACING.sm,
-  },
-  optionsRow: {
-    flexDirection: "row",
-    gap: SPACING.sm,
-  },
-  optionButton: {
-    flex: 1,
+
+  // Cards
+  card: {
     backgroundColor: COLORS.surface,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-    justifyContent: "center",
+    padding: SPACING.lg,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.lg,
     ...SHADOWS.light,
   },
-  selectedOption: {
-    backgroundColor: COLORS.primary,
-  },
-  optionTag: {
-    color: COLORS.textSub,
+  cardSectionTitle: {
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    marginBottom: SPACING.md,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  selectedOptionText: {
-    color: COLORS.surface,
-  },
-  footer: {
-    marginTop: SPACING.xl * 2,
-    gap: SPACING.md,
+
+  // Security Card
+  securityCard: {
+    backgroundColor: "#F8FAFC",
+    padding: SPACING.lg,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
     marginBottom: SPACING.xl,
   },
-  saveButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.lg,
+  securityHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: SPACING.lg,
+  },
+  securityIcon: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  securityTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+  },
+  securitySubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+
+  // Form Elements
+  inputGroup: {
+    marginBottom: SPACING.md,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.textMain,
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+  input: {
+    backgroundColor: "#F1F5F9",
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "transparent",
+    fontSize: 15,
+    color: COLORS.textMain,
+  },
+  textArea: {
+    minHeight: 90,
+  },
+
+  // Toggle Options
+  optionsRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  optionBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: "#F1F5F9",
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  optionBtnActive: {
+    backgroundColor: "rgba(89, 170, 111, 0.1)",
+    borderColor: COLORS.primary,
+  },
+  optionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textSub,
+  },
+  optionTextActive: {
+    color: COLORS.primary,
+    fontWeight: "800",
+  },
+
+  // Footer Actions
+  footer: {
+    marginTop: 10,
+  },
+  primaryButton: {
+    backgroundColor: COLORS.button,
+    paddingVertical: 16,
+    borderRadius: RADIUS.pill,
     alignItems: "center",
     ...SHADOWS.medium,
   },
-  saveButtonText: {
-    color: COLORS.surface,
-    fontSize: 18,
-    fontWeight: "bold",
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
-  skipButton: {
-    paddingVertical: SPACING.sm,
+  secondaryActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.sm,
   },
-  skipButtonText: {
+  skipText: {
     color: COLORS.textSub,
-    fontSize: 14,
-    textDecorationLine: "underline",
-  },
-  deleteButton: {
-    paddingVertical: SPACING.sm,
-    alignItems: "center",
-    marginTop: SPACING.md,
-  },
-  deleteButtonText: {
-    color: COLORS.danger,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
+  },
+  deleteText: {
+    color: COLORS.danger,
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

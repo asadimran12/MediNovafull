@@ -13,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { COLORS, SPACING, RADIUS } from "../constants/theme";
 import { ChatSession } from "../services/StorageService";
 
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history";
 
 const { width } = Dimensions.get("window");
 const SIDEBAR_WIDTH = width * 0.8;
@@ -189,7 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {sessions.length === 0 ? (
                   <Text style={styles.emptyHistoryText}>No recent chats</Text>
                 ) : (
-                  sessions.map((s) => (
+                  sessions.slice(0, 3).map((s) => (
                     <View
                       key={s.id}
                       style={[
@@ -222,6 +222,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </View>
                   ))
                 )}
+                <TouchableOpacity onPress={() => navigateTo("chat_history")}>
+                  <Text style={{ color: COLORS.primary, fontSize: 13, fontWeight: "600", textAlign: "center" }}>View All Chat History</Text>
+                </TouchableOpacity>
               </View>
             )}
 
