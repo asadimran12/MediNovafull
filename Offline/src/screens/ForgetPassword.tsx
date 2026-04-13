@@ -24,6 +24,8 @@ interface ForgetPasswordProps {
 type Step = "identify" | "verify" | "reset";
 
 export const ForgetPassword = ({ onBack }: ForgetPasswordProps) => {
+    const { colors: COLORS } = useTheme();
+    const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [step, setStep] = useState<Step>("identify");
 

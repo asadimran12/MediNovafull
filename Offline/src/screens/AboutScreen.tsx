@@ -4,7 +4,14 @@ import { useTheme } from "../context/ThemeContext";
 import { StyleSheet, ScrollView, Text, View, TouchableOpacity } from "react-native";
 import { SPACING } from "../constants/theme";
 
-export const AboutScreen: React.FC = () => {
+interface AboutScreenProps {
+  onBack?: () => void;
+}
+
+export const AboutScreen: React.FC<AboutScreenProps> = ({ onBack }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   // A simple array to map out your core features
   const features = [
     { icon: "🔒", title: "100% Private", desc: "Your data never leaves your device." },
@@ -13,16 +20,25 @@ export const AboutScreen: React.FC = () => {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-
-      {/* 1. HERO SECTION */}
-      <View style={styles.heroSection}>
-        <View style={styles.logoPlaceholder}>
-          <Text style={styles.logoText}>M</Text>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      {onBack && (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>About MediNova</Text>
+          <View style={{ width: 40 }} />
         </View>
-        <Text style={styles.appTitle}>MediNova</Text>
-        <Text style={styles.appSubtitle}>Your Offline AI Health Companion</Text>
-      </View>
+      )}
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+        {/* 1. HERO SECTION */}
+        <View style={styles.heroSection}>
+          <View style={styles.logoPlaceholder}>
+            <Text style={styles.logoText}>M</Text>
+          </View>
+          <Text style={styles.appTitle}>MediNova</Text>
+          <Text style={styles.appSubtitle}>Your Offline AI Health Companion</Text>
+        </View>
 
       {/* 2. DESCRIPTION */}
       <Text style={styles.aboutText}>
@@ -67,11 +83,13 @@ export const AboutScreen: React.FC = () => {
         <Text style={styles.copyrightText}>© 2024 MediNova. All rights reserved.</Text>
       </View>
 
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+function createStyles(COLORS: any) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background
@@ -79,6 +97,32 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   contentContainer: {
     padding: SPACING.lg || 20, // Fallback to 20 if SPACING.lg is undefined
     paddingBottom: 40,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  backArrow: {
+    fontSize: 22,
+    color: COLORS.primary,
+    fontWeight: "900",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textHeader,
   },
 
   // Hero Styles
@@ -209,3 +253,4 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 12,
   },
 });
+}

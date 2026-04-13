@@ -463,12 +463,13 @@ function MainApp() {
       case "exercise_plans":
         return <ExercisePlansScreen onBack={() => setCurrentView("dashboard")} />;
       case "about":
-        return <AboutScreen />;
+        return <AboutScreen onBack={() => setCurrentView("dashboard")} />;
       case "settings":
         return <SettingsScreen
           onClearAll={handleClearAll}
           onManageModels={() => setCurrentView("model_manager")}
           onManageProfile={() => setCurrentView("profile")}
+          onAbout={() => setCurrentView("about")}
           onBack={() => setCurrentView("dashboard")}
           onLogout={handleLogout}
         />;
@@ -612,7 +613,7 @@ function MainApp() {
                 <View style={styles.logoContainer}>
                   <View style={styles.imageContainer}>
                     <Image
-                      source={require("../Offline/src/assets/images/splash_logo.png")}
+                      source={require("./src/assets/images/splash_logo.png")}
                       style={styles.logo}
                       resizeMode="contain"
                     />
@@ -678,7 +679,8 @@ function MainApp() {
   );
 }
 
-const createStyles = (COLORS: any) => StyleSheet.create({
+function createStyles(COLORS: any) {
+  return StyleSheet.create({
 
   logoContainer: {
     flexDirection: "column",
@@ -770,3 +772,4 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     lineHeight: 18,
   }
 });
+}

@@ -18,6 +18,7 @@ interface SettingsScreenProps {
   onClearAll: () => void;
   onManageModels: () => void;
   onManageProfile: () => void;
+  onAbout: () => void;
   onBack?: () => void;
   onLogout?: () => void;
 }
@@ -26,6 +27,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onClearAll,
   onManageModels,
   onManageProfile,
+  onAbout,
   onBack,
   onLogout,
 }) => {
@@ -295,6 +297,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           />
         </View>
 
+        {/* ── Application ───────────────────────────── */}
+        <Text style={styles.sectionLabel}>APPLICATION</Text>
+        <View style={styles.card}>
+          <SettingRow
+            icon="ℹ️"
+            title="About MediNova"
+            subtitle="Mission, privacy & version info"
+            actionLabel="View"
+            onAction={onAbout}
+          />
+        </View>
+
         {/* ── Data ───────────────────────────── */}
         <Text style={styles.sectionLabel}>DATA & STORAGE</Text>
         <View style={styles.card}>
@@ -384,7 +398,8 @@ const SettingRow: React.FC<SettingRowProps> = ({ icon, title, subtitle, actionLa
 };
 
 // ── Styles ─────────────────────────────────────────────────────
-const createStyles = (COLORS: any) => StyleSheet.create({
+function createStyles(COLORS: any) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -747,3 +762,4 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textSub,
   },
 });
+}
