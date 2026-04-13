@@ -7,7 +7,8 @@ import {
   Dimensions,
   Image,
 } from "react-native";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 
 const { width, height } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - SPACING.lg * 3) / 2;
@@ -19,6 +20,8 @@ interface DashboardScreenProps {
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
   const { onNavigate, onOpenSettings, userName } = props;
 
   const modules = [
@@ -31,22 +34,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
   return (
     <View style={styles.outerContainer}>
 
-      {/* ── TOP NAV ── */}
-      <View style={styles.topNav}>
-        <Image
-          source={require("../assets/images/splash_logo.png")}
-          style={styles.headerLogo}
-          resizeMode="contain"
-        />
+      {/* ── TOP NAV & WELCOME ── */}
+      <View style={[styles.topNav, { justifyContent: 'space-between', height: 'auto', alignItems: 'center', marginBottom: SPACING.lg }]}>
+        <View style={[styles.welcomeSection, { marginTop: 0, marginBottom: 0, flex: 1, marginRight: 15 }]}>
+          <Text numberOfLines={1}>
+            <Text style={[styles.welcomeText, { fontSize: 16 }]}>Welcome back, </Text>
+            <Text style={[styles.userNameText, { fontSize: 22 }]}>{userName || "Friend"}</Text>
+          </Text>
+        </View>
         <TouchableOpacity onPress={onOpenSettings} activeOpacity={0.7} style={styles.settingsBtn}>
           <Text style={styles.settingsIcon}>⚙️</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* ── WELCOME ── */}
-      <View style={styles.welcomeSection}>
-        <Text style={styles.welcomeText}>Welcome back,</Text>
-        <Text style={styles.userNameText}>{userName || "Friend"}</Text>
       </View>
 
       {/* ── HERO CARD ── */}
@@ -137,7 +135,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
   );
 };
 
-const styles = StyleSheet.create({
+// ── Styles ─────────────────────────────────────────────────────
+const createStyles = (COLORS: any) => StyleSheet.create({
   outerContainer: {
     flex: 1,
     backgroundColor: COLORS.background,

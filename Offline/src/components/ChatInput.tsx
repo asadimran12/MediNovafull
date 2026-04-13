@@ -1,4 +1,6 @@
 import React from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
   StyleSheet,
   View,
@@ -8,7 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { COLORS, SPACING, RADIUS } from "../constants/theme";
+import { SPACING, RADIUS } from "../constants/theme";
 
 interface ChatInputProps {
   inputText: string;
@@ -27,6 +29,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isGenerating,
   disabled,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   const isSendDisabled = disabled || !inputText.trim();
 
   return (
@@ -39,9 +44,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <TextInput
             style={styles.input}
             placeholder="Ask MediNova anything…"
-            placeholderTextColor="#A0AEC0"
+            placeholderTextColor={COLORS.textSub}
             value={inputText}
             onChangeText={setInputText}
+            autoCorrect={false}
             multiline
             editable={!disabled}
           />
@@ -71,7 +77,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   wrapper: {
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
@@ -88,10 +94,10 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    backgroundColor: "#F1F5F9",
+    backgroundColor: COLORS.background,
     borderRadius: 28,
     borderWidth: 1.5,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     paddingLeft: 18,
     paddingRight: 6,
     paddingVertical: 6,
@@ -122,7 +128,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sendBtnDisabled: {
-    backgroundColor: "#CBD5E0",
+    backgroundColor: COLORS.textMuted,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -156,8 +162,8 @@ const styles = StyleSheet.create({
   hint: {
     textAlign: "center",
     fontSize: 10,
-    color: "#A0AEC0",
+    color: COLORS.textSub,
     marginTop: 6,
     letterSpacing: 0.3,
   },
-});
+});

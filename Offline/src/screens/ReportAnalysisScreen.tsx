@@ -1,6 +1,8 @@
 import React from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert, Dimensions } from "react-native";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 
 interface ReportAnalysisScreenProps {
   onBack: () => void;
@@ -9,6 +11,9 @@ interface ReportAnalysisScreenProps {
 }
 
 export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBack, onNavigateToUpload, onNavigateToChat }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   const handleSelect = (type: 'gallery' | 'pdf' | 'camera') => {
     onNavigateToUpload(type);
   }
@@ -59,7 +64,7 @@ export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBa
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: "row",

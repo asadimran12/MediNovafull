@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
   StyleSheet,
   View,
@@ -8,7 +10,7 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import { COLORS } from "../constants/theme";
+
 
 interface SplashScreenProps {
   status: string;
@@ -16,6 +18,9 @@ interface SplashScreenProps {
 }
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ status, progress }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
@@ -92,7 +97,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ status, progress }) 
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF", // White background

@@ -13,7 +13,8 @@ import {
   Animated,
 } from "react-native";
 import { useRef } from "react";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 import AuthService, { UserAccount } from "../services/AuthService";
 import StorageService from "../services/StorageService";
 import * as ReactNativeFS from "react-native-fs";
@@ -26,6 +27,8 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPassword, onRestore, cloudData }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -121,7 +124,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <Text style={styles.brand}>MediNova</Text>
           <Text style={styles.title}>
@@ -229,7 +232,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -279,22 +282,22 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   input: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     color: COLORS.textMain,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
   },
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
   },
   passwordInput: {
     flex: 1,
@@ -309,6 +312,7 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     fontSize: 18,
+    color: COLORS.textMain,
   },
   authButton: {
     backgroundColor: COLORS.primary,
@@ -333,6 +337,7 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 14,
     fontWeight: "600",
+    color: COLORS.primary,
   },
   restoreButton: {
     flexDirection: "row",
@@ -342,9 +347,9 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.md,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     alignSelf: 'center',
     ...SHADOWS.light,
   },

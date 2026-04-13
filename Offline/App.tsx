@@ -25,7 +25,8 @@ import StorageService, {
 import AuthService, { UserAccount } from "./src/services/AuthService";
 
 // Constant & Components
-import { COLORS, SIDEBAR_WIDTH, SPACING, RADIUS, SHADOWS } from "./src/constants/theme";
+import { SIDEBAR_WIDTH, SPACING, RADIUS, SHADOWS } from "./src/constants/theme";
+import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { Sidebar } from "./src/components/Sidebar";
 import { ChatBubble } from "./src/components/ChatBubble";
 import { ChatInput } from "./src/components/ChatInput";
@@ -54,6 +55,16 @@ import { CloudRestoreLoginScreen } from "./src/screens/CloudRestoreLoginScreen";
 type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history" | "cloud_restore_login";
 
 export default function App() {
+  return (
+    <ThemeProvider>
+      <MainApp />
+    </ThemeProvider>
+  );
+}
+
+function MainApp() {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
   const [hasSkippedImport, setHasSkippedImport] = useState(false);
   const [messages, setMessages] = useState<LocalMessage[]>([]);
@@ -667,7 +678,7 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
 
   logoContainer: {
     flexDirection: "column",

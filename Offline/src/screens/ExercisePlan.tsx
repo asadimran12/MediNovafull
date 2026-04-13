@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
     View,
     Text,
@@ -14,7 +16,7 @@ import {
 
 import NotificationService, { ReminderTimes } from "../services/NotificationService";
 
-import { COLORS } from "../constants/theme";
+
 import storageService, { HealthPlan } from "../services/StorageService";
 import {
     StructuredExercisePlan,
@@ -36,7 +38,11 @@ function getExerciseIcon(type: string): string {
 }
 
 /* ─── Exercise Item Card ───────────────────────── */
-const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => (
+const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+  
+  return (
     <View style={styles.exerciseCard}>
         <Text style={styles.exerciseName}>{item.name}</Text>
         <Text style={styles.exerciseDetails}>
@@ -46,7 +52,8 @@ const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => (
             {" | "}Intensity: {item.intensity}
         </Text>
     </View>
-);
+  );
+};
 
 function formatDate(iso: string) {
     const d = new Date(iso);
@@ -58,6 +65,9 @@ interface ExercisePlansScreenProps {
 }
 
 export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
     const [selectedDayIndex, setSelectedDayIndex] = useState(0);
     const [activePlan, setActivePlan] = useState<StructuredExercisePlan | null>(null);
     const [activePlanId, setActivePlanId] = useState<string | null>(null);
@@ -215,7 +225,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     };
 
     return (
-        <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+        <View style={{ flex: 1, backgroundColor: COLORS.background }}>
 
             {/* ── Professional Green Header ── */}
             <View style={styles.headerContainer}>
@@ -433,7 +443,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                                 <Switch
                                     value={reminders.exercise.enabled}
                                     onValueChange={v => updateExerciseReminder('enabled', v)}
-                                    trackColor={{ false: "#ddd", true: COLORS.primary }}
+                                    trackColor={{ false: COLORS.border, true: COLORS.primary }}
                                 />
                             </View>
                         )}
@@ -452,7 +462,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
 };
 
 /* ─── Styles ────────────────────────────────────────────── */
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
     headerContainer: {
         backgroundColor: COLORS.primary,
         paddingTop: 16,
@@ -572,36 +582,36 @@ const styles = StyleSheet.create({
     dayText: { color: COLORS.primary, fontWeight: "bold", fontSize: 12 },
     dayTextSelected: { color: "#fff" },
 
-    progressContainer: { backgroundColor: "#fff", padding: 16, borderRadius: 12, marginBottom: 20 },
-    progressTitle: { fontWeight: "700", marginBottom: 10 },
-    progressBarBackground: { height: 12, backgroundColor: "#eee", borderRadius: 6, overflow: "hidden" },
-    progressBarFill: { height: "100%", backgroundColor: "#27ae60" },
-    progressPercent: { marginTop: 6, fontWeight: "600", textAlign: "right" },
+    progressContainer: { backgroundColor: COLORS.surface, padding: 16, borderRadius: 12, marginBottom: 20 },
+    progressTitle: { fontWeight: "700", marginBottom: 10, color: COLORS.textHeader },
+    progressBarBackground: { height: 12, backgroundColor: COLORS.background, borderRadius: 6, overflow: "hidden" },
+    progressBarFill: { height: "100%", backgroundColor: COLORS.success },
+    progressPercent: { marginTop: 6, fontWeight: "600", textAlign: "right", color: COLORS.success },
 
     mealSection: { marginBottom: 22 },
     mealHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
     mealIcon: { fontSize: 20 },
-    mealTitle: { fontWeight: "800", fontSize: 17, color: "#222" },
+    mealTitle: { fontWeight: "800", fontSize: 17, color: COLORS.textHeader },
     sectionCompleted: { opacity: 0.5 },
     check: { marginLeft: "auto", fontSize: 16, color: "#27ae60", fontWeight: "bold" },
 
     exerciseItemWrapper: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#fff",
+        backgroundColor: COLORS.surface,
         borderRadius: 12,
         padding: 14,
         marginBottom: 10,
     },
     exerciseCard: { flex: 1 },
-    exerciseName: { fontWeight: "700", fontSize: 15, marginBottom: 6 },
-    exerciseDetails: { fontSize: 13, color: "#555" },
+    exerciseName: { fontWeight: "700", fontSize: 15, marginBottom: 6, color: COLORS.textHeader },
+    exerciseDetails: { fontSize: 13, color: COLORS.textSub },
     circle: {
         width: 28, height: 28, borderRadius: 14,
-        borderWidth: 2, borderColor: "#ddd",
+        borderWidth: 2, borderColor: COLORS.border,
         justifyContent: "center", alignItems: "center", marginLeft: 12,
     },
-    circleCompleted: { backgroundColor: "#27ae60", borderColor: "#27ae60" },
+    circleCompleted: { backgroundColor: COLORS.success, borderColor: COLORS.success },
     tick: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 
     empty: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },
@@ -622,15 +632,15 @@ const styles = StyleSheet.create({
         width: 40, height: 4, backgroundColor: "#ddd",
         borderRadius: 2, alignSelf: "center", marginBottom: 16,
     },
-    modalTitle: { fontSize: 18, fontWeight: "800", color: "#1a1a2e", marginBottom: 16 },
-    modalEmpty: { color: "#888", textAlign: "center", marginVertical: 30, fontSize: 15 },
+    modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader, marginBottom: 16 },
+    modalEmpty: { color: COLORS.textMuted, textAlign: "center", marginVertical: 30, fontSize: 15 },
     planRow: {
         flexDirection: "row", alignItems: "center",
-        backgroundColor: "#F8F9FA", borderRadius: 12,
+        backgroundColor: COLORS.background, borderRadius: 12,
         padding: 14, marginBottom: 10, gap: 10,
     },
-    planRowTitle: { fontWeight: "700", fontSize: 14, color: "#1a1a2e" },
-    planRowDate: { fontSize: 12, color: "#888", marginTop: 2 },
+    planRowTitle: { fontWeight: "700", fontSize: 14, color: COLORS.textHeader },
+    planRowDate: { fontSize: 12, color: COLORS.textSub, marginTop: 2 },
     useBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
     useBtnDisabled: { backgroundColor: "#27ae60" },
     useBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
@@ -645,17 +655,17 @@ const styles = StyleSheet.create({
     inUseBadgeText: { color: "#27ae60", fontSize: 11, fontWeight: "700" },
     planRowActive: {
         borderWidth: 1.5,
-        borderColor: "#27ae60",
-        backgroundColor: "#f0fdf4",
+        borderColor: COLORS.primary,
+        backgroundColor: COLORS.surface,
     },
     deleteBtn: { backgroundColor: "#FFE5E5", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
     deleteBtnText: { fontSize: 16 },
-    modalCloseBtn: { marginTop: 16, backgroundColor: "#F1F5F9", padding: 14, borderRadius: 12, alignItems: "center" },
-    modalCloseBtnText: { color: "#555", fontWeight: "700", fontSize: 15 },
+    modalCloseBtn: { marginTop: 16, backgroundColor: COLORS.background, padding: 14, borderRadius: 12, alignItems: "center" },
+    modalCloseBtnText: { color: COLORS.textHeader, fontWeight: "700", fontSize: 15 },
 
     // Reminders
-    reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: "#F8F9FA", padding: 12, borderRadius: 10 },
-    reminderTitle: { fontWeight: "700", fontSize: 16, color: "#1a1a2e" },
+    reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: COLORS.background, padding: 12, borderRadius: 10 },
+    reminderTitle: { fontWeight: "700", fontSize: 16, color: COLORS.textHeader },
     timeInputContainer: { flexDirection: "row", alignItems: "center", marginRight: 15 },
-    timeInput: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd", borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, fontSize: 16, fontWeight: "600", textAlign: "center", minWidth: 40, marginHorizontal: 4 },
+    timeInput: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, fontSize: 16, fontWeight: "600", textAlign: "center", minWidth: 40, marginHorizontal: 4, color: COLORS.textHeader },
 });

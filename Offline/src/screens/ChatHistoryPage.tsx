@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
     View,
     Text,
@@ -8,13 +10,16 @@ import {
     ActivityIndicator,
 } from "react-native";
 import storageService, { ChatSession } from "../services/StorageService";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 
 interface ChatHistoryProps {
     onSelectChat: (id: string) => void;
 }
 
 export const ChatHistoryPage = ({ onSelectChat }: ChatHistoryProps) => {
+    const { colors: COLORS } = useTheme();
+    const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+    
     const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -99,7 +104,7 @@ export const ChatHistoryPage = ({ onSelectChat }: ChatHistoryProps) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,

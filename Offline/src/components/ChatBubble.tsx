@@ -1,6 +1,8 @@
 import React from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import { LocalMessage } from "../services/StorageService";
 
 interface ChatBubbleProps {
@@ -9,6 +11,9 @@ interface ChatBubbleProps {
 }
 
 export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onSavePlan }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
 
@@ -28,7 +33,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onSavePlan }) =
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   messageRow: { marginBottom: SPACING.lg, flexDirection: "row" },
   userRow: { justifyContent: "flex-end" },
   assistantRow: { justifyContent: "flex-start" },

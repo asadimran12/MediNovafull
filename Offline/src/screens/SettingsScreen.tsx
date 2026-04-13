@@ -10,8 +10,9 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import storageService from "../services/StorageService";
+import { useTheme, ThemeMode } from "../context/ThemeContext";
 
 interface SettingsScreenProps {
   onClearAll: () => void;
@@ -28,6 +29,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onBack,
   onLogout,
 }) => {
+  const { colors: COLORS, themeMode, setThemeMode } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
 
   const [showExportModal, setShowExportModal] = useState(false);
@@ -66,10 +69,37 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const handleExportOnCloud = async () => {
     setIsExporting(true);
     try {
+      const exists = await storageService.checkCloudBackupExists();
+      if (exists) {
+        setIsExporting(false);
+        Alert.alert(
+          "Backup Already Exists",
+          "You already have a backup on the cloud. Do you want to update it?",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Update",
+              onPress: async () => {
+                setIsExporting(true);
+                try {
+                  await storageService.exportAllDataOnCloud();
+                  showSuccess("Your data has been backed up to the cloud successfully.");
+                } catch (error) {
+                  Alert.alert("Export Failed", "Failed to export data. Please try again.");
+                } finally {
+                  setIsExporting(false);
+                }
+              }
+            }
+          ]
+        );
+        return;
+      }
+
       await storageService.exportAllDataOnCloud();
       showSuccess("Your data has been backed up to the cloud successfully.");
     } catch (error) {
-      Alert.alert("Export Failed", "Failed to export data. Please try again.");
+      Alert.alert("Export Failed", "Failed to check or export data. Please try again.");
     } finally {
       setIsExporting(false);
     }
@@ -209,6 +239,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
+        {/* ── Appearance ───────────────────────────── */}
+        <Text style={styles.sectionLabel}>APPEARANCE</Text>
+        <View style={styles.card}>
+          <SettingRow
+            icon={themeMode === "dark" ? "🌙" : themeMode === "light" ? "☀️" : "⚙️"}
+            title="App Theme"
+            subtitle={`Currently using ${themeMode === 'system' ? 'System Default' : themeMode === 'dark' ? 'Dark Mode' : 'Light Mode'}`}
+            actionLabel={themeMode === 'system' ? 'System' : themeMode === 'dark' ? 'Dark' : 'Light'}
+            onAction={() => {
+              Alert.alert("Choose Theme", "Select your preferred app appearance", [
+                { text: "System Default", onPress: () => setThemeMode("system") },
+                { text: "Light Mode", onPress: () => setThemeMode("light") },
+                { text: "Dark Mode", onPress: () => setThemeMode("dark") },
+                { text: "Cancel", style: "cancel" }
+              ]);
+            }}
+          />
+        </View>
+
         {/* ── AI & Models ───────────────────────────── */}
         <Text style={styles.sectionLabel}>AI & MODELS</Text>
         <View style={styles.card}>
@@ -223,9 +272,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <Text style={styles.rowIcon}>🧠</Text>
-              <View>
-                <Text style={styles.rowTitle}>Model Context</Text>
-                <Text style={styles.rowSubtitle}>Token limit per conversation</Text>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.rowTitle} numberOfLines={1}>Model Context</Text>
+                <Text style={styles.rowSubtitle} numberOfLines={2}>Token limit per conversation</Text>
               </View>
             </View>
             <View style={styles.badge}>
@@ -308,13 +357,17 @@ interface SettingRowProps {
   actionDanger?: boolean;
 }
 
-const SettingRow: React.FC<SettingRowProps> = ({ icon, title, subtitle, actionLabel, onAction, actionDanger }) => (
+const SettingRow: React.FC<SettingRowProps> = ({ icon, title, subtitle, actionLabel, onAction, actionDanger }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+  
+  return (
   <View style={styles.row}>
     <View style={styles.rowLeft}>
       <Text style={styles.rowIcon}>{icon}</Text>
-      <View>
-        <Text style={styles.rowTitle}>{title}</Text>
-        <Text style={styles.rowSubtitle}>{subtitle}</Text>
+      <View style={{ flex: 1, paddingRight: 8 }}>
+        <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
+        <Text style={styles.rowSubtitle} numberOfLines={2}>{subtitle}</Text>
       </View>
     </View>
     <TouchableOpacity
@@ -327,13 +380,14 @@ const SettingRow: React.FC<SettingRowProps> = ({ icon, title, subtitle, actionLa
       </Text>
     </TouchableOpacity>
   </View>
-);
+  );
+};
 
 // ── Styles ─────────────────────────────────────────────────────
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F2F2F7",
+    backgroundColor: COLORS.background,
   },
 
   // Header

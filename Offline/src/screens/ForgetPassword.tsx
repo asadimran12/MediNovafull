@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
     View,
     Text,
@@ -13,7 +15,7 @@ import {
 } from "react-native";
 import StorageService, { UserProfile } from "../services/StorageService";
 import AuthService from "../services/AuthService";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 
 interface ForgetPasswordProps {
     onBack: () => void;
@@ -275,7 +277,7 @@ export const ForgetPassword = ({ onBack }: ForgetPasswordProps) => {
     );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,

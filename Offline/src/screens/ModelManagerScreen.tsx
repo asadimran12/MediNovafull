@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
   StyleSheet,
   View,
@@ -9,7 +11,7 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import ModelService, { AIModel } from "../services/ModelService";
 import LlamaService from "../services/LlamaService";
 
@@ -18,6 +20,9 @@ interface ModelManagerScreenProps {
 }
 
 export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   const [models, setModels] = useState<(AIModel & { isDownloaded: boolean; isActive: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -266,7 +271,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: "row",

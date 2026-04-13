@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
     View,
     Text,
@@ -9,7 +11,7 @@ import {
     Platform,
     Image,
 } from "react-native";
-import { COLORS, SPACING, RADIUS } from "../constants/theme";
+import { SPACING, RADIUS } from "../constants/theme";
 import { ChatBubble } from "../components/ChatBubble";
 import { ChatInput } from "../components/ChatInput";
 import { LocalMessage } from "../services/StorageService";
@@ -32,6 +34,9 @@ interface ChatPageProps {
 }
 
 export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps) {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
     const [messages, setMessages] = useState<LocalMessage[]>(() => {
         const initialText = reportData
             ? `I see your report titled '${reportData.title}'. What would you like to know about it?`
@@ -226,7 +231,7 @@ export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.background },
     header: {
         flexDirection: "row",
@@ -287,7 +292,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.sm,
         borderRadius: 4,
     },
-    rowEven: { backgroundColor: "#f9f9f9" },
+    rowEven: { backgroundColor: COLORS.background },
     rowOdd: { backgroundColor: "transparent" },
     rowLabel: {
         fontSize: 13,
@@ -348,6 +353,6 @@ const styles = StyleSheet.create({
         height: 150,
         borderRadius: 8,
         marginBottom: SPACING.md,
-        backgroundColor: "#f0f0f0",
+        backgroundColor: COLORS.background,
     },
 });

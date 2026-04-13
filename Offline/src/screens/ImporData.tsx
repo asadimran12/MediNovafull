@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { useTheme } from "../context/ThemeContext";
+
 import {
     View,
     Text,
@@ -11,7 +13,7 @@ import {
 } from 'react-native'
 import { pick } from "@react-native-documents/picker";
 import storageService from '../services/StorageService'
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 
 interface ImportDataProps {
     onSkip: () => void;
@@ -21,6 +23,9 @@ interface ImportDataProps {
 }
 
 export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched, onCloudRestoreReady }: ImportDataProps) {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
 
     const [isImporting, setIsImporting] = useState(false);
     const [importingLabel, setImportingLabel] = useState("Importing...");
@@ -68,20 +73,38 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
             
             const baseUrl = 'https://medinovafull-2.onrender.com';
             const url = `${baseUrl}/users/GetAllData?username=${encodeURIComponent(cloudUsername.trim())}`;
+            
+            console.log("=== CLOUD IMPORT LOGS ===");
+            console.log("Attempting to fetch cloud backup for username:", cloudUsername.trim());
+            console.log("Endpoint URL:", url);
+
             const response = await fetch(url, { method: "GET" });
             
+            console.log("Cloud Import Response Status:", response.status);
+
             if (response.status === 404) {
                 setIsImporting(false);
+                console.log("No backup found for username:", cloudUsername.trim());
                 Alert.alert('Not Found', `No cloud backup found for username "${cloudUsername.trim()}". Please check the username and try again.`);
                 return;
             }
             if (!response.ok) {
                 setIsImporting(false);
+                console.log("Server error returned:", response.status);
                 Alert.alert('Server Error', `The server returned an error (${response.status}). Please try again later.`);
                 return;
             }
             const data = await response.json();
             setIsImporting(false);
+
+            console.log("Cloud Import Data Received:", {
+               hasProfile: !!data.profile,
+               chatsCount: data.chats?.length || 0,
+               plansCount: data.plans?.length || 0,
+               usersCount: data.auth?.users?.length || 0,
+               hasSession: !!data.auth?.session
+            });
+            console.log("===========================");
 
             if (data) {
                 onCloudDataFetched(data);
@@ -195,7 +218,7 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center',

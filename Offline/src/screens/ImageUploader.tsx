@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
     View,
     Text,
@@ -12,7 +14,7 @@ import {
 import { launchImageLibrary, launchCamera } from "react-native-image-picker";
 import { pick } from "@react-native-documents/picker";
 import TextRecognition from "@react-native-ml-kit/text-recognition";
-import { COLORS, SPACING } from "../constants/theme";
+import { SPACING } from "../constants/theme";
 import KnowledgeBase from "../services/KnowledgeBase";
 
 const { PdfToImageModule } = NativeModules;
@@ -53,6 +55,9 @@ function parseReportText(raw: string): ParsedReport {
 }
 
 export default function ImageUploader({ onNavigate, onBack, initialMode }: ImageUploaderProps) {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
     // ✅ All hooks at top — unconditional, same order every render
     const [image, setImage] = useState<string | null>(null);
     const [report, setReport] = useState<ParsedReport | null>(null);
@@ -289,7 +294,7 @@ export default function ImageUploader({ onNavigate, onBack, initialMode }: Image
     );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,

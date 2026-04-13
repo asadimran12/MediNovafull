@@ -10,10 +10,11 @@ import {
   Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { COLORS, SPACING, RADIUS } from "../constants/theme";
+import { SPACING, RADIUS } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 import { ChatSession } from "../services/StorageService";
 
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history" | "cloud_restore_login";
 
 const { width } = Dimensions.get("window");
 const SIDEBAR_WIDTH = width * 0.8;
@@ -54,6 +55,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   currentUser,
 }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+  
   return (
     <>
       {/* Overlay */}
@@ -109,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               marginTop: 10,
               padding: 15,
               borderRadius: 15,
-              backgroundColor: "#fff",
+              backgroundColor: COLORS.surface,
               borderWidth: 1,
               borderColor: COLORS.primary,
               flexDirection: "row",
@@ -131,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   style={{
                     fontSize: 16,
                     fontWeight: "bold",
-                    color: "#333",
+                    color: COLORS.textHeader,
                   }}
                 >
                   {currentUser.username}
@@ -140,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Text
                   style={{
                     fontSize: 12,
-                    color: "#777",
+                    color: COLORS.textSub,
                     marginTop: 2,
                   }}
                 >
@@ -177,6 +181,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             contentContainerStyle={styles.scrollContent}
           >
             <Text style={styles.sideGroupTitle}>PRIMARY</Text>
+            <SidebarItem
+              label="🏠 Dashboard"
+              active={currentView === "dashboard"}
+              onPress={() => navigateTo("dashboard")}
+            />
             <SidebarItem
               label="💬 Chat History"
               active={currentView === "chat"}
@@ -283,7 +292,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 };
 
 // Extracted and strongly-typed SidebarItem component
-const SidebarItem: React.FC<SidebarItemProps> = ({ label, active, onPress, isDestructive }) => (
+const SidebarItem: React.FC<SidebarItemProps> = ({ label, active, onPress, isDestructive }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
+  return (
   <TouchableOpacity
     onPress={onPress}
     activeOpacity={0.7}
@@ -301,9 +314,10 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ label, active, onPress, isDes
       {label}
     </Text>
   </TouchableOpacity>
-);
+  );
+};
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: COLORS.overlay || "rgba(0,0,0,0.4)",
@@ -315,7 +329,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: SIDEBAR_WIDTH,
-    backgroundColor: COLORS.surface || "#FFFFFF",
+    backgroundColor: COLORS.surface,
     zIndex: 20,
     elevation: 16,
     shadowColor: "#000",
@@ -356,13 +370,13 @@ const styles = StyleSheet.create({
   },
   userBadge: {
     fontSize: 13,
-    color: COLORS.textSub || "#666",
+    color: COLORS.textSub,
     fontWeight: "600",
     marginTop: 2,
     marginLeft: 15
   },
   sidebarNewChat: {
-    backgroundColor: COLORS.primary || "#007AFF",
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: RADIUS.lg || 12,
@@ -384,7 +398,7 @@ const styles = StyleSheet.create({
   sideGroupTitle: {
     fontSize: 11,
     fontWeight: "700",
-    color: COLORS.textMuted || "#999",
+    color: COLORS.textMuted,
     marginTop: 28,
     marginHorizontal: 20,
     marginBottom: 10,
@@ -400,26 +414,26 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md || 8,
   },
   sideItemActive: {
-    backgroundColor: "#F0F0F5",
+    backgroundColor: COLORS.surface === "#1C1C1E" ? "#2C2C2E" : "#F0F0F5",
   },
   sideItemLabel: {
     fontSize: 16,
-    color: COLORS.textMain || "#1C1C1E",
+    color: COLORS.textMain,
     fontWeight: "500",
   },
   sideItemLabelActive: {
-    color: COLORS.primary || "#007AFF",
+    color: COLORS.primary,
     fontWeight: "700",
   },
   sideItemDestructive: {
-    color: "#FF3B30",
+    color: COLORS.danger,
   },
   historyList: {
     marginBottom: 10,
   },
   emptyHistoryText: {
     fontSize: 13,
-    color: COLORS.textMuted || "#999",
+    color: COLORS.textMuted,
     fontStyle: "italic",
     marginLeft: 40,
     marginTop: 5,
@@ -438,14 +452,14 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
   },
   histItemActive: {
-    backgroundColor: "#F2F2F7",
+    backgroundColor: COLORS.surface === "#1C1C1E" ? "#2C2C2E" : "#F2F2F7",
   },
   histText: {
     fontSize: 14,
-    color: COLORS.textSub || "#666",
+    color: COLORS.textSub,
   },
   histTextActive: {
-    color: COLORS.primary || "#007AFF",
+    color: COLORS.primary,
     fontWeight: "600",
   },
   histDeleteBtn: {
@@ -454,13 +468,13 @@ const styles = StyleSheet.create({
   },
   histDeleteText: {
     fontSize: 14,
-    color: COLORS.textMuted || "#999",
+    color: COLORS.textMuted,
     fontWeight: "600",
   },
   logoutContainer: {
     marginTop: 30,
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F5",
+    borderTopColor: COLORS.border,
     paddingTop: 10,
   },
 });

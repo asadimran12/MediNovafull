@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
   View,
   Text,
@@ -10,7 +12,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
-import { COLORS, SPACING, RADIUS, SHADOWS } from "../constants/theme";
+import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import StorageService, { UserProfile } from "../services/StorageService";
 
 interface ProfileScreenProps {
@@ -22,6 +24,9 @@ const GENDERS = ["Male", "Female", "Other"];
 const SEVERITIES = ["Low", "Medium", "High"];
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   const [age, setAge] = useState("");
   const [gender, setGender] = useState<UserProfile["gender"]>("");
   const [conditions, setConditions] = useState("");
@@ -239,7 +244,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -303,11 +308,11 @@ const styles = StyleSheet.create({
 
   // Security Card
   securityCard: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: COLORS.surface,
     padding: SPACING.lg,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: COLORS.border,
     marginBottom: SPACING.xl,
   },
   securityHeader: {
@@ -342,12 +347,12 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   input: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: COLORS.background,
     borderRadius: RADIUS.md,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: COLORS.border,
     fontSize: 15,
     color: COLORS.textMain,
   },
@@ -363,11 +368,11 @@ const styles = StyleSheet.create({
   optionBtn: {
     flex: 1,
     paddingVertical: 12,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: COLORS.background,
     borderRadius: RADIUS.md,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: COLORS.border,
   },
   optionBtnActive: {
     backgroundColor: "rgba(89, 170, 111, 0.1)",

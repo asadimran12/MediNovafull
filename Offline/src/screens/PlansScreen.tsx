@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import {
   View,
   Text,
@@ -14,7 +16,7 @@ import {
 
 import NotificationService, { ReminderTimes } from "../services/NotificationService";
 
-import { COLORS } from "../constants/theme";
+
 import storageService, { HealthPlan } from "../services/StorageService";
 import {
   StructuredDietPlan,
@@ -56,15 +58,24 @@ const MacroPill = ({
   value: string | number;
   color: string;
   bg: string;
-}) => (
+}) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+  
+  return (
   <View style={[styles.pill, { backgroundColor: bg }]}>
     <Text style={[styles.pillValue, { color }]}>{value}</Text>
     <Text style={[styles.pillLabel, { color }]}>{label}</Text>
   </View>
-);
+  );
+};
 
 /* ─── FoodItemCard ─────────────────────────────────────────── */
-const FoodItemCard = ({ item }: { item: MealItem }) => (
+const FoodItemCard = ({ item }: { item: MealItem }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+  
+  return (
   <View style={styles.foodCard}>
     <Text style={styles.foodName}>{item.name}</Text>
     <View style={styles.pillRow}>
@@ -74,7 +85,8 @@ const FoodItemCard = ({ item }: { item: MealItem }) => (
       <MacroPill label="fat" value={item.fat} color="#e0a800" bg="#fdcb6e33" />
     </View>
   </View>
-);
+  );
+};
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 function normalizeMeals(meals: any[]): MealItem[][] {
@@ -122,6 +134,9 @@ function formatDate(iso: string) {
 
 /* ─── Main Screen ──────────────────────────────────────────── */
 export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [activePlan, setActivePlan] = useState<StructuredDietPlan | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
@@ -320,7 +335,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 
   /* ─── Diet UI ─────────────────────────────────────────── */
   return (
-    <View style={{ flex: 1, backgroundColor: "#F8F9FA" }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
 
       {/* ── Professional Green Header ── */}
       <View style={styles.headerContainer}>
@@ -545,7 +560,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
                 <Switch
                   value={reminders[meal].enabled}
                   onValueChange={v => updateMealReminder(meal, 'enabled', v)}
-                  trackColor={{ false: "#ddd", true: COLORS.primary }}
+                  trackColor={{ false: COLORS.border, true: COLORS.primary }}
                 />
               </View>
             ))}
@@ -564,7 +579,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 };
 
 /* ─── Styles ───────────────────────────────────────────────── */
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   headerContainer: {
     backgroundColor: COLORS.primary,
     paddingTop: 16,
@@ -588,8 +603,8 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: 22, // perfect circle for a modern look
-    backgroundColor: "rgba(255,255,255,0.25)",
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -597,7 +612,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "900",
     fontSize: 22,
-    marginTop: -8 // optically balance the arrow inside the circle
+    marginTop: -4
   },
   screenTitle: { fontSize: 22, fontWeight: "800", color: "#fff", textAlign: "center" },
   headerActionRow: {
@@ -606,7 +621,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerActionBtn: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
@@ -627,7 +642,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   statCard: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     flex: 1,
     marginHorizontal: 3,
     paddingVertical: 12,
@@ -640,7 +655,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statValue: { fontSize: 16, fontWeight: "800", color: COLORS.primary },
-  statLabel: { fontSize: 11, color: "#777", marginTop: 3, fontWeight: "600" },
+  statLabel: { fontSize: 11, color: COLORS.textSub, marginTop: 3, fontWeight: "600" },
 
   generateButton: {
     backgroundColor: COLORS.primary,
@@ -678,7 +693,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   regenBtn: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     borderWidth: 1.5,
     borderColor: COLORS.primary,
   },
@@ -686,17 +701,17 @@ const styles = StyleSheet.create({
 
   unsavedBadge: {
     alignSelf: "center",
-    backgroundColor: "#fff3cd",
+    backgroundColor: COLORS.fullNoticeBg,
     borderWidth: 1,
-    borderColor: "#ffc107",
+    borderColor: COLORS.fullNoticeBorder,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 4,
     marginBottom: 6,
   },
-  unsavedBadgeText: { color: "#856404", fontSize: 12, fontWeight: "600" },
+  unsavedBadgeText: { color: COLORS.fullNoticeText, fontSize: 12, fontWeight: "600" },
 
-  topBar: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#eee" },
+  topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   dayCircle: {
     width: 52,
     height: 52,
@@ -706,7 +721,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
   },
   dayCircleSelected: {
     backgroundColor: COLORS.primary,
@@ -720,19 +735,19 @@ const styles = StyleSheet.create({
   dayTextSelected: { color: "#fff" },
 
   // Progress bar
-  progressContainer: { backgroundColor: "#fff", padding: 16, borderRadius: 12, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  progressTitle: { fontWeight: "700", fontSize: 14, color: "#333", marginBottom: 10 },
-  progressBarBackground: { height: 12, backgroundColor: "#eee", borderRadius: 6, overflow: "hidden" },
-  progressBarFill: { height: "100%", backgroundColor: "#27ae60", borderRadius: 6 },
-  progressPercent: { marginTop: 6, fontWeight: "600", fontSize: 13, textAlign: "right", color: "#27ae60" },
+  progressContainer: { backgroundColor: COLORS.surface, padding: 16, borderRadius: 12, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  progressTitle: { fontWeight: "700", fontSize: 14, color: COLORS.textHeader, marginBottom: 10 },
+  progressBarBackground: { height: 12, backgroundColor: COLORS.background, borderRadius: 6, overflow: "hidden" },
+  progressBarFill: { height: "100%", backgroundColor: COLORS.success, borderRadius: 6 },
+  progressPercent: { marginTop: 6, fontWeight: "600", fontSize: 13, textAlign: "right", color: COLORS.success },
 
   mealSection: { marginBottom: 22 },
   mealSectionDone: { opacity: 0.5 },
   mealHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
   mealIcon: { fontSize: 20 },
-  mealTitle: { fontWeight: "800", fontSize: 17, color: "#222" },
+  mealTitle: { fontWeight: "800", fontSize: 17, color: COLORS.textHeader },
   foodCard: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
@@ -742,14 +757,14 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 2,
   },
-  foodName: { fontWeight: "700", fontSize: 15, color: "#222", marginBottom: 10 },
-  mealDoneCheck: { marginLeft: "auto", fontSize: 15, color: "#27ae60", fontWeight: "bold" },
+  foodName: { fontWeight: "700", fontSize: 15, color: COLORS.textHeader, marginBottom: 10 },
+  mealDoneCheck: { marginLeft: "auto", fontSize: 15, color: COLORS.success, fontWeight: "bold" },
   mealCircle: {
     width: 28, height: 28, borderRadius: 14,
-    borderWidth: 2, borderColor: "#ddd",
+    borderWidth: 2, borderColor: COLORS.border,
     justifyContent: "center", alignItems: "center", marginLeft: "auto",
   },
-  mealCircleDone: { backgroundColor: "#27ae60", borderColor: "#27ae60" },
+  mealCircleDone: { backgroundColor: COLORS.success, borderColor: COLORS.success },
   mealTick: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   pillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   pill: { borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4, alignItems: "center", minWidth: 52 },
@@ -758,8 +773,8 @@ const styles = StyleSheet.create({
 
   empty: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },
   emptyIcon: { fontSize: 64, marginBottom: 14 },
-  emptyTitle: { fontSize: 20, fontWeight: "800", color: "#333", marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: "#888", textAlign: "center", lineHeight: 21 },
+  emptyTitle: { fontSize: 20, fontWeight: "800", color: COLORS.textHeader, marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, color: COLORS.textSub, textAlign: "center", lineHeight: 21 },
 
   // Modal
   modalOverlay: {

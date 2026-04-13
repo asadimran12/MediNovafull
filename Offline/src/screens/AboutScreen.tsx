@@ -1,6 +1,8 @@
 import React from "react";
+import { useTheme } from "../context/ThemeContext";
+
 import { StyleSheet, ScrollView, Text, View, TouchableOpacity } from "react-native";
-import { COLORS, SPACING } from "../constants/theme";
+import { SPACING } from "../constants/theme";
 
 export const AboutScreen: React.FC = () => {
   // A simple array to map out your core features
@@ -69,10 +71,10 @@ export const AboutScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F9FA" // Soft background color
+    backgroundColor: COLORS.background
   },
   contentContainer: {
     padding: SPACING.lg || 20, // Fallback to 20 if SPACING.lg is undefined
@@ -129,7 +131,7 @@ const styles = StyleSheet.create({
   // Features Styles
   featuresContainer: {
     marginBottom: 30,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 20,
     shadowColor: "#000",
@@ -163,9 +165,9 @@ const styles = StyleSheet.create({
 
   // Disclaimer Styles
   disclaimerBox: {
-    backgroundColor: "#FFF3F3", // Soft red/warning background
+    backgroundColor: COLORS.surface, 
     borderLeftWidth: 4,
-    borderLeftColor: "#FF4C4C",
+    borderLeftColor: COLORS.danger,
     padding: 15,
     borderRadius: 8,
     marginBottom: 40,
@@ -173,12 +175,12 @@ const styles = StyleSheet.create({
   disclaimerTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#D8000C",
+    color: COLORS.danger,
     marginBottom: 8,
   },
   disclaimerText: {
     fontSize: 14,
-    color: "#D8000C",
+    color: COLORS.textSub,
     lineHeight: 20,
   },
 
@@ -186,7 +188,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: "#EAEAEA",
+    borderTopColor: COLORS.border,
     paddingTop: 20,
   },
   linkText: {

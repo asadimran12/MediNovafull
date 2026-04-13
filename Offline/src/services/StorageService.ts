@@ -101,6 +101,49 @@ class StorageService {
     return exportPath;
   }
 
+  async getPrimaryUsername(): Promise<string> {
+    const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
+    let primaryUsername = "";
+    try {
+      let users = [];
+      let session: any = {};
+      if (await ReactNativeFS.exists(`${authDir}/users.json`)) {
+        users = JSON.parse(await ReactNativeFS.readFile(`${authDir}/users.json`, "utf8"));
+      }
+      if (await ReactNativeFS.exists(`${authDir}/session.json`)) {
+        session = JSON.parse(await ReactNativeFS.readFile(`${authDir}/session.json`, "utf8"));
+      }
+
+      if (session.userId && Array.isArray(users)) {
+        const currentUser = users.find((u: any) => u.id === session.userId);
+        if (currentUser && currentUser.username) {
+            primaryUsername = currentUser.username;
+        }
+      }
+      if (!primaryUsername && Array.isArray(users) && users.length > 0) {
+          primaryUsername = users[0].username;
+      }
+    } catch (e) {
+      console.error("Failed to read auth data to get username", e);
+    }
+    return primaryUsername;
+  }
+
+  async checkCloudBackupExists(): Promise<boolean> {
+    const username = await this.getPrimaryUsername();
+    if (!username) return false;
+    
+    try {
+      const url = `${this.BACKEND_URL}/users/GetAllData?username=${encodeURIComponent(username)}`;
+      const response = await fetch(url, { method: "GET" });
+      if (response.ok) return true;
+      return false; // If 404 or other errors, assume not exists (or handled on save)
+    } catch (error) {
+      console.error("Failed to check cloud backup", error);
+      throw error; // Let caller handle network errors
+    }
+  }
+
   async exportAllDataOnCloud() {
     try {
       const exportData: any = {
@@ -124,6 +167,21 @@ class StorageService {
       } catch (e) {
         console.error("Failed to read auth data for export", e);
       }
+
+      // Determine the primary username for cloud backup indexing
+      const primaryUsername = await this.getPrimaryUsername();
+      exportData.primary_username = primaryUsername;
+
+      console.log("=== CLOUD EXPORT LOGS ===");
+      console.log("Exporting Date:", exportData.timestamp);
+      console.log("Primary Username:", primaryUsername);
+      console.log("Total Chats:", exportData.chats?.length || 0);
+      console.log("Total Plans:", exportData.plans?.length || 0);
+      console.log("Profile isSet:", exportData.profile?.isSet);
+      console.log("Auth Users Count:", exportData.auth?.users?.length || 0);
+      console.log("Session User ID:", exportData.auth?.session?.userId);
+      console.log("===========================");
+
       const response = await fetch(`${this.BACKEND_URL}/upload`, {
         method: "POST",
         headers: {
@@ -132,6 +190,7 @@ class StorageService {
         body: JSON.stringify(exportData),
       });
       const data = await response.json();
+      console.log("Cloud Upload successful:", data);
     } catch (error) {
       console.error("Failed to export to cloud", error);
       throw error;
@@ -256,6 +315,16 @@ class StorageService {
     const path = `${this.getUserDir()}/${key}.txt`;
     if (!(await ReactNativeFS.exists(path))) return null;
     return await ReactNativeFS.readFile(path, "utf8");
+  }
+
+  async getAppTheme(): Promise<"light" | "dark" | "system"> {
+    const val = await this.getItem("appTheme");
+    if (val === "light" || val === "dark") return val;
+    return "system";
+  }
+
+  async setAppTheme(theme: "light" | "dark" | "system") {
+    await this.setItem("appTheme", theme);
   }
 
   generateTitle(messages: LocalMessage[]): string {
