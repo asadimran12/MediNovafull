@@ -63,12 +63,12 @@ function buildConditionGuidelines(conditions: string): string {
     return rules.length > 0 ? rules.join(" | ") : "Balanced healthy diet. Standard macros (50% Carb, 25% Protein, 25% Fat).";
 }
 
-function buildDayPrompt(profile: UserProfile, day: string, medicalContext: string): string {
+function buildPrompt(profile: UserProfile, day: string, medicalContext: string): string {
     const age = profile.age ? `${profile.age} year old` : "adult";
     const gender = profile.gender || "person";
     const conditions = profile.conditions?.trim() || "none";
     const guidelines = buildConditionGuidelines(conditions);
-    const focus = getDietaryFocus(day);
+    const theme = `${day}: ${getDietaryFocus(day)}`;
 
     return `You are a certified clinical nutritionist and halal diet expert.
 
@@ -78,7 +78,7 @@ PATIENT PROFILE:
 - Medical Conditions: ${conditions}
 
 MANDATORY DAILY THEME:
-${focus}
+${theme}
 
 MEDICAL DIET GUIDELINES:
 ${guidelines}
@@ -91,18 +91,20 @@ RULES (STRICT):
 2. BE DIVERSE: Every day of the week must have completely different food items.
 3. REAL NAMES ONLY: Use specific real food names that match the DAILY THEME. NEVER write "e.g." or any placeholder text.
 4. HALAL: All suggestions must be halal.
-5. Response MUST be a single JSON object. No extra text, no markdown, no "e.g." prefix anywhere.
+5. Minified keys MUST be used: "kc" for calories, "p" for protein, "c" for carbs, "f" for fat (macros as raw numbers, NO "g")
+6. NO TEXT. ONLY JSON. START WITH { AND END WITH }.
 
-RESPONSE FORMAT (JSON) - FOLLOW THIS STRUCTURE WITH YOUR OWN REAL FOOD CHOICES:
+RESPONSE FORMAT (JSON OBJECT) - FOLLOW THIS STRUCTURE EXACTLY:
 {
-  "day": "${day}",
-  "summary": { "calories": 2000, "protein": "100g", "carbs": "250g", "fat": "70g" },
-  "breakfast": { "items": [{ "name": "Scrambled Eggs with Sauteed Spinach", "calories": 350, "protein": "25g", "carbs": "5g", "fat": "20g" }] },
-  "lunch": { "items": [{ "name": "Grilled Chicken Breast with Brown Rice", "calories": 550, "protein": "45g", "carbs": "40g", "fat": "15g" }] },
-  "dinner": { "items": [{ "name": "Baked Salmon with Steamed Broccoli", "calories": 450, "protein": "40g", "carbs": "10g", "fat": "12g" }] },
-  "snacks": { "items": [{ "name": "Handful of Unsalted Almonds", "calories": 150, "protein": "6g", "carbs": "5g", "fat": "14g" }] }
+  "d": "${day}",
+  "sum": { "kc": 2000, "p": 100, "c": 250, "f": 70 },
+  "b": [{ "n": "Scrambled Eggs with Sauteed Spinach", "kc": 350, "p": 25, "c": 5, "f": 20 }],
+  "l": [{ "n": "Grilled Chicken Breast with Brown Rice", "kc": 550, "p": 45, "c": 40, "f": 15 }],
+  "dn": [{ "n": "Baked Salmon with Steamed Broccoli", "kc": 450, "p": 40, "c": 10, "f": 12 }],
+  "s": [{ "n": "Handful of Unsalted Almonds", "kc": 150, "p": 6, "c": 5, "f": 14 }]
 }`;
 }
+
 
 /**
  * Performs a post-generation safety check against medical guidelines.
@@ -147,7 +149,7 @@ export async function generateDietPlan(
     const LlamaService = (await import("./LlamaService")).default;
 
     onProgress?.("Loading Knowledge Base...", 0);
-    
+
     const ModelService = (await import("./ModelService")).default;
     const activeModel = await ModelService.getActiveModel();
 
@@ -167,7 +169,8 @@ export async function generateDietPlan(
     // Initialize/Query RAG
     await KnowledgeBase.initialize();
     const query = `diet plan for ${profile.gender} ${profile.age} years old with ${profile.conditions || "no conditions"}`;
-    const medicalContext = await KnowledgeBase.getRelevantContext(query);
+    const rawContext = await KnowledgeBase.getRelevantContext(query);
+    const medicalContext = rawContext ? rawContext.substring(0, 1000) : "";
     console.log("🔍 RAG Context Retrieved for query:", query);
 
     // Switch back to generation model
@@ -176,53 +179,52 @@ export async function generateDietPlan(
     const generatedDays: DayPlan[] = [];
 
     for (let i = 0; i < DAY_NAMES.length; i++) {
+        const dayName = DAY_NAMES[i];
+        onProgress?.(`Generating ${dayName}...`, i);
 
-        const day = DAY_NAMES[i];
-        onProgress?.(`Generating ${day}...`, i);
+        console.log(`🔄 Generating ${dayName}`);
 
-        console.log(`🔄 Generating ${day}`);
-
-        const prompt = buildDayPrompt(profile, day, medicalContext);
-        const systemPrompt = "You are a nutritionist. Return ONLY valid JSON.";
+        const prompt = buildPrompt(profile, dayName, medicalContext);
+        const systemPrompt = "Return ONLY JSON. No text before or after.";
 
         let attempts = 0;
         let success = false;
 
         while (!success && attempts < 3) {
             try {
-
                 const messages = [
                     { role: "user" as const, content: prompt }
                 ];
-
                 const response = await LlamaService.chat(messages, systemPrompt);
 
-                const parsedDay = parseSingleDay(response, day);
+                const parsedDay = parseDay(response, dayName);
 
                 if (parsedDay) {
                     const safety = verifyDietSafety(parsedDay, medicalContext);
                     if (!safety.safe) {
-                        console.warn(`🚨 Safety check failed for ${day}: ${safety.reason}. Retrying...`);
+                        console.warn(`🚨 Safety check failed for ${dayName}: ${safety.reason}. Retrying...`);
                         attempts++;
                         continue;
                     }
+
                     generatedDays.push(parsedDay);
                     success = true;
-                    console.log(`✅ ${day} generated and verified safe`);
+                    console.log(`✅ ${dayName} generated and verified safe`);
                 } else {
                     attempts++;
-                    console.warn(`⚠️ Parse failed for ${day}, retry ${attempts}/3`);
+                    console.warn(`⚠️ Parse failed for ${dayName}, retry ${attempts}/3`);
                 }
 
             } catch (err) {
                 attempts++;
-                console.error(`❌ ${day} attempt ${attempts} failed`, err);
+                console.error(`❌ ${dayName} attempt ${attempts} failed`, err);
             }
         }
 
         if (!success) {
-            throw new Error(`Failed generating ${day}`);
+            throw new Error(`Failed generating ${dayName}`);
         }
+
     }
 
     const fullPlan: StructuredDietPlan = {
@@ -412,7 +414,38 @@ function normaliseDay(raw: any, dayName?: string): DayPlan {
     };
 }
 
-function parseSingleDay(raw: string, expectedDay: string): DayPlan | null {
+function expandMinifiedMeals(minMeals: any): any[] {
+    if (!minMeals) return [];
+    if (!Array.isArray(minMeals)) minMeals = [minMeals];
+    return minMeals.map((m: any) => ({
+        name: m.n || m.name,
+        calories: m.kc || m.calories,
+        protein: m.p !== undefined ? (typeof m.p === 'number' ? `${m.p}g` : m.p) : undefined,
+        carbs: m.c !== undefined ? (typeof m.c === 'number' ? `${m.c}g` : m.c) : undefined,
+        fat: m.f !== undefined ? (typeof m.f === 'number' ? `${m.f}g` : m.f) : undefined
+    }));
+}
+
+function expandMinifiedDay(minData: any, expectedName: string): any {
+    return {
+        day: minData.d || minData.day || expectedName,
+        summary: minData.sum ? {
+            calories: minData.sum.kc || minData.sum.calories,
+            // Re-add "g" for summary macros
+            protein: minData.sum.p !== undefined ? `${minData.sum.p}g` : undefined,
+            carbs: minData.sum.c !== undefined ? `${minData.sum.c}g` : undefined,
+            fat: minData.sum.f !== undefined ? `${minData.sum.f}g` : undefined
+        } : minData.summary,
+        meals: [
+            { type: "Breakfast", items: expandMinifiedMeals(minData.b || minData.breakfast) },
+            { type: "Lunch", items: expandMinifiedMeals(minData.l || minData.lunch) },
+            { type: "Dinner", items: expandMinifiedMeals(minData.dn || minData.dinner) },
+            { type: "Snacks", items: expandMinifiedMeals(minData.s || minData.snacks) }
+        ]
+    };
+}
+
+function parseDay(raw: string, expectedDay: string): DayPlan | null {
     const cleaned = extractJson(fixJSON(raw));
 
     let parsed: any = null;
@@ -424,13 +457,19 @@ function parseSingleDay(raw: string, expectedDay: string): DayPlan | null {
         } catch (_) { }
     }
 
-    if (parsed && typeof parsed === "object") {
-        return normaliseDay(parsed, expectedDay);
+    if (parsed) {
+        // If it was wrapped in an array, take the first element
+        let obj = Array.isArray(parsed) ? parsed[0] : parsed;
+        if (obj.days && Array.isArray(obj.days)) {
+            obj = obj.days[0];
+        }
+        return normaliseDay(expandMinifiedDay(obj, expectedDay));
     }
 
     console.warn(`⚠️ Could not parse day: ${expectedDay}, raw: ${raw.substring(0, 200)}`);
-    return normaliseDay({}, expectedDay); // Fallback instead of failing entirely
+    return null;
 }
+
 
 export function safeParseDietPlan(raw: string): StructuredDietPlan | null {
     if (!raw || raw.trim().length < 10) return null;
@@ -499,9 +538,9 @@ export function safeParseDietPlan(raw: string): StructuredDietPlan | null {
 
 const MEAL_DEFAULTS: Record<string, { name: string; cals: number }> = {
     Breakfast: { name: "Oatmeal with Eggs", cals: 350 },
-    Lunch:     { name: "Grilled Chicken Salad", cals: 500 },
-    Dinner:    { name: "Baked Fish with Vegetables", cals: 600 },
-    Snacks:    { name: "Mixed Nuts and Fruit", cals: 250 },
+    Lunch: { name: "Grilled Chicken Salad", cals: 500 },
+    Dinner: { name: "Baked Fish with Vegetables", cals: 600 },
+    Snacks: { name: "Mixed Nuts and Fruit", cals: 250 },
 };
 
 export function sanitisePlan(plan: StructuredDietPlan): StructuredDietPlan {
