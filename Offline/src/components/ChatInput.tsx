@@ -35,45 +35,41 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const isSendDisabled = disabled || !inputText.trim();
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <View style={styles.wrapper}>
-        <View style={styles.inputRow}>
-          {/* Text Input */}
-          <TextInput
-            style={styles.input}
-            placeholder="Ask MediNova anything…"
-            placeholderTextColor={COLORS.textSub}
-            value={inputText}
-            onChangeText={setInputText}
-            autoCorrect={false}
-            multiline
-            editable={!disabled}
-          />
+    <View style={styles.wrapper}>
+      <View style={styles.inputRow}>
+        {/* Text Input */}
+        <TextInput
+          style={styles.input}
+          placeholder="Ask MediNova anything…"
+          placeholderTextColor={COLORS.textSub}
+          value={inputText}
+          onChangeText={setInputText}
+          autoCorrect={false}
+          multiline
+          editable={!disabled}
+        />
 
-          {/* Stop Button */}
-          {isGenerating ? (
-            <TouchableOpacity style={styles.stopBtn} onPress={onStop} activeOpacity={0.8}>
-              <View style={styles.stopIcon} />
-            </TouchableOpacity>
-          ) : (
-            /* Send Button */
-            <TouchableOpacity
-              style={[styles.sendBtn, isSendDisabled && styles.sendBtnDisabled]}
-              onPress={onSend}
-              disabled={isSendDisabled}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.sendArrow}>↑</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Hint text */}
-        <Text style={styles.hint}>MediNova AI • Offline & Private</Text>
+        {/* Stop Button */}
+        {isGenerating ? (
+          <TouchableOpacity style={styles.stopBtn} onPress={onStop} activeOpacity={0.8}>
+            <View style={styles.stopIcon} />
+          </TouchableOpacity>
+        ) : (
+          /* Send Button */
+          <TouchableOpacity
+            style={[styles.sendBtn, isSendDisabled && styles.sendBtnDisabled]}
+            onPress={onSend}
+            disabled={isSendDisabled}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.sendArrow}>↑</Text>
+          </TouchableOpacity>
+        )}
       </View>
-    </KeyboardAvoidingView>
+
+      {/* Hint text */}
+      <Text style={styles.hint}>MediNova AI • Offline & Private</Text>
+    </View>
   );
 };
 

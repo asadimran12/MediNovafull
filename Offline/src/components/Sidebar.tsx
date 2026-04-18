@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   StyleSheet,
   View,
@@ -8,13 +8,14 @@ import {
   Animated,
   Dimensions,
   Image,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SPACING, RADIUS } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { ChatSession } from "../services/StorageService";
 
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history" | "cloud_restore_login";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history" | "cloud_restore_login" | "report_chat_history";
 
 const { width } = Dimensions.get("window");
 const SIDEBAR_WIDTH = width * 0.8;
@@ -57,7 +58,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
-  
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   return (
     <>
       {/* Overlay */}
@@ -222,7 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={() => deleteSession(s.id)}
+                        onPress={() => setDeleteConfirmId(s.id)}
                         style={styles.histDeleteBtn}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
@@ -287,6 +290,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </ScrollView>
         </SafeAreaView>
       </Animated.View>
+
+      {/* Beautiful Custom Delete Confirmation Modal */}
+      <Modal
+        transparent={true}
+        visible={deleteConfirmId !== null}
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmId(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalIconContainer}>
+              <Text style={styles.modalIcon}>🗑️</Text>
+            </View>
+            <Text style={styles.modalTitle}>Delete Chat?</Text>
+            <Text style={styles.modalSubtitle}>Are you sure you want to permanently remove this conversation? This action cannot be undone.</Text>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setDeleteConfirmId(null)}>
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnDelete} onPress={() => {
+                if (deleteConfirmId) {
+                  deleteSession(deleteConfirmId);
+                  setDeleteConfirmId(null);
+                }
+              }}>
+                <Text style={styles.modalBtnDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
@@ -297,23 +332,23 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ label, active, onPress, isDes
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
   return (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={0.7}
-    style={[styles.sideItem, active && styles.sideItemActive]}
-    accessibilityRole="button"
-    accessibilityState={{ selected: active }}
-  >
-    <Text
-      style={[
-        styles.sideItemLabel,
-        active && styles.sideItemLabelActive,
-        isDestructive && styles.sideItemDestructive
-      ]}
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={[styles.sideItem, active && styles.sideItemActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
     >
-      {label}
-    </Text>
-  </TouchableOpacity>
+      <Text
+        style={[
+          styles.sideItemLabel,
+          active && styles.sideItemLabelActive,
+          isDestructive && styles.sideItemDestructive
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 };
 
@@ -476,5 +511,88 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     paddingTop: 10,
+  },
+
+  // Modal Custom Styling
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: "85%",
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: SPACING.xl,
+    alignItems: "center",
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(255, 59, 48, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.lg,
+  },
+  modalIcon: {
+    fontSize: 32,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    marginBottom: SPACING.sm,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSub,
+    textAlign: "center",
+    marginBottom: SPACING.xl,
+    lineHeight: 22,
+  },
+  modalActions: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+    gap: SPACING.md,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalBtnCancelText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.textMain,
+  },
+  modalBtnDelete: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.danger || "#FF3B30",
+    alignItems: "center",
+    shadowColor: COLORS.danger || "#FF3B30",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalBtnDeleteText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#FFF",
   },
 });

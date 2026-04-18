@@ -10,6 +10,7 @@ export interface LocalMessage {
 
 export interface ChatSession {
   id: string;
+  type: "general" | "report";
   title: string;
   messages: LocalMessage[];
   updatedAt: string;
@@ -38,6 +39,9 @@ export interface UserProfile {
 // ─── Storage Service ───────────────────────────────────────────────────────────
 
 class StorageService {
+
+
+
 
   private readonly BACKEND_URL = 'https://medinovafull-2.onrender.com';
   private userId: string | null = null;
@@ -70,11 +74,13 @@ class StorageService {
   async exportAllDataLocally(): Promise<string> {
     await this.init();
 
+    const allChats = await this.getAllChats();
+
     // Gather all data
     const exportData: any = {
       timestamp: new Date().toISOString(),
       profile: await this.getProfile(),
-      chats: await this.getAllChats(),
+      chats: allChats,
       plans: await this.getPlans(),
       auth: {}
     };
@@ -117,11 +123,11 @@ class StorageService {
       if (session.userId && Array.isArray(users)) {
         const currentUser = users.find((u: any) => u.id === session.userId);
         if (currentUser && currentUser.username) {
-            primaryUsername = currentUser.username;
+          primaryUsername = currentUser.username;
         }
       }
       if (!primaryUsername && Array.isArray(users) && users.length > 0) {
-          primaryUsername = users[0].username;
+        primaryUsername = users[0].username;
       }
     } catch (e) {
       console.error("Failed to read auth data to get username", e);
@@ -132,7 +138,7 @@ class StorageService {
   async checkCloudBackupExists(): Promise<boolean> {
     const username = await this.getPrimaryUsername();
     if (!username) return false;
-    
+
     try {
       const url = `${this.BACKEND_URL}/users/GetAllData?username=${encodeURIComponent(username)}`;
       const response = await fetch(url, { method: "GET" });
@@ -146,10 +152,11 @@ class StorageService {
 
   async exportAllDataOnCloud() {
     try {
+      const allChats = await this.getAllChats();
       const exportData: any = {
         timestamp: new Date().toISOString(),
         profile: await this.getProfile(),
-        chats: await this.getAllChats(),
+        chats: allChats,
         plans: await this.getPlans(),
         auth: {
           users: [],
@@ -171,16 +178,6 @@ class StorageService {
       // Determine the primary username for cloud backup indexing
       const primaryUsername = await this.getPrimaryUsername();
       exportData.primary_username = primaryUsername;
-
-      console.log("=== CLOUD EXPORT LOGS ===");
-      console.log("Exporting Date:", exportData.timestamp);
-      console.log("Primary Username:", primaryUsername);
-      console.log("Total Chats:", exportData.chats?.length || 0);
-      console.log("Total Plans:", exportData.plans?.length || 0);
-      console.log("Profile isSet:", exportData.profile?.isSet);
-      console.log("Auth Users Count:", exportData.auth?.users?.length || 0);
-      console.log("Session User ID:", exportData.auth?.session?.userId);
-      console.log("===========================");
 
       const response = await fetch(`${this.BACKEND_URL}/upload`, {
         method: "POST",
@@ -213,9 +210,7 @@ class StorageService {
       }
 
       if (data.chats) {
-        for (const chat of data.chats) {
-          await this.saveChat(chat);
-        }
+        for (const chat of data.chats) await this.saveChat(chat);
       }
 
       if (data.plans) {
@@ -250,13 +245,22 @@ class StorageService {
     return chat;
   }
 
-  async getAllChats(): Promise<ChatSession[]> {
+  async getAllChats(type?: "general" | "report"): Promise<ChatSession[]> {
     await this.init();
     const files = await ReactNativeFS.readDir(this.chatsDir);
     const chats: ChatSession[] = [];
     for (const file of files) {
       if (!file.name.endsWith(".json")) continue;
-      try { chats.push(JSON.parse(await ReactNativeFS.readFile(file.path, "utf8"))); }
+      try { 
+        const chat = JSON.parse(await ReactNativeFS.readFile(file.path, "utf8")); 
+        if (!type) {
+            chats.push(chat);
+        } else if (type === "report" && chat.type === "report") {
+            chats.push(chat);
+        } else if (type === "general" && chat.type !== "report") {
+            chats.push(chat);
+        }
+      }
       catch (e) { console.error("Chat parse error:", file.path); }
     }
     return chats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());

@@ -23,19 +23,19 @@ class ReportAnalyzeChat {
     profile: UserProfile | null,
     history: { id?: string; role: string; content?: string; text?: string }[]
   ): FormattedMessage[] {
-    
+
 
     // 2. High-Fidelity Proximity Parser: Extract specific values within medical ranges
     let findingsText = "PATIENT DATA:\n";
     if (reportData.rawText) {
       const text = reportData.rawText;
       const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-      
+
       // Extraction Helpers
       const findNear = (keyword: string, min: number, max: number, unit: string) => {
         const idx = lines.findIndex(l => l.toLowerCase().includes(keyword.toLowerCase()));
         if (idx === -1) return null;
-        
+
         // Scan 10 lines around the keyword
         for (let i = Math.max(0, idx - 2); i < Math.min(lines.length, idx + 8); i++) {
           const match = lines[i].match(/(\d+(\.\d+)?)/);
@@ -53,11 +53,11 @@ class ReportAnalyzeChat {
       // Build the requested format
       if (hba1c) findingsText += `- HbA1C: ${hba1c}\n`;
       if (glucose) findingsText += `- Estimated Average Glucose: ${glucose}\n`;
-      
+
       // If none found specifically, don't use 'Finding 1' (confuses 0.5B)
       // Instead, just pass the raw findings to let the AI try to label them 
       if (!hba1c && !glucose) {
-        findingsText += "- Lab Values: " + lines.filter(l => /\d/.test(l)).slice(0,3).join(", ");
+        findingsText += "- Lab Values: " + lines.filter(l => /\d/.test(l)).slice(0, 3).join(", ");
       }
       findingsText = findingsText.trim();
     } else {
@@ -68,7 +68,7 @@ class ReportAnalyzeChat {
     }
 
     if (findingsText === "PATIENT DATA:") {
-       findingsText = "PATIENT DATA:\n- (No clear values found. Please summarize the report findings manually.)";
+      findingsText = "PATIENT DATA:\n- (No clear values found. Please summarize the report findings manually.)";
     }
 
     // 3. Construct the prompt with Literal Grounding
@@ -85,11 +85,7 @@ Explain the findings in one warm paragraph. Be ultra-concise.`;
     const messages: FormattedMessage[] = [
       { role: "system", content: systemContent }
     ];
-
-    // DETERMINISTIC ANALYSIS MODE: If the user is asking to "explain" for the first time, 
-    // we bypass the history entirely to ensure the 0.5B model doesn't hallucinate 
-    // based on previous greetings or profile conflicts.
-    const isInitialAnalysis = history.length <= 2 && 
+    const isInitialAnalysis = history.length <= 2 &&
       history.some(h => (h.content || h.text || "").toLowerCase().includes("explain"));
 
     if (isInitialAnalysis) {
@@ -99,13 +95,13 @@ Explain the findings in one warm paragraph. Be ultra-concise.`;
       });
     } else {
       // Standard Chat Mode for follow-ups
-      const cleanHistory = history.filter(h => h.id !== "1"); 
+      const cleanHistory = history.filter(h => h.id !== "1");
       messages.push({
         role: "user",
         content: `CONTEXT: ${findingsText}`
       });
       cleanHistory.forEach(h => {
-          messages.push({ role: h.role as any, content: h.content || h.text || "" });
+        messages.push({ role: h.role as any, content: h.content || h.text || "" });
       });
     }
 

@@ -31,24 +31,52 @@ interface ChatPageProps {
     onBack?: () => void;
     reportData?: ParsedReport;
     imageUri?: string | null;
+    initialSessionId?: string | null;
 }
 
-export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps) {
-  const { colors: COLORS } = useTheme();
-  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+export default function ChatPage({ onBack, reportData, imageUri, initialSessionId }: ChatPageProps) {
+    const { colors: COLORS } = useTheme();
+    const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
-    const [messages, setMessages] = useState<LocalMessage[]>(() => {
-        const initialText = reportData
-            ? `I see your report titled '${reportData.title}'. What would you like to know about it?`
-            : "Hello! How can I help you analyze your report today?";
-
-        return [{ id: "1", role: "assistant", text: initialText, timestamp: new Date() }];
-    });
-
+    const [messages, setMessages] = useState<LocalMessage[]>([]);
     const [input, setInput] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const [hasAnalyzed, setHasAnalyzed] = useState(false);
     const [hasAttemptedAutoExplain, setHasAttemptedAutoExplain] = useState(false);
+    const [sessionID] = useState(() => initialSessionId || Math.random().toString(36).substring(7));
+
+    useEffect(() => {
+        if (initialSessionId) {
+            StorageService.loadChat(initialSessionId).then((session) => {
+                if (session && session.messages) {
+                    setMessages(session.messages);
+                    setHasAnalyzed(true); // Disable "Analyze with AI" button if it's past chat
+                }
+            });
+        } else {
+            const initialText = reportData
+                ? `I see your report titled '${reportData.title}'. What would you like to know about it?`
+                : "Hello! How can I help you analyze your report today?";
+            setMessages([{ id: "1", role: "assistant", text: initialText, timestamp: new Date() }]);
+        }
+    }, [initialSessionId, reportData]);
+
+    useEffect(() => {
+        const hasUserMsg = messages.some((m) => m.role === "user");
+        if (hasUserMsg && !isGenerating) {
+            const title = reportData ? `Report: ${reportData.title}` : "Report Analysis";
+            const currentSession: any = {
+                id: sessionID,
+                type: "report",
+                title: title,
+                messages: messages,
+                updatedAt: new Date().toISOString(),
+            };
+            StorageService.saveChat(currentSession).catch(console.error);
+        }
+    }, [messages.length, isGenerating, sessionID, reportData]);
+
+
 
     const triggerAnalysis = async () => {
         if (!reportData || hasAnalyzed || isGenerating) return;
@@ -160,6 +188,7 @@ export default function ChatPage({ onBack, reportData, imageUri }: ChatPageProps
             style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+
 
             <ScrollView style={styles.chatArea} contentContainerStyle={styles.scrollContent}>
 

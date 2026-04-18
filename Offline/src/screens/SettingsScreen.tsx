@@ -43,6 +43,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     visible: false,
     message: "",
   });
+  const [exportError, setExportError] = useState<{ visible: boolean; message: string }>({
+    visible: false,
+    message: "",
+  });
+  const [showCloudUpdateModal, setShowCloudUpdateModal] = useState(false);
   const [showDeviceInfoModal, setShowDeviceInfoModal] = useState(false);
   const [deviceData, setDeviceData] = useState<any>(null);
 
@@ -65,6 +70,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const showSuccess = (message: string) => {
     setExportSuccess({ visible: true, message });
   };
+  const showError = (message: string) => {
+    setExportError({ visible: true, message });
+  };
   const handleExportLocally = async () => {
     setIsExporting(true);
     try {
@@ -81,7 +89,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       }
       showSuccess(`Your data has been exported to:\n${exportPath}`);
     } catch (error) {
-      Alert.alert("Export Failed", "Failed to export data. Please try again.");
+      showError("Failed to export data. Please try again.");
     } finally {
       setIsExporting(false);
     }
@@ -93,45 +101,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       const exists = await storageService.checkCloudBackupExists();
       if (exists) {
         setIsExporting(false);
-        Alert.alert(
-          "Backup Already Exists",
-          "You already have a backup on the cloud. Do you want to update it?",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Update",
-              onPress: async () => {
-                setIsExporting(true);
-                try {
-                  await storageService.exportAllDataOnCloud();
-                  showSuccess("Your data has been backed up to the cloud successfully.");
-                } catch (error) {
-                  Alert.alert("Export Failed", "Failed to export data. Please try again.");
-                } finally {
-                  setIsExporting(false);
-                }
-              }
-            }
-          ]
-        );
+        setShowCloudUpdateModal(true);
         return;
       }
 
       await storageService.exportAllDataOnCloud();
       showSuccess("Your data has been backed up to the cloud successfully.");
     } catch (error) {
-      Alert.alert("Export Failed", "Failed to check or export data. Please try again.");
+      showError("Failed to check or export data. Please try again.");
     } finally {
       setIsExporting(false);
     }
   };
 
-  const handleExportData = () => {
-    Alert.alert("Export Data", "Choose where to save your backup:", [
-      { text: "Cancel", style: "cancel" },
-      { text: "☁️ Export on Cloud", onPress: handleExportOnCloud },
-      { text: "📱 Export Locally", onPress: handleExportLocally },
-    ]);
+  const executeCloudUpdate = async () => {
+    setShowCloudUpdateModal(false);
+    setIsExporting(true);
+    try {
+      await storageService.exportAllDataOnCloud();
+      showSuccess("Your data has been backed up to the cloud successfully.");
+    } catch (error) {
+      showError("Failed to export data. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -189,6 +182,55 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </View>
       </Modal>
 
+      {/* ── Export Error Modal ─────────────────────────────── */}
+      <Modal transparent visible={exportError.visible} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.successBox}>
+            <View style={styles.errorIconCircle}>
+              <Text style={styles.errorIcon}>✕</Text>
+            </View>
+            <Text style={styles.successTitle}>Export Failed</Text>
+            <Text style={styles.successMessage}>{exportError.message}</Text>
+            <TouchableOpacity
+              style={styles.errorBtn}
+              activeOpacity={0.85}
+              onPress={() => setExportError({ visible: false, message: "" })}
+            >
+              <Text style={styles.successBtnText}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Cloud Update Confirmation Modal ────────────────── */}
+      <Modal transparent visible={showCloudUpdateModal} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.logoutModalBox}>
+            <View style={styles.cloudIconCircle}>
+              <Text style={styles.logoutModalIcon}>☁️</Text>
+            </View>
+            <Text style={styles.logoutModalTitle}>Backup Exists</Text>
+            <Text style={styles.logoutModalSubtitle}>
+              You already have a backup on the cloud. Do you want to overwrite and update it?
+            </Text>
+            <TouchableOpacity
+              style={styles.cloudUpdateBtn}
+              activeOpacity={0.85}
+              onPress={executeCloudUpdate}
+            >
+              <Text style={styles.logoutModalBtnText}>Yes, Update Cloud</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.logoutModalCancelBtn}
+              activeOpacity={0.8}
+              onPress={() => setShowCloudUpdateModal(false)}
+            >
+              <Text style={styles.logoutModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Exporting Loading Overlay ──────────────────────── */}
       <Modal transparent visible={isExporting} animationType="fade">
         <View style={styles.modalOverlay}>
@@ -208,7 +250,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.deviceInfoIcon}>📱</Text>
             </View>
             <Text style={styles.deviceInfoTitle}>Device Details</Text>
-            
+
             <View style={styles.infoScroll}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Device</Text>
@@ -231,10 +273,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Storage</Text>
                 <Text style={styles.infoValue}>
-                  {deviceData?.freeDiskSpace 
+                  {deviceData?.freeDiskSpace
                     ? ((deviceData.freeDiskSpace) / (1024 * 1024 * 1024)).toFixed(1) + " GB / "
                     : ""}
-                  {deviceData?.totalDiskSpace 
+                  {deviceData?.totalDiskSpace
                     ? ((deviceData.totalDiskSpace) / (1024 * 1024 * 1024)).toFixed(0) + " GB Free"
                     : "N/A"}
                 </Text>
@@ -453,456 +495,501 @@ interface SettingRowProps {
 const SettingRow: React.FC<SettingRowProps> = ({ icon, title, subtitle, actionLabel, onAction, actionDanger }) => {
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
-  
+
   return (
-  <View style={styles.row}>
-    <View style={styles.rowLeft}>
-      <Text style={styles.rowIcon}>{icon}</Text>
-      <View style={{ flex: 1, paddingRight: 8 }}>
-        <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
-        <Text style={styles.rowSubtitle} numberOfLines={2}>{subtitle}</Text>
+    <View style={styles.row}>
+      <View style={styles.rowLeft}>
+        <Text style={styles.rowIcon}>{icon}</Text>
+        <View style={{ flex: 1, paddingRight: 8 }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.rowSubtitle} numberOfLines={2}>{subtitle}</Text>
+        </View>
       </View>
+      <TouchableOpacity
+        onPress={onAction}
+        style={[styles.actionBtn, actionDanger && styles.actionBtnDanger]}
+        activeOpacity={0.75}
+      >
+        <Text style={[styles.actionBtnText, actionDanger && styles.actionBtnTextDanger]}>
+          {actionLabel}
+        </Text>
+      </TouchableOpacity>
     </View>
-    <TouchableOpacity
-      onPress={onAction}
-      style={[styles.actionBtn, actionDanger && styles.actionBtnDanger]}
-      activeOpacity={0.75}
-    >
-      <Text style={[styles.actionBtnText, actionDanger && styles.actionBtnTextDanger]}>
-        {actionLabel}
-      </Text>
-    </TouchableOpacity>
-  </View>
   );
 };
 
 // ── Styles ─────────────────────────────────────────────────────
 function createStyles(COLORS: any) {
   return StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.background,
+    },
 
-  // Header
-  pageHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 14,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backArrow: {
-    fontSize: 20,
-    color: COLORS.primary,
-    fontWeight: "900",
-    marginTop: -2,
-  },
-  pageTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-  },
+    // Header
+    pageHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: SPACING.md,
+      paddingVertical: 14,
+      backgroundColor: COLORS.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    backArrow: {
+      fontSize: 20,
+      color: COLORS.primary,
+      fontWeight: "900",
+      marginTop: -2,
+    },
+    pageTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+    },
 
-  // Scroll
-  scrollContent: {
-    padding: SPACING.md,
-    paddingBottom: 50,
-  },
+    // Scroll
+    scrollContent: {
+      padding: SPACING.md,
+      paddingBottom: 50,
+    },
 
-  // Section labels
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: COLORS.textMuted,
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-    marginTop: 24,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
+    // Section labels
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: COLORS.textMuted,
+      letterSpacing: 1.2,
+      textTransform: "uppercase",
+      marginTop: 24,
+      marginBottom: 8,
+      marginLeft: 4,
+    },
 
-  // Cards
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    overflow: "hidden",
-    ...SHADOWS.light,
-  },
+    // Cards
+    card: {
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.lg,
+      overflow: "hidden",
+      ...SHADOWS.light,
+    },
 
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginLeft: 60,
-  },
+    divider: {
+      height: 1,
+      backgroundColor: COLORS.border,
+      marginLeft: 60,
+    },
 
-  // Rows inside cards
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 14,
-    justifyContent: "space-between",
-  },
-  rowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    gap: 12,
-  },
-  rowIcon: {
-    fontSize: 22,
-    width: 36,
-    textAlign: "center",
-  },
-  rowTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.textHeader,
-    marginBottom: 2,
-  },
-  rowSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSub,
-    fontWeight: "400",
-  },
+    // Rows inside cards
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: SPACING.md,
+      paddingVertical: 14,
+      justifyContent: "space-between",
+    },
+    rowLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+      gap: 12,
+    },
+    rowIcon: {
+      fontSize: 22,
+      width: 36,
+      textAlign: "center",
+    },
+    rowTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.textHeader,
+      marginBottom: 2,
+    },
+    rowSubtitle: {
+      fontSize: 12,
+      color: COLORS.textSub,
+      fontWeight: "400",
+    },
 
-  // Action button
-  actionBtn: {
-    backgroundColor: "rgba(89,170,111,0.12)",
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: "rgba(89,170,111,0.25)",
-  },
-  actionBtnDanger: {
-    backgroundColor: "rgba(255,59,48,0.08)",
-    borderColor: "rgba(255,59,48,0.2)",
-  },
-  actionBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  actionBtnTextDanger: {
-    color: COLORS.danger,
-  },
+    // Action button
+    actionBtn: {
+      backgroundColor: "rgba(89,170,111,0.12)",
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      borderColor: "rgba(89,170,111,0.25)",
+    },
+    actionBtnDanger: {
+      backgroundColor: "rgba(255,59,48,0.08)",
+      borderColor: "rgba(255,59,48,0.2)",
+    },
+    actionBtnText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: COLORS.primary,
+    },
+    actionBtnTextDanger: {
+      color: COLORS.danger,
+    },
 
-  // Badge (read-only value)
-  badge: {
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.textSub,
-  },
+    // Badge (read-only value)
+    badge: {
+      backgroundColor: COLORS.background,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: RADIUS.pill,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: COLORS.textSub,
+    },
 
-  // Logout card
-  logoutCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,59,48,0.2)",
-    ...SHADOWS.light,
-  },
-  logoutIcon: {
-    fontSize: 22,
-    width: 36,
-    textAlign: "center",
-  },
-  logoutTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.danger,
-    marginBottom: 2,
-  },
-  logoutSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSub,
-  },
-  logoutChevron: {
-    fontSize: 22,
-    color: COLORS.danger,
-    fontWeight: "bold",
-    opacity: 0.6,
-  },
+    // Logout card
+    logoutCard: {
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.lg,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderWidth: 1,
+      borderColor: "rgba(255,59,48,0.2)",
+      ...SHADOWS.light,
+    },
+    logoutIcon: {
+      fontSize: 22,
+      width: 36,
+      textAlign: "center",
+    },
+    logoutTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.danger,
+      marginBottom: 2,
+    },
+    logoutSubtitle: {
+      fontSize: 12,
+      color: COLORS.textSub,
+    },
+    logoutChevron: {
+      fontSize: 22,
+      color: COLORS.danger,
+      fontWeight: "bold",
+      opacity: 0.6,
+    },
 
-  // Footer
-  footer: {
-    textAlign: "center",
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 36,
-    marginBottom: 10,
-    fontWeight: "500",
-  },
+    // Footer
+    footer: {
+      textAlign: "center",
+      fontSize: 12,
+      color: COLORS.textMuted,
+      marginTop: 36,
+      marginBottom: 10,
+      fontWeight: "500",
+    },
 
-  // Export Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalBox: {
-    width: "82%",
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: 24,
-    ...SHADOWS.light,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: COLORS.textSub,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  modalBtn: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 13,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  modalCancelBtn: {
-    backgroundColor: "rgba(255,59,48,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,59,48,0.2)",
-  },
-  modalBtnText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#fff",
-  },
+    // Export Modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalBox: {
+      width: "82%",
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.lg,
+      padding: 24,
+      ...SHADOWS.light,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+      textAlign: "center",
+      marginBottom: 4,
+    },
+    modalSubtitle: {
+      fontSize: 13,
+      color: COLORS.textSub,
+      textAlign: "center",
+      marginBottom: 20,
+    },
+    modalBtn: {
+      backgroundColor: COLORS.primary,
+      paddingVertical: 13,
+      borderRadius: RADIUS.md,
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    modalCancelBtn: {
+      backgroundColor: "rgba(255,59,48,0.08)",
+      borderWidth: 1,
+      borderColor: "rgba(255,59,48,0.2)",
+    },
+    modalBtnText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#fff",
+    },
 
-  // Exporting loading box
-  loadingBox: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: 32,
-    alignItems: "center",
-    gap: 12,
-    ...SHADOWS.light,
-  },
-  loadingText: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-    marginTop: 4,
-  },
-  loadingSubText: {
-    fontSize: 12,
-    color: COLORS.textSub,
-    textAlign: "center",
-  },
+    // Exporting loading box
+    loadingBox: {
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.lg,
+      padding: 32,
+      alignItems: "center",
+      gap: 12,
+      ...SHADOWS.light,
+    },
+    loadingText: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+      marginTop: 4,
+    },
+    loadingSubText: {
+      fontSize: 12,
+      color: COLORS.textSub,
+      textAlign: "center",
+    },
 
-  // Export Success Modal
-  successBox: {
-    width: "82%",
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: 32,
-    alignItems: "center",
-    gap: 10,
-    ...SHADOWS.light,
-  },
-  successIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(52,199,89,0.12)",
-    borderWidth: 2,
-    borderColor: "rgba(52,199,89,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  successIcon: {
-    fontSize: 34,
-    color: "#34C759",
-    fontWeight: "900",
-  },
-  successTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-    textAlign: "center",
-  },
-  successMessage: {
-    fontSize: 13,
-    color: COLORS.textSub,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  successBtn: {
-    backgroundColor: "#34C759",
-    paddingVertical: 13,
-    paddingHorizontal: 48,
-    borderRadius: RADIUS.pill,
-    marginTop: 4,
-  },
-  successBtnText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#fff",
-  },
+    // Export Success Modal
+    successBox: {
+      width: "82%",
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.lg,
+      padding: 32,
+      alignItems: "center",
+      gap: 10,
+      ...SHADOWS.light,
+    },
+    successIconCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: "rgba(52,199,89,0.12)",
+      borderWidth: 2,
+      borderColor: "rgba(52,199,89,0.4)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    successIcon: {
+      fontSize: 34,
+      color: "#34C759",
+      fontWeight: "900",
+    },
+    successTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+      textAlign: "center",
+    },
+    successMessage: {
+      fontSize: 13,
+      color: COLORS.textSub,
+      textAlign: "center",
+      lineHeight: 20,
+      marginBottom: 8,
+    },
+    successBtn: {
+      backgroundColor: "#34C759",
+      paddingVertical: 13,
+      paddingHorizontal: 48,
+      borderRadius: RADIUS.pill,
+      marginTop: 4,
+    },
+    successBtnText: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: "#fff",
+    },
 
-  // Logout Confirmation Modal
-  logoutModalBox: {
-    width: "82%",
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: 28,
-    alignItems: "center",
-    gap: 10,
-    ...SHADOWS.light,
-  },
-  logoutModalIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(255,59,48,0.08)",
-    borderWidth: 2,
-    borderColor: "rgba(255,59,48,0.25)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  logoutModalIcon: {
-    fontSize: 32,
-  },
-  logoutModalTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-    textAlign: "center",
-  },
-  logoutModalSubtitle: {
-    fontSize: 13,
-    color: COLORS.textSub,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 6,
-  },
-  logoutModalBtn: {
-    width: "100%",
-    backgroundColor: COLORS.danger,
-    paddingVertical: 14,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-  },
-  logoutModalBtnText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#fff",
-  },
-  logoutModalCancelBtn: {
-    width: "100%",
-    paddingVertical: 13,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  logoutModalCancelText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.textSub,
-  },
-  
-  // Device Info Modal
-  deviceInfoBox: {
-    width: "85%",
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
-    padding: 24,
-    alignItems: "center",
-    ...SHADOWS.medium,
-  },
-  deviceInfoIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(0,122,255,0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  deviceInfoIcon: {
-    fontSize: 28,
-  },
-  deviceInfoTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-    marginBottom: 20,
-  },
-  infoScroll: {
-    width: "100%",
-    marginBottom: 24,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: COLORS.textSub,
-    fontWeight: "600",
-  },
-  infoValue: {
-    fontSize: 14,
-    color: COLORS.textHeader,
-    fontWeight: "700",
-    textAlign: "right",
-    flex: 1,
-    marginLeft: 16,
-  },
-  deviceInfoBtn: {
-    width: "100%",
-    backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-  },
-  deviceInfoBtnText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#fff",
-  },
-});
+    // Export Error Styles (Shared with Success box layout)
+    errorIconCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: "rgba(255,59,48,0.12)",
+      borderWidth: 2,
+      borderColor: "rgba(255,59,48,0.4)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    errorIcon: {
+      fontSize: 34,
+      color: "#FF3B30",
+      fontWeight: "900",
+    },
+    errorBtn: {
+      backgroundColor: "#FF3B30",
+      paddingVertical: 13,
+      paddingHorizontal: 48,
+      borderRadius: RADIUS.pill,
+      marginTop: 4,
+    },
+
+    // Cloud Update Modal Styles
+    cloudIconCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: "rgba(0,122,255,0.08)",
+      borderWidth: 2,
+      borderColor: "rgba(0,122,255,0.25)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    cloudUpdateBtn: {
+      width: "100%",
+      backgroundColor: COLORS.primary,
+      paddingVertical: 14,
+      borderRadius: RADIUS.md,
+      alignItems: "center",
+    },
+
+    // Logout Confirmation Modal
+    logoutModalBox: {
+      width: "82%",
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.lg,
+      padding: 28,
+      alignItems: "center",
+      gap: 10,
+      ...SHADOWS.light,
+    },
+    logoutModalIconCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: "rgba(255,59,48,0.08)",
+      borderWidth: 2,
+      borderColor: "rgba(255,59,48,0.25)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    logoutModalIcon: {
+      fontSize: 32,
+    },
+    logoutModalTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+      textAlign: "center",
+    },
+    logoutModalSubtitle: {
+      fontSize: 13,
+      color: COLORS.textSub,
+      textAlign: "center",
+      lineHeight: 20,
+      marginBottom: 6,
+    },
+    logoutModalBtn: {
+      width: "100%",
+      backgroundColor: COLORS.danger,
+      paddingVertical: 14,
+      borderRadius: RADIUS.md,
+      alignItems: "center",
+    },
+    logoutModalBtnText: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: "#fff",
+    },
+    logoutModalCancelBtn: {
+      width: "100%",
+      paddingVertical: 13,
+      borderRadius: RADIUS.md,
+      alignItems: "center",
+      backgroundColor: COLORS.background,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    logoutModalCancelText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.textSub,
+    },
+
+    // Device Info Modal
+    deviceInfoBox: {
+      width: "85%",
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.xl,
+      padding: 24,
+      alignItems: "center",
+      ...SHADOWS.medium,
+    },
+    deviceInfoIconCircle: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: "rgba(0,122,255,0.1)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    deviceInfoIcon: {
+      fontSize: 28,
+    },
+    deviceInfoTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+      marginBottom: 20,
+    },
+    infoScroll: {
+      width: "100%",
+      marginBottom: 24,
+    },
+    infoRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+    },
+    infoLabel: {
+      fontSize: 14,
+      color: COLORS.textSub,
+      fontWeight: "600",
+    },
+    infoValue: {
+      fontSize: 14,
+      color: COLORS.textHeader,
+      fontWeight: "700",
+      textAlign: "right",
+      flex: 1,
+      marginLeft: 16,
+    },
+    deviceInfoBtn: {
+      width: "100%",
+      backgroundColor: COLORS.primary,
+      paddingVertical: 14,
+      borderRadius: RADIUS.md,
+      alignItems: "center",
+    },
+    deviceInfoBtnText: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: "#fff",
+    },
+  });
 }

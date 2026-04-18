@@ -14,9 +14,10 @@ import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 
 interface ChatHistoryProps {
     onSelectChat: (id: string) => void;
+    historyType?: "general" | "report";
 }
 
-export const ChatHistoryPage = ({ onSelectChat }: ChatHistoryProps) => {
+export const ChatHistoryPage = ({ onSelectChat, historyType = "general" }: ChatHistoryProps) => {
     const { colors: COLORS } = useTheme();
     const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
     
@@ -29,7 +30,13 @@ export const ChatHistoryPage = ({ onSelectChat }: ChatHistoryProps) => {
                 const history = await storageService.getAllChats();
                 // Filter out empty sessions
                 const validHistory = history.filter(chat => chat.messages && chat.messages.length > 0);
-                setChatHistory(validHistory);
+                
+                // Filter by type:
+                const filteredHistory = validHistory.filter(chat => 
+                    historyType === "report" ? chat.type === "report" : chat.type !== "report"
+                );
+                
+                setChatHistory(filteredHistory);
             } catch (error) {
                 console.log("Error loading chat history:", error);
             } finally {
@@ -66,8 +73,8 @@ export const ChatHistoryPage = ({ onSelectChat }: ChatHistoryProps) => {
         <ScrollView style={styles.container} contentContainerStyle={styles.content}>
             <View style={styles.headerRow}>
                 <View>
-                    <Text style={styles.pageTitle}>Chat History</Text>
-                    <Text style={styles.pageSubtitle}>Review your past medical consultations</Text>
+                    <Text style={styles.pageTitle}>{historyType === "report" ? "Report Discussions" : "Chat History"}</Text>
+                    <Text style={styles.pageSubtitle}>{historyType === "report" ? "Review past analyses of your medical reports" : "Review your past medical consultations"}</Text>
                 </View>
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>{chatHistory.length}</Text>
@@ -77,8 +84,8 @@ export const ChatHistoryPage = ({ onSelectChat }: ChatHistoryProps) => {
             {chatHistory.length === 0 ? (
                 <View style={styles.emptyState}>
                     <Text style={styles.emptyIcon}>📂</Text>
-                    <Text style={styles.emptyTitle}>No past conversations</Text>
-                    <Text style={styles.emptySub}>Your health chat history will live here once you start exploring MediNova.</Text>
+                    <Text style={styles.emptyTitle}>{historyType === "report" ? "No past report analyses" : "No past conversations"}</Text>
+                    <Text style={styles.emptySub}>{historyType === "report" ? "Your scanned reports and AI feedback will appear here." : "Your health chat history will live here once you start exploring MediNova."}</Text>
                 </View>
             ) : (
                 <View style={styles.listContainer}>

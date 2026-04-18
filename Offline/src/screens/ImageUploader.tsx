@@ -55,8 +55,8 @@ function parseReportText(raw: string): ParsedReport {
 }
 
 export default function ImageUploader({ onNavigate, onBack, initialMode }: ImageUploaderProps) {
-  const { colors: COLORS } = useTheme();
-  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+    const { colors: COLORS } = useTheme();
+    const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
     // ✅ All hooks at top — unconditional, same order every render
     const [image, setImage] = useState<string | null>(null);
@@ -190,24 +190,13 @@ export default function ImageUploader({ onNavigate, onBack, initialMode }: Image
     const modeLabel = initialMode === 'gallery'
         ? { icon: '🖼️', title: 'Gallery', action: pickImage }
         : initialMode === 'pdf'
-        ? { icon: '📄', title: 'PDF Document', action: pickPdf }
-        : initialMode === 'camera'
-        ? { icon: '📸', title: 'Camera', action: captureImage }
-        : null;
+            ? { icon: '📄', title: 'PDF Document', action: pickPdf }
+            : initialMode === 'camera'
+                ? { icon: '📸', title: 'Camera', action: captureImage }
+                : null;
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                {onBack && (
-                    <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                        <Text style={styles.backText}>← Back</Text>
-                    </TouchableOpacity>
-                )}
-                <Text style={styles.headerTitle}>
-                    {modeLabel ? `Upload via ${modeLabel.title}` : 'Upload Report'}
-                </Text>
-            </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
 
@@ -310,7 +299,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     backBtn: { padding: SPACING.sm, marginRight: SPACING.sm },
     backText: { color: COLORS.primary, fontWeight: "800", fontSize: 16 },
     headerTitle: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader },
-    
+
     scrollContent: {
         padding: SPACING.lg,
         paddingBottom: 100, // Space for bottom bar
@@ -321,7 +310,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         marginBottom: SPACING.lg,
         textAlign: "center",
     },
-    
+
     grid: {
         flexDirection: "row",
         justifyContent: "space-between",

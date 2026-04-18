@@ -11,6 +11,8 @@ import {
   Alert,
   AppState,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -52,7 +54,7 @@ import NotificationService from "./src/services/NotificationService";
 import { ChatHistoryPage } from "./src/screens/ChatHistoryPage";
 import { CloudRestoreLoginScreen } from "./src/screens/CloudRestoreLoginScreen";
 
-type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history" | "cloud_restore_login";
+type AppView = "dashboard" | "chat" | "diet_plans" | "exercise_plans" | "about" | "settings" | "profile" | "model_setup" | "model_manager" | "report_analysis" | "image_uploader" | "chat_page" | "forget_password" | "restore" | "chat_history" | "cloud_restore_login" | "report_chat_history";
 
 export default function App() {
   return (
@@ -86,6 +88,7 @@ function MainApp() {
   const [scannedImage, setScannedImage] = useState<string | null>(null);
   const [uploadMode, setUploadMode] = useState<'gallery' | 'pdf' | 'camera' | undefined>();
   const [cloudData, setCloudData] = useState<any>(null);
+  const [activeReportSessionId, setActiveReportSessionId] = useState<string | null>(null);
 
 
   const MAX_MESSAGES = 40;
@@ -176,7 +179,7 @@ function MainApp() {
   const checkModelStatus = async () => {
     const downloaded = await ModelService.getDownloadedModels();
     setHasModel(downloaded.length > 0);
-    
+
     const recId = await ModelService.getRecommendedModelId();
     const models = await ModelService.getAvailableModels();
     const recommended = models.find(m => m.id === recId);
@@ -190,6 +193,7 @@ function MainApp() {
       const title = StorageService.generateTitle(messages);
       const updatedSession: ChatSession = {
         id: currentSessionId,
+        type: "general",
         title,
         messages,
         updatedAt: new Date().toISOString(),
@@ -397,7 +401,7 @@ function MainApp() {
   const handleSaveProfile = async (profile: UserProfile) => {
     setUserProfile(profile);
     setCurrentView("dashboard");
-    const allChats = await StorageService.getAllChats();
+    const allChats = await StorageService.getAllChats("general");
     initializeSession(allChats);
   };
 
@@ -406,7 +410,7 @@ function MainApp() {
     setCurrentUser(user);
     const profile = await StorageService.getProfile();
     setUserProfile(profile);
-    const allChats = await StorageService.getAllChats();
+    const allChats = await StorageService.getAllChats("general");
     setSessions(allChats);
     await fetchPlans();
 
@@ -438,7 +442,7 @@ function MainApp() {
       setCurrentView("profile");
     } else {
       setCurrentView("dashboard");
-      const allChats = await StorageService.getAllChats();
+      const allChats = await StorageService.getAllChats("general");
       initializeSession(allChats);
     }
   };
@@ -502,13 +506,19 @@ function MainApp() {
             setUploadMode(mode);
             setCurrentView("image_uploader");
           }}
-          onNavigateToChat={() => setCurrentView("chat_page")}
+          onNavigateToChat={() => setCurrentView("report_chat_history")}
         />;
 
       case "chat_history":
-        return <ChatHistoryPage onSelectChat={(id) => {
+        return <ChatHistoryPage historyType="general" onSelectChat={(id) => {
           loadSession(id);
           setCurrentView("chat");
+        }} />;
+
+      case "report_chat_history":
+        return <ChatHistoryPage historyType="report" onSelectChat={(id) => {
+          setActiveReportSessionId(id);
+          setCurrentView("chat_page");
         }} />;
 
       case "image_uploader":
@@ -529,10 +539,12 @@ function MainApp() {
           onBack={() => {
             setScannedReport(null);
             setScannedImage(null);
-            setCurrentView("report_analysis");
+            setActiveReportSessionId(null);
+            setCurrentView("report_chat_history"); // Navigate back to the report history if viewing history
           }}
           reportData={scannedReport}
           imageUri={scannedImage}
+          initialSessionId={activeReportSessionId}
         />;
       case "forget_password":
         return <ForgetPassword onBack={() => setCurrentView("chat")} />;
@@ -569,8 +581,10 @@ function MainApp() {
         );
       default:
         return (
-          <View style={{ flex: 1 }}>
-
+          <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
             <FlatList
               ref={flatListRef}
               data={messages}
@@ -597,7 +611,7 @@ function MainApp() {
               isGenerating={isTyping}
               disabled={isTyping || isChatFull}
             />
-          </View>
+          </KeyboardAvoidingView>
         );
     }
   };
@@ -653,7 +667,7 @@ function MainApp() {
                   </View>
                 </View>
               ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginRight: 40 }}>
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginRight: currentView === "chat_page" ? 0 : 40 }}>
                   <Text style={[styles.headerTitle, { fontSize: 18, color: COLORS.textHeader, fontWeight: '800' }]}>
                     {currentView === "report_analysis" ? "Report Analysis" :
                       currentView === "image_uploader" ? "Upload Report" :
@@ -665,6 +679,11 @@ function MainApp() {
               {currentView === "chat" && (
                 <TouchableOpacity onPress={startNewChat}>
                   <Text style={{ color: COLORS.primary, fontWeight: "600" }}>New</Text>
+                </TouchableOpacity>
+              )}
+              {currentView === "chat_page" && (
+                <TouchableOpacity onPress={() => setCurrentView("report_chat_history")} style={{ padding: 5 }}>
+                  <Text style={{ fontSize: 24, color: COLORS.primary }}>🕒</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -698,94 +717,94 @@ function MainApp() {
 function createStyles(COLORS: any) {
   return StyleSheet.create({
 
-  logoContainer: {
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    flex: 1,
-    marginLeft: 15,
-  },
+    logoContainer: {
+      flexDirection: "column",
+      justifyContent: "center",
+      alignItems: "flex-start",
+      flex: 1,
+      marginLeft: 15,
+    },
 
-  imageContainer: {
-    width: 140,
-    height: 140,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    marginTop: -45,
-    marginBottom: -45,
-    marginLeft: -15,
-  },
+    imageContainer: {
+      width: 140,
+      height: 140,
+      overflow: "hidden",
+      justifyContent: "center",
+      alignItems: "flex-start",
+      marginTop: -45,
+      marginBottom: -45,
+      marginLeft: -15,
+    },
 
-  logo: {
-    width: "100%",
-    height: "100%",
-  },
+    logo: {
+      width: "100%",
+      height: "100%",
+    },
 
-  appName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.textHeader,
-  },
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { flexDirection: "row", alignItems: "center", padding: 15, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textHeader },
-  statusText: { fontSize: 11, fontWeight: "500" },
-  menuIcon: { padding: 5 },
-  listContent: { padding: 15 },
-  generatingState: { fontSize: 12, color: COLORS.textMuted, fontStyle: "italic", marginLeft: 20, marginBottom: 10 },
-  fullNotice: { backgroundColor: COLORS.fullNoticeBg, padding: 10, alignItems: "center", borderTopWidth: 1, borderTopColor: COLORS.fullNoticeBorder },
-  fullNoticeText: { color: COLORS.fullNoticeText, fontSize: 12, marginBottom: 5 },
-  inlineNewChatBtn: { backgroundColor: COLORS.fullNoticeBtn, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
-  inlineNewChatBtnText: { color: COLORS.surface, fontSize: 12, fontWeight: "700" },
-  chatHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 15,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backButton: {
-    padding: 5,
-    marginRight: 10,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: COLORS.primary,
-    fontWeight: "bold",
-  },
-  chatTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-  },
-  chatSubtitle: {
-    fontSize: 12,
-    color: COLORS.textSub,
-    fontWeight: "500",
-  },
-  chatInfoBanner: {
-    backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.lg,
-    marginHorizontal: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.light,
-  },
-  chatInfoEmoji: {
-    fontSize: 24,
-    marginRight: SPACING.md,
-  },
-  chatInfoText: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.textMain,
-    lineHeight: 18,
-  }
-});
+    appName: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: COLORS.textHeader,
+    },
+    container: { flex: 1, backgroundColor: COLORS.background },
+    header: { flexDirection: "row", alignItems: "center", padding: 15, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    headerTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textHeader },
+    statusText: { fontSize: 11, fontWeight: "500" },
+    menuIcon: { padding: 5 },
+    listContent: { padding: 15 },
+    generatingState: { fontSize: 12, color: COLORS.textMuted, fontStyle: "italic", marginLeft: 20, marginBottom: 10 },
+    fullNotice: { backgroundColor: COLORS.fullNoticeBg, padding: 10, alignItems: "center", borderTopWidth: 1, borderTopColor: COLORS.fullNoticeBorder },
+    fullNoticeText: { color: COLORS.fullNoticeText, fontSize: 12, marginBottom: 5 },
+    inlineNewChatBtn: { backgroundColor: COLORS.fullNoticeBtn, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 10 },
+    inlineNewChatBtnText: { color: COLORS.surface, fontSize: 12, fontWeight: "700" },
+    chatHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 15,
+      backgroundColor: COLORS.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+    },
+    backButton: {
+      padding: 5,
+      marginRight: 10,
+    },
+    backIcon: {
+      fontSize: 24,
+      color: COLORS.primary,
+      fontWeight: "bold",
+    },
+    chatTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+    },
+    chatSubtitle: {
+      fontSize: 12,
+      color: COLORS.textSub,
+      fontWeight: "500",
+    },
+    chatInfoBanner: {
+      backgroundColor: COLORS.surface,
+      padding: SPACING.lg,
+      borderRadius: RADIUS.lg,
+      marginBottom: SPACING.lg,
+      marginHorizontal: SPACING.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      ...SHADOWS.light,
+    },
+    chatInfoEmoji: {
+      fontSize: 24,
+      marginRight: SPACING.md,
+    },
+    chatInfoText: {
+      flex: 1,
+      fontSize: 13,
+      color: COLORS.textMain,
+      lineHeight: 18,
+    }
+  });
 }

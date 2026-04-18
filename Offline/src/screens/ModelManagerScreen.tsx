@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Modal,
 } from "react-native";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import ModelService, { AIModel } from "../services/ModelService";
@@ -30,6 +31,10 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
 
   const [isPaused, setIsPaused] = useState(false);
   const [recommendedId, setRecommendedId] = useState<string | null>(null);
+
+  // States for Custom Modals
+  const [deleteConfirmModel, setDeleteConfirmModel] = useState<AIModel | null>(null);
+  const [infoAlert, setInfoAlert] = useState<{ title: string; message: string; type: "success" | "error" | "info" } | null>(null);
 
   useEffect(() => {
     loadStatus();
@@ -64,7 +69,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
             await loadStatus();
             setDownloadingId(null);
             setIsPaused(false);
-            Alert.alert("Success", `${model.name} downloaded successfully.`);
+            setInfoAlert({ title: "Success", message: `${model.name} downloaded successfully.`, type: "success" });
           },
           () => {
             setDownloadingId(null);
@@ -79,13 +84,13 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     setLoading(true);
     const all = await ModelService.getAvailableModels();
     const active = await ModelService.getActiveModel();
-    
+
     const enriched = await Promise.all(all.map(async (m) => ({
       ...m,
       isDownloaded: await ModelService.isModelDownloaded(m.id),
       isActive: active?.id === m.id
     })));
-    
+
     setModels(enriched);
     setLoading(false);
   };
@@ -97,10 +102,11 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
 
   const handleDownload = async (model: AIModel) => {
     if (!model.downloadUrl) {
-      Alert.alert(
-        "Manual Setup Required", 
-        `This is a custom model. Please push '${model.filename}' to your device's Documents folder manually using ADB or a file manager.`
-      );
+      setInfoAlert({
+        title: "Manual Setup Required",
+        message: `This is a custom model. Please push '${model.filename}' to your device's Documents folder manually using ADB or a file manager.`,
+        type: "info"
+      });
       return;
     }
     setDownloadingId(model.id);
@@ -108,8 +114,8 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     setIsPaused(false);
     try {
       await LlamaService.downloadModel(
-        model.filename, 
-        model.downloadUrl, 
+        model.filename,
+        model.downloadUrl,
         (p) => {
           setProgress(p);
         },
@@ -117,18 +123,18 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
           await loadStatus();
           setDownloadingId(null);
           setIsPaused(false);
-          Alert.alert("Success", `${model.name} downloaded successfully.`);
+          setInfoAlert({ title: "Success", message: `${model.name} downloaded successfully.`, type: "success" });
         },
         (err) => {
           setDownloadingId(null);
           setIsPaused(false);
-          Alert.alert("Error", "Download failed or canceled.");
+          setInfoAlert({ title: "Error", message: "Download failed or canceled.", type: "error" });
         }
       );
     } catch (err) {
       setDownloadingId(null);
       setIsPaused(false);
-      Alert.alert("Error", "Download failed.");
+      setInfoAlert({ title: "Error", message: "Download failed.", type: "error" });
     }
   };
 
@@ -150,32 +156,17 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   };
 
   const handleDelete = async (model: AIModel) => {
-    Alert.alert(
-      "Delete Model",
-      `Are you sure you want to delete ${model.name}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive", 
-          onPress: async () => {
-            await ModelService.deleteModel(model.id);
-            await loadStatus();
-          } 
-        }
-      ]
-    );
+    setDeleteConfirmModel(model);
   };
 
   const handleActivate = async (model: AIModel) => {
     await ModelService.setActiveModel(model.id);
     await loadStatus();
-    // Potentially force reload in LlamaService if it's already running
     try {
-        await LlamaService.loadModel(model.filename);
-        Alert.alert("Success", `${model.name} is now active.`);
+      await LlamaService.loadModel(model.filename);
+      setInfoAlert({ title: "Success", message: `${model.name} is now active.`, type: "success" });
     } catch (e) {
-        Alert.alert("Error", "Failed to load model.");
+      setInfoAlert({ title: "Error", message: "Failed to load model.", type: "error" });
     }
   };
 
@@ -199,7 +190,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
           )}
         </View>
       </View>
-      
+
       <Text style={styles.modelDesc}>{item.description}</Text>
 
       <View style={styles.actions}>
@@ -211,23 +202,23 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
                   {isPaused ? `Paused at ${Math.round(progress || 0)}%` : `Downloading ${Math.round(progress || 0)}%`}
                 </Text>
                 <View style={styles.progressActions}>
-                   {isPaused ? (
-                     <TouchableOpacity style={[styles.controlBtn]} onPress={() => handleResume(item)}>
-                        <Text style={styles.controlBtnText}>Resume</Text>
-                     </TouchableOpacity>
-                   ) : (
-                     <TouchableOpacity style={[styles.controlBtn]} onPress={() => handlePause(item)}>
-                        <Text style={styles.controlBtnText}>Pause</Text>
-                     </TouchableOpacity>
-                   )}
-                   <TouchableOpacity style={[styles.controlBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
-                      <Text style={[styles.controlBtnText, styles.dangerText]}>Cancel</Text>
-                   </TouchableOpacity>
+                  {isPaused ? (
+                    <TouchableOpacity style={[styles.controlBtn]} onPress={() => handleResume(item)}>
+                      <Text style={styles.controlBtnText}>Resume</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={[styles.controlBtn]} onPress={() => handlePause(item)}>
+                      <Text style={styles.controlBtnText}>Pause</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={[styles.controlBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
+                    <Text style={[styles.controlBtnText, styles.dangerText]}>Cancel</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ) : (
-              <TouchableOpacity 
-                style={[styles.btn, styles.primaryBtn]} 
+              <TouchableOpacity
+                style={[styles.btn, styles.primaryBtn]}
                 onPress={() => handleDownload(item)}
                 disabled={!!downloadingId}
               >
@@ -238,15 +229,15 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
         ) : (
           <>
             {!item.isActive && (
-              <TouchableOpacity 
-                style={[styles.btn, styles.secondaryBtn]} 
+              <TouchableOpacity
+                style={[styles.btn, styles.secondaryBtn]}
                 onPress={() => handleActivate(item)}
               >
                 <Text style={styles.secondaryBtnText}>Set Active</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity 
-              style={[styles.btn, styles.dangerBtn]} 
+            <TouchableOpacity
+              style={[styles.btn, styles.dangerBtn]}
               onPress={() => handleDelete(item)}
             >
               <Text style={styles.dangerBtnText}>Delete</Text>
@@ -259,12 +250,6 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage AI Models</Text>
-      </View>
 
       {loading ? (
         <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
@@ -283,8 +268,8 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
                 <View style={[styles.infoText, { backgroundColor: COLORS.primary + '11', padding: 12, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#FFB020' }]}>
                   <Text style={{ fontWeight: 'bold', color: COLORS.textHeader, marginBottom: 4 }}>💡 Device Optimization Hint</Text>
                   <Text style={{ fontSize: 13, color: COLORS.textSub }}>
-                    Based on your {Math.round(1)} GB detected RAM, we recommend using the 
-                    <Text style={{ fontWeight: 'bold' }}> {models.find(m => m.id === recommendedId)?.name.split('-')[0]} </Text> 
+                    Based on your {Math.round(1)} GB detected RAM, we recommend using the
+                    <Text style={{ fontWeight: 'bold' }}> {models.find(m => m.id === recommendedId)?.name.split('-')[0]} </Text>
                     for smooth performance.
                   </Text>
                 </View>
@@ -293,6 +278,64 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
           }
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        transparent={true}
+        visible={deleteConfirmModel !== null}
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmModel(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalIconContainer}>
+              <Text style={styles.modalIcon}>🗑️</Text>
+            </View>
+            <Text style={styles.modalTitle}>Delete Model?</Text>
+            <Text style={styles.modalSubtitle}>Are you sure you want to delete {deleteConfirmModel?.name}? You will have to re-download it to use it again.</Text>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setDeleteConfirmModel(null)}>
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnDelete} onPress={async () => {
+                if (deleteConfirmModel) {
+                  await ModelService.deleteModel(deleteConfirmModel.id);
+                  await loadStatus();
+                  setDeleteConfirmModel(null);
+                }
+              }}>
+                <Text style={styles.modalBtnDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Info/Success/Error Modal */}
+      <Modal
+        transparent={true}
+        visible={infoAlert !== null}
+        animationType="fade"
+        onRequestClose={() => setInfoAlert(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={[styles.modalIconContainer, { backgroundColor: infoAlert?.type === 'success' ? '#27AE6015' : infoAlert?.type === 'error' ? '#FF3B3015' : '#4A90E215' }]}>
+              <Text style={styles.modalIcon}>
+                {infoAlert?.type === 'success' ? '✅' : infoAlert?.type === 'error' ? '❌' : 'ℹ️'}
+              </Text>
+            </View>
+            <Text style={styles.modalTitle}>{infoAlert?.title}</Text>
+            <Text style={styles.modalSubtitle}>{infoAlert?.message}</Text>
+            
+            <TouchableOpacity style={styles.modalBtnOk} onPress={() => setInfoAlert(null)}>
+              <Text style={styles.modalBtnOkText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -331,18 +374,18 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   badgeContainer: { flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "40%" },
   modelName: { fontSize: 16, fontWeight: "700", color: COLORS.textMain, flex: 1 },
   modelSize: { fontSize: 12, fontWeight: "600", color: COLORS.primary },
-  activeBadge: { 
-    backgroundColor: COLORS.success || "#27AE60", 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
+  activeBadge: {
+    backgroundColor: COLORS.success || "#27AE60",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: RADIUS.pill || 20,
     flexDirection: "row",
     alignItems: "center"
   },
-  recommendedBadge: { 
-    backgroundColor: "#FFB020", 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
+  recommendedBadge: {
+    backgroundColor: "#FFB020",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: RADIUS.pill || 20,
     flexDirection: "row",
     alignItems: "center"
@@ -364,5 +407,101 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   controlBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.textMuted, alignItems: "center" },
   controlBtnText: { color: COLORS.textMain, fontSize: 12, fontWeight: "600" },
   dangerBorder: { borderColor: COLORS.danger },
-  dangerText: { color: COLORS.danger }
+  dangerText: { color: COLORS.danger },
+
+  // Modal Custom Styling
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: SPACING.lg,
+  },
+  modalContainer: {
+    width: "100%",
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: SPACING.xl,
+    alignItems: "center",
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(255, 59, 48, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.lg,
+  },
+  modalIcon: {
+    fontSize: 28,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    marginBottom: SPACING.sm,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: COLORS.textSub,
+    textAlign: "center",
+    marginBottom: SPACING.xl,
+    lineHeight: 22,
+  },
+  modalActions: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+    gap: SPACING.md,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalBtnCancelText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.textMain,
+  },
+  modalBtnDelete: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.danger || "#FF3B30",
+    alignItems: "center",
+    shadowColor: COLORS.danger || "#FF3B30",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalBtnDeleteText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#FFF",
+  },
+  modalBtnOk: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+  },
+  modalBtnOkText: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#FFF",
+  }
 });

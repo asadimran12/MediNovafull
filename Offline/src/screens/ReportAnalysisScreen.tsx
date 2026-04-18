@@ -57,9 +57,26 @@ export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBa
         </TouchableOpacity>
       </View>
 
+      <View style={{ marginTop: SPACING.xxl, paddingHorizontal: SPACING.lg }}>
+        <Text style={{ fontSize: 12, fontWeight: "700", color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 1.2, marginBottom: SPACING.md, marginLeft: 5 }}>
+          History & Archive
+        </Text>
+        <TouchableOpacity onPress={onNavigateToChat} style={styles.verticalCard}>
+          <View style={[styles.iconContainer, { backgroundColor: '#F2994A15' }]}>
+            <Text style={[styles.gridIcon, { color: '#F2994A' }]}>🕒</Text>
+          </View>
+          <View style={styles.cardInfo}>
+            <Text style={styles.gridTitle}>Report Discussions</Text>
+            <Text style={styles.gridSubtitle}>Review your past AI analyses</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity style={styles.howItWorks} onPress={() => Alert.alert("Coming Soon", "Detailed instructions will be added here.")}>
         <Text style={styles.howItWorksText}>❓ How it works</Text>
       </TouchableOpacity>
+
     </View>
   );
 };
