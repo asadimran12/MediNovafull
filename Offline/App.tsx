@@ -510,16 +510,24 @@ function MainApp() {
         />;
 
       case "chat_history":
-        return <ChatHistoryPage historyType="general" onSelectChat={(id) => {
-          loadSession(id);
-          setCurrentView("chat");
-        }} />;
+        return <ChatHistoryPage 
+          historyType="general" 
+          onSelectChat={(id) => {
+            loadSession(id);
+            setCurrentView("chat");
+          }} 
+          onBack={() => setCurrentView("dashboard")}
+        />;
 
       case "report_chat_history":
-        return <ChatHistoryPage historyType="report" onSelectChat={(id) => {
-          setActiveReportSessionId(id);
-          setCurrentView("chat_page");
-        }} />;
+        return <ChatHistoryPage 
+          historyType="report" 
+          onSelectChat={(id) => {
+            setActiveReportSessionId(id);
+            setCurrentView("chat_page");
+          }} 
+          onBack={() => setCurrentView("report_analysis")}
+        />;
 
       case "image_uploader":
         return <ImageUploader
@@ -621,7 +629,7 @@ function MainApp() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        {currentUser && currentView !== "model_setup" && currentView !== "dashboard" && currentView !== "settings" && currentView !== "profile" && currentView !== "diet_plans" && currentView !== "exercise_plans" && (
+        {currentUser && currentView !== "model_setup" && currentView !== "dashboard" && currentView !== "settings" && currentView !== "profile" && currentView !== "diet_plans" && currentView !== "exercise_plans" && currentView !== "model_manager" && currentView !== "report_analysis" && currentView !== "chat_history" && currentView !== "report_chat_history" && currentView !== "about" && (
           <>
             <Sidebar
               isOpen={isSidebarOpen}
@@ -639,7 +647,7 @@ function MainApp() {
             />
             <View style={styles.header}>
               <TouchableOpacity onPress={toggleSidebar} style={[styles.menuIcon, { zIndex: 10 }]}><Text style={{ fontSize: 24 }}>☰</Text></TouchableOpacity>
-              {currentView !== "chat" && currentView !== "chat_page" && currentView !== "report_analysis" && currentView !== "image_uploader" && currentView !== "model_manager" ? (
+              {currentView !== "chat" && currentView !== "chat_page" && currentView !== "image_uploader" ? (
                 <View style={styles.logoContainer}>
                   <View style={styles.imageContainer}>
                     <Image
@@ -669,10 +677,8 @@ function MainApp() {
               ) : (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginRight: currentView === "chat_page" ? 0 : 40 }}>
                   <Text style={[styles.headerTitle, { fontSize: 18, color: COLORS.textHeader, fontWeight: '800' }]}>
-                    {currentView === "report_analysis" ? "Report Analysis" :
-                      currentView === "image_uploader" ? "Upload Report" :
-                        currentView === "model_manager" ? "Manage Models" :
-                          currentView === "chat_page" ? "Analysis Results" : ""}
+                    {currentView === "image_uploader" ? "Upload Report" :
+                      currentView === "chat_page" ? "Analysis Results" : ""}
                   </Text>
                 </View>
               )}

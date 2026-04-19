@@ -25,7 +25,7 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
-  const [models, setModels] = useState<AIModel[]>([]);
+  const [models, setModels] = useState<(AIModel & { isDownloaded: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -46,8 +46,17 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
 
   const loadModels = async () => {
     const available = await ModelService.getAvailableModels();
-    setModels(available);
+    const enriched = await Promise.all(available.map(async (m) => ({
+      ...m,
+      isDownloaded: await ModelService.isModelDownloaded(m.id)
+    })));
+    setModels(enriched);
     setLoading(false);
+  };
+
+  const handleUseLocal = async (model: AIModel) => {
+    await ModelService.setActiveModel(model.id);
+    onComplete();
   };
 
   const handleDownload = async (model: AIModel) => {
@@ -98,7 +107,7 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
     setIsPaused(false);
   };
 
-  const renderModel = ({ item }: { item: AIModel }) => (
+  const renderModel = ({ item }: { item: typeof models[0] }) => (
     <View style={styles.modelCard}>
       <View style={styles.modelInfo}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -110,6 +119,11 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
           )}
         </View>
         <Text style={styles.modelSize}>{item.size}</Text>
+        {item.isDownloaded && (
+          <View style={[styles.recommendedBadge, { backgroundColor: COLORS.success, marginBottom: 8 }]}>
+            <Text style={styles.recommendedBadgeText}>✓ DOWNLOADED</Text>
+          </View>
+        )}
         <Text style={styles.modelDesc}>{item.description}</Text>
       </View>
       
@@ -133,6 +147,13 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
              </TouchableOpacity>
           </View>
         </View>
+      ) : item.isDownloaded ? (
+        <TouchableOpacity 
+          style={[styles.downloadBtn, { backgroundColor: COLORS.success }]} 
+          onPress={() => handleUseLocal(item)}
+        >
+          <Text style={styles.downloadBtnText}>Use This Model</Text>
+        </TouchableOpacity>
       ) : (
         <TouchableOpacity 
           style={styles.downloadBtn} 

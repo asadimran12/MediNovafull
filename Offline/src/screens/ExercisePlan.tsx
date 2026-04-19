@@ -55,6 +55,11 @@ const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => {
   );
 };
 
+function getTodayIndex(): number {
+    const day = new Date().getDay(); // 0 is Sunday, 1 is Monday...
+    return (day + 6) % 7; // Map so index 0 = Monday, ..., index 6 = Sunday
+}
+
 function formatDate(iso: string) {
     const d = new Date(iso);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -68,7 +73,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
-    const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+    const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayIndex());
     const [activePlan, setActivePlan] = useState<StructuredExercisePlan | null>(null);
     const [activePlanId, setActivePlanId] = useState<string | null>(null);
     const [pendingPlan, setPendingPlan] = useState<StructuredExercisePlan | null>(null);
@@ -153,7 +158,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
             );
             if (result) {
                 setPendingPlan(result as StructuredExercisePlan);
-                setSelectedDayIndex(0);
+                setSelectedDayIndex(getTodayIndex());
             }
         } catch (err: any) {
             Alert.alert("Generation Failed", err?.message ?? "Please try again.");
@@ -202,7 +207,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
             setActivePlan(parsed);
             setActivePlanId(plan.id);
             setPendingPlan(null);
-            setSelectedDayIndex(0);
+            setSelectedDayIndex(getTodayIndex());
         } catch { /* ignore */ }
         setShowManageModal(false);
     };
@@ -412,14 +417,14 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
             {/* ── Reminder Modal ── */}
             <Modal visible={showReminderModal} transparent animationType="fade" onRequestClose={() => setShowReminderModal(false)}>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalSheet}>
+                    <View style={[styles.modalSheet, { backgroundColor: COLORS.surface }]}>
                         <View style={styles.modalHandle} />
                         <Text style={styles.modalTitle}>🔔 Exercise Reminder</Text>
 
                         {reminders && (
                             <View style={styles.reminderRow}>
                                 <View style={{ flex: 1 }}>
-                                    <Text style={styles.reminderTitle}>Daily Workout</Text>
+                                    <Text style={styles.planRowTitle}>Daily Workout</Text>
                                 </View>
                                 <View style={styles.timeInputContainer}>
                                     <TextInput
@@ -448,8 +453,8 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                             </View>
                         )}
 
-                        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveReminders}>
-                            <Text style={[styles.useBtnText, { textAlign: 'center' }]}>💾 Save Reminder</Text>
+                        <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleSaveReminders}>
+                            <Text style={styles.modalPrimaryBtnText}>Set Workout Reminder</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.modalCloseBtn, { marginTop: 10 }]} onPress={() => setShowReminderModal(false)}>
                             <Text style={styles.modalCloseBtnText}>Cancel</Text>
@@ -504,7 +509,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         gap: 12,
     },
     headerActionBtn: {
-        backgroundColor: "#fff",
+        backgroundColor: COLORS.surface,
         paddingVertical: 8,
         paddingHorizontal: 16,
         borderRadius: 20,
@@ -556,17 +561,17 @@ const createStyles = (COLORS: any) => StyleSheet.create({
 
     unsavedBadge: {
         alignSelf: "center",
-        backgroundColor: "#fff3cd",
+        backgroundColor: COLORS.fullNoticeBg || "#fff3cd",
         borderWidth: 1,
-        borderColor: "#ffc107",
+        borderColor: COLORS.fullNoticeBorder || "#ffc107",
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 4,
         marginBottom: 6,
     },
-    unsavedBadgeText: { color: "#856404", fontSize: 12, fontWeight: "600" },
+    unsavedBadgeText: { color: COLORS.fullNoticeText || "#856404", fontSize: 12, fontWeight: "600" },
 
-    topBar: { backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#eee" },
+    topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
     dayCircle: {
         width: 52,
         height: 52,
@@ -576,9 +581,16 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         marginRight: 10,
-        backgroundColor: "#fff",
+        backgroundColor: COLORS.surface,
     },
-    dayCircleSelected: { backgroundColor: COLORS.primary },
+    dayCircleSelected: { 
+        backgroundColor: COLORS.primary,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.35,
+        shadowRadius: 5,
+        elevation: 4,
+    },
     dayText: { color: COLORS.primary, fontWeight: "bold", fontSize: 12 },
     dayTextSelected: { color: "#fff" },
 
@@ -616,13 +628,13 @@ const createStyles = (COLORS: any) => StyleSheet.create({
 
     empty: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },
     emptyIcon: { fontSize: 64, marginBottom: 14 },
-    emptyTitle: { fontSize: 20, fontWeight: "800", color: "#333", marginBottom: 8 },
-    emptySubtitle: { fontSize: 14, color: "#888", textAlign: "center" },
+    emptyTitle: { fontSize: 20, fontWeight: "800", color: COLORS.textHeader, marginBottom: 8 },
+    emptySubtitle: { fontSize: 14, color: COLORS.textSub, textAlign: "center" },
 
     // Modal
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
     modalSheet: {
-        backgroundColor: "#fff",
+        backgroundColor: COLORS.surface,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         padding: 20,
@@ -647,7 +659,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     inUseBadge: {
         marginTop: 4,
         alignSelf: "flex-start",
-        backgroundColor: "#e8f8ef",
+        backgroundColor: "rgba(39,174,96,0.12)",
         borderRadius: 6,
         paddingHorizontal: 7,
         paddingVertical: 2,
@@ -658,10 +670,28 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         borderColor: COLORS.primary,
         backgroundColor: COLORS.surface,
     },
-    deleteBtn: { backgroundColor: "#FFE5E5", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
-    deleteBtnText: { fontSize: 16 },
+    deleteBtn: { backgroundColor: "rgba(255,69,58,0.15)", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
+    deleteBtnText: { fontSize: 16, color: COLORS.danger },
     modalCloseBtn: { marginTop: 16, backgroundColor: COLORS.background, padding: 14, borderRadius: 12, alignItems: "center" },
-    modalCloseBtnText: { color: COLORS.textHeader, fontWeight: "700", fontSize: 15 },
+    modalCloseBtnText: { color: COLORS.textSub, fontWeight: "700", fontSize: 15 },
+    modalPrimaryBtn: {
+        backgroundColor: COLORS.primary,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: "center",
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+        elevation: 4,
+        marginTop: 10,
+    },
+    modalPrimaryBtnText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "800",
+        letterSpacing: 0.3,
+    },
 
     // Reminders
     reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: COLORS.background, padding: 12, borderRadius: 10 },

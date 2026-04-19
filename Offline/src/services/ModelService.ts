@@ -29,29 +29,22 @@ const AVAILABLE_MODELS: AIModel[] = [
     downloadUrl: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
     filename: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
   },
-  {
-    id: "medinova-master",
-    name: "MediNova Master (GGUF)",
-    description: "The primary medical model for offline diagnostics and planning.",
-    size: "4.5 GB",
-    downloadUrl: "",
-    filename: "MedinovaMaster.gguf",
-    isCustom: true,
-  },
-  {
-    id: "custom-finetuned",
-    name: "Our Fine-tuned Model",
-    description: "Your custom fine-tuned model for local testing.",
-    size: "Custom",
-    downloadUrl: "",
-    filename: "Ourfinetunedmodel.gguf",
-    isCustom: true,
-  }
 ];
 
 class ModelService {
   async getAvailableModels(): Promise<AIModel[]> {
-    return AVAILABLE_MODELS;
+    const available: AIModel[] = [];
+    for (const model of AVAILABLE_MODELS) {
+      if (!model.downloadUrl) {
+        // Only include custom models if they actually exist on disk
+        if (await this.isModelDownloaded(model.id)) {
+          available.push(model);
+        }
+      } else {
+        available.push(model);
+      }
+    }
+    return available;
   }
 
   async getDownloadedModels(): Promise<AIModel[]> {
@@ -99,10 +92,17 @@ class ModelService {
 
   async getActiveModel(): Promise<AIModel | null> {
     const activeId = await StorageService.getItem("active_model_id");
-    if (!activeId) {
-        return AVAILABLE_MODELS.find(m => m.id === "medinova-master") || null;
+    if (!activeId) return null;
+
+    const model = AVAILABLE_MODELS.find(m => m.id === activeId);
+    if (!model) return null;
+
+    // Only return as active if it's actually downloaded
+    if (await this.isModelDownloaded(model.id)) {
+      return model;
     }
-    return AVAILABLE_MODELS.find(m => m.id === activeId) || null;
+
+    return null;
   }
 
   async setActiveModel(modelId: string): Promise<void> {

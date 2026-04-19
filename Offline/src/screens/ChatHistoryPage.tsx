@@ -14,10 +14,11 @@ import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 
 interface ChatHistoryProps {
     onSelectChat: (id: string) => void;
+    onBack?: () => void;
     historyType?: "general" | "report";
 }
 
-export const ChatHistoryPage = ({ onSelectChat, historyType = "general" }: ChatHistoryProps) => {
+export const ChatHistoryPage = ({ onSelectChat, onBack, historyType = "general" }: ChatHistoryProps) => {
     const { colors: COLORS } = useTheme();
     const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
     
@@ -70,16 +71,27 @@ export const ChatHistoryPage = ({ onSelectChat, historyType = "general" }: ChatH
     }
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-            <View style={styles.headerRow}>
-                <View>
-                    <Text style={styles.pageTitle}>{historyType === "report" ? "Report Discussions" : "Chat History"}</Text>
-                    <Text style={styles.pageSubtitle}>{historyType === "report" ? "Review past analyses of your medical reports" : "Review your past medical consultations"}</Text>
-                </View>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{chatHistory.length}</Text>
-                </View>
+        <View style={styles.container}>
+            {/* ── Page Header ───────────────────────────── */}
+            <View style={styles.pageHeader}>
+                {onBack && (
+                    <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
+                        <Text style={styles.backArrow}>←</Text>
+                    </TouchableOpacity>
+                )}
+                <Text style={styles.headerTitle}>{historyType === "report" ? "Report Discussions" : "Chat History"}</Text>
+                <View style={styles.backBtn} />
             </View>
+
+            <ScrollView contentContainerStyle={styles.content}>
+                <View style={styles.headerRow}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.pageSubtitle}>{historyType === "report" ? "Review past analyses of your medical reports" : "Review your past medical consultations"}</Text>
+                    </View>
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{chatHistory.length}</Text>
+                    </View>
+                </View>
 
             {chatHistory.length === 0 ? (
                 <View style={styles.emptyState}>
@@ -107,7 +119,8 @@ export const ChatHistoryPage = ({ onSelectChat, historyType = "general" }: ChatH
                     ))}
                 </View>
             )}
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 };
 
@@ -116,6 +129,36 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
+    // Header
+    pageHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: SPACING.md,
+        paddingVertical: 14,
+        backgroundColor: COLORS.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    backBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    backArrow: {
+        fontSize: 20,
+        color: COLORS.primary,
+        fontWeight: "900",
+        marginTop: -2,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: "800",
+        color: COLORS.textHeader,
+    },
+
     content: {
         padding: SPACING.lg,
         paddingBottom: SPACING.xxl,
@@ -138,16 +181,10 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         alignItems: "center",
         marginBottom: SPACING.xl,
     },
-    pageTitle: {
-        fontSize: 26,
-        fontWeight: "900",
-        color: COLORS.textHeader,
-        letterSpacing: -0.5,
-    },
     pageSubtitle: {
         fontSize: 13,
         color: COLORS.textSub,
-        marginTop: 4,
+        marginTop: -4,
     },
     badge: {
         backgroundColor: "rgba(89, 170, 111, 0.15)",

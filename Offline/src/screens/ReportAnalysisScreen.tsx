@@ -16,9 +16,20 @@ export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBa
 
   const handleSelect = (type: 'gallery' | 'pdf' | 'camera') => {
     onNavigateToUpload(type);
-  }
+  };
+
   return (
     <View style={styles.container}>
+      {/* ── Page Header ───────────────────────────── */}
+      <View style={styles.header}>
+        {onBack && (
+          <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
+            <Text style={styles.backText}>←</Text>
+          </TouchableOpacity>
+        )}
+        <Text style={styles.headerTitle}>Report Analysis</Text>
+        <View style={styles.backBtn} />
+      </View>
 
       <Text style={styles.subtitle}>Choose your report format to begin analysis</Text>
 

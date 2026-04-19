@@ -89,6 +89,11 @@ const FoodItemCard = ({ item }: { item: MealItem }) => {
 };
 
 /* ─── Helpers ─────────────────────────────────────────────── */
+function getTodayIndex(): number {
+  const day = new Date().getDay(); // 0 is Sunday, 1 is Monday...
+  return (day + 6) % 7; // Map so index 0 = Monday, ..., index 6 = Sunday
+}
+
 function normalizeMeals(meals: any[]): MealItem[][] {
   return meals.map((meal) => {
     try {
@@ -137,7 +142,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
-  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayIndex());
   const [activePlan, setActivePlan] = useState<StructuredDietPlan | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [pendingPlan, setPendingPlan] = useState<StructuredDietPlan | null>(null);
@@ -236,7 +241,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       if (result) {
         const sanitised = sanitisePlan(result);
         setPendingPlan(sanitised);
-        setSelectedDayIndex(0);
+        setSelectedDayIndex(getTodayIndex());
       }
     } catch (err: any) {
       Alert.alert("Generation Failed", err?.message ?? "Please try again.");
@@ -286,7 +291,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       setActivePlan(sanitised);
       setActivePlanId(plan.id);
       setPendingPlan(null);
-      setSelectedDayIndex(0);
+      setSelectedDayIndex(getTodayIndex());
     }
     setShowManageModal(false);
   };
@@ -529,14 +534,14 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       {/* ── Reminder Modal ── */}
       <Modal visible={showReminderModal} transparent animationType="fade" onRequestClose={() => setShowReminderModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { backgroundColor: COLORS.surface }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>🔔 Meal Reminders</Text>
 
             {reminders && (['breakfast', 'lunch', 'snack', 'dinner'] as const).map(meal => (
               <View key={meal} style={styles.reminderRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.reminderTitle}>{meal.charAt(0).toUpperCase() + meal.slice(1)}</Text>
+                  <Text style={styles.planRowTitle}>{meal.charAt(0).toUpperCase() + meal.slice(1)}</Text>
                 </View>
                 <View style={styles.timeInputContainer}>
                   <TextInput
@@ -565,8 +570,8 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
               </View>
             ))}
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveReminders}>
-              <Text style={styles.useBtnText}>💾 Save Reminders</Text>
+            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleSaveReminders}>
+              <Text style={styles.modalPrimaryBtnText}>Set Meal Reminders</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.modalCloseBtn, { marginTop: 10 }]} onPress={() => setShowReminderModal(false)}>
               <Text style={styles.modalCloseBtnText}>Cancel</Text>
@@ -783,7 +788,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -797,19 +802,19 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     alignSelf: "center",
     marginBottom: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#1a1a2e", marginBottom: 16 },
-  modalEmpty: { color: "#888", textAlign: "center", marginVertical: 30, fontSize: 15 },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader, marginBottom: 16 },
+  modalEmpty: { color: COLORS.textSub, textAlign: "center", marginVertical: 30, fontSize: 15 },
   planRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8F9FA",
+    backgroundColor: COLORS.background,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
     gap: 10,
   },
-  planRowTitle: { fontWeight: "700", fontSize: 14, color: "#1a1a2e" },
-  planRowDate: { fontSize: 12, color: "#888", marginTop: 2 },
+  planRowTitle: { fontWeight: "700", fontSize: 14, color: COLORS.textHeader },
+  planRowDate: { fontSize: 12, color: COLORS.textSub, marginTop: 2 },
   useBtn: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
@@ -843,16 +848,33 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   deleteBtnText: { fontSize: 16 },
   modalCloseBtn: {
     marginTop: 16,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: COLORS.background,
     padding: 14,
     borderRadius: 12,
     alignItems: "center",
   },
-  modalCloseBtnText: { color: "#555", fontWeight: "700", fontSize: 15 },
+  modalCloseBtnText: { color: COLORS.textSub, fontWeight: "700", fontSize: 15 },
+  modalPrimaryBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+    marginTop: 10,
+  },
+  modalPrimaryBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
 
   // Reminders
-  reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: "#F8F9FA", padding: 12, borderRadius: 10 },
-  reminderTitle: { fontWeight: "700", fontSize: 16, color: "#1a1a2e" },
+  reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: COLORS.background, padding: 12, borderRadius: 10 },
   timeInputContainer: { flexDirection: "row", alignItems: "center", marginRight: 15 },
-  timeInput: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#ddd", borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, fontSize: 16, fontWeight: "600", textAlign: "center", minWidth: 40, marginHorizontal: 4 },
+  timeInput: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, fontSize: 16, fontWeight: "600", textAlign: "center", minWidth: 40, marginHorizontal: 4, color: COLORS.textHeader },
 });
