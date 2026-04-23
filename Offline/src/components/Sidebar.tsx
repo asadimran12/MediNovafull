@@ -268,11 +268,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <Text style={styles.sideGroupTitle}>GENERAL</Text>
             <SidebarItem
-              label="ℹ️ About App"
-              active={currentView === "about"}
-              onPress={() => navigateTo("about")}
-            />
-            <SidebarItem
               label="⚙️ Settings"
               active={currentView === "settings"}
               onPress={() => navigateTo("settings")}
@@ -291,36 +286,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </SafeAreaView>
       </Animated.View>
 
-      {/* Beautiful Custom Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       <Modal
-        transparent={true}
+        transparent
         visible={deleteConfirmId !== null}
         animationType="fade"
         onRequestClose={() => setDeleteConfirmId(null)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalIconContainer}>
-              <Text style={styles.modalIcon}>🗑️</Text>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setDeleteConfirmId(null)}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={styles.modalContainer}>
+              {/* Top accent bar */}
+              <View style={styles.modalAccentBar} />
+
+              <View style={styles.modalIconContainer}>
+                <Text style={styles.modalIcon}>🗑️</Text>
+              </View>
+
+              <Text style={styles.modalTitle}>Delete Chat?</Text>
+              <Text style={styles.modalSubtitle}>
+                This conversation will be permanently removed and cannot be recovered.
+              </Text>
+
+              <View style={styles.modalDivider} />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalBtnCancel}
+                  onPress={() => setDeleteConfirmId(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalBtnCancelText}>Keep It</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.modalBtnDelete}
+                  onPress={() => {
+                    if (deleteConfirmId) {
+                      deleteSession(deleteConfirmId);
+                      setDeleteConfirmId(null);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalBtnDeleteText}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.modalTitle}>Delete Chat?</Text>
-            <Text style={styles.modalSubtitle}>Are you sure you want to permanently remove this conversation? This action cannot be undone.</Text>
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setDeleteConfirmId(null)}>
-                <Text style={styles.modalBtnCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBtnDelete} onPress={() => {
-                if (deleteConfirmId) {
-                  deleteSession(deleteConfirmId);
-                  setDeleteConfirmId(null);
-                }
-              }}>
-                <Text style={styles.modalBtnDeleteText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </>
   );
@@ -524,13 +542,30 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     width: "85%",
     backgroundColor: COLORS.surface,
     borderRadius: 20,
-    padding: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.xl,
+    paddingTop: 0,
     alignItems: "center",
     elevation: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 15,
+    overflow: "hidden",
+  },
+  modalAccentBar: {
+    width: "100%",
+    height: 5,
+    backgroundColor: COLORS.danger || "#FF3B30",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginBottom: SPACING.lg,
+  },
+  modalDivider: {
+    width: "100%",
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginBottom: SPACING.lg,
   },
   modalIconContainer: {
     width: 64,

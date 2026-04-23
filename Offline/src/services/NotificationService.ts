@@ -1,4 +1,4 @@
-import notifee, { TriggerType, RepeatFrequency } from '@notifee/react-native';
+import notifee, { TriggerType, RepeatFrequency, AndroidImportance } from '@notifee/react-native';
 import StorageService from './StorageService';
 
 const CHANNEL_ID = 'medinova-reminders';
@@ -28,6 +28,7 @@ class NotificationService {
             id: CHANNEL_ID,
             name: 'MediNova Reminders',
             sound: 'default',
+            importance: AndroidImportance.HIGH,
         });
         console.log('[NotificationService] Init complete.');
     }
@@ -130,6 +131,23 @@ class NotificationService {
             await this.cancelReminder('exercise-reminder');
         }
     }
+
+    async SendExportReminder() {
+        await notifee.displayNotification({
+            id: 'export-reminder',
+            title: '🌐 Internet Restored!',
+            body: 'You are back online. Remember to export your health data to the cloud.',
+            android: {
+                channelId: CHANNEL_ID,
+                pressAction: {
+                    id: 'default',
+                },
+            },
+        });
+        console.log(`[NotificationService] Successfully scheduled export-reminder`);
+    }
+
+
 }
 
 export default new NotificationService();

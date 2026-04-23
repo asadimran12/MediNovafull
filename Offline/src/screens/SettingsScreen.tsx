@@ -344,8 +344,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       {/* ── Page Header ───────────────────────────── */}
       <View style={styles.pageHeader}>
         {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
-            <Text style={styles.backArrow}>←</Text>
+          <TouchableOpacity onPress={onBack} activeOpacity={0.7}>
+            <View style={{ backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+              <Text style={{ fontSize: 16, color: "#fff", fontWeight: "700" }}>‹ Back</Text>
+            </View>
           </TouchableOpacity>
         )}
         <Text style={styles.pageTitle}>Settings</Text>
@@ -357,20 +359,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* ── Appearance ───────────────────────────── */}
         <Text style={styles.sectionLabel}>APPEARANCE</Text>
         <View style={styles.card}>
-          <SettingRow
-            icon={themeMode === "dark" ? "🌙" : themeMode === "light" ? "☀️" : "⚙️"}
-            title="App Theme"
-            subtitle={`Currently using ${themeMode === 'system' ? 'System Default' : themeMode === 'dark' ? 'Dark Mode' : 'Light Mode'}`}
-            actionLabel={themeMode === 'system' ? 'System' : themeMode === 'dark' ? 'Dark' : 'Light'}
-            onAction={() => {
-              Alert.alert("Choose Theme", "Select your preferred app appearance", [
-                { text: "System Default", onPress: () => setThemeMode("system") },
-                { text: "Light Mode", onPress: () => setThemeMode("light") },
-                { text: "Dark Mode", onPress: () => setThemeMode("dark") },
-                { text: "Cancel", style: "cancel" }
-              ]);
-            }}
-          />
+          {/* ── Inline theme picker ── */}
+          <ThemeRow themeMode={themeMode} setThemeMode={setThemeMode} />
         </View>
 
         {/* ── AI & Models ───────────────────────────── */}
@@ -518,6 +508,60 @@ const SettingRow: React.FC<SettingRowProps> = ({ icon, title, subtitle, actionLa
   );
 };
 
+// ── Theme Segmented Control ────────────────────────────────────
+const THEME_OPTIONS: { mode: ThemeMode; icon: string; label: string }[] = [
+  { mode: "light",  icon: "☀️",  label: "Light"  },
+  { mode: "system", icon: "⚙️",  label: "Auto"   },
+  { mode: "dark",   icon: "🌙",  label: "Dark"   },
+];
+
+const ThemeRow: React.FC<{ themeMode: ThemeMode; setThemeMode: (m: ThemeMode) => void }> = ({
+  themeMode,
+  setThemeMode,
+}) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
+  const activeLabel =
+    themeMode === "system" ? "System Default" :
+    themeMode === "dark"   ? "Dark Mode"      : "Light Mode";
+
+  return (
+    <View style={styles.themeRow}>
+      {/* Left info */}
+      <View style={styles.rowLeft}>
+        <Text style={styles.rowIcon}>
+          {themeMode === "dark" ? "🌙" : themeMode === "light" ? "☀️" : "⚙️"}
+        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rowTitle}>App Theme</Text>
+          <Text style={styles.rowSubtitle}>Currently: {activeLabel}</Text>
+        </View>
+      </View>
+      {/* Segmented pills */}
+      <View style={styles.segmentTrack}>
+        {THEME_OPTIONS.map(({ mode, icon, label }) => {
+          const active = themeMode === mode;
+          return (
+            <TouchableOpacity
+              key={mode}
+              onPress={() => setThemeMode(mode)}
+              activeOpacity={0.75}
+              style={[styles.segmentPill, active && styles.segmentPillActive]}
+            >
+              <Text style={styles.segmentIcon}>{icon}</Text>
+              <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
+
 // ── Styles ─────────────────────────────────────────────────────
 function createStyles(COLORS: any) {
   return StyleSheet.create({
@@ -654,6 +698,51 @@ function createStyles(COLORS: any) {
       fontSize: 12,
       fontWeight: "700",
       color: COLORS.textSub,
+    },
+
+    // Theme segmented control
+    themeRow: {
+      paddingHorizontal: SPACING.md,
+      paddingTop: 14,
+      paddingBottom: 14,
+      gap: 12,
+    },
+    segmentTrack: {
+      flexDirection: "row",
+      backgroundColor: COLORS.background,
+      borderRadius: 14,
+      padding: 4,
+      gap: 4,
+      marginHorizontal: SPACING.md,
+      marginBottom: 6,
+    },
+    segmentPill: {
+      flex: 1,
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 8,
+      borderRadius: 10,
+      gap: 3,
+    },
+    segmentPillActive: {
+      backgroundColor: COLORS.primary,
+      shadowColor: COLORS.primary,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.35,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    segmentIcon: {
+      fontSize: 18,
+    },
+    segmentLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: COLORS.textSub,
+    },
+    segmentLabelActive: {
+      color: "#fff",
     },
 
     // Logout card

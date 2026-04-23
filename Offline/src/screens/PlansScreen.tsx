@@ -61,12 +61,12 @@ const MacroPill = ({
 }) => {
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
-  
+
   return (
-  <View style={[styles.pill, { backgroundColor: bg }]}>
-    <Text style={[styles.pillValue, { color }]}>{value}</Text>
-    <Text style={[styles.pillLabel, { color }]}>{label}</Text>
-  </View>
+    <View style={[styles.pill, { backgroundColor: bg }]}>
+      <Text style={[styles.pillValue, { color }]}>{value}</Text>
+      <Text style={[styles.pillLabel, { color }]}>{label}</Text>
+    </View>
   );
 };
 
@@ -74,17 +74,17 @@ const MacroPill = ({
 const FoodItemCard = ({ item }: { item: MealItem }) => {
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
-  
+
   return (
-  <View style={styles.foodCard}>
-    <Text style={styles.foodName}>{item.name}</Text>
-    <View style={styles.pillRow}>
-      <MacroPill label="cal" value={item.calories} color="#e17055" bg="#ffeaa744" />
-      <MacroPill label="protein" value={item.protein} color={COLORS.primary} bg={COLORS.primary + "22"} />
-      <MacroPill label="carbs" value={item.carbs} color="#6c5ce7" bg="#6c5ce722" />
-      <MacroPill label="fat" value={item.fat} color="#e0a800" bg="#fdcb6e33" />
+    <View style={styles.foodCard}>
+      <Text style={styles.foodName}>{item.name}</Text>
+      <View style={styles.pillRow}>
+        <MacroPill label="cal" value={item.calories} color="#e17055" bg="#ffeaa744" />
+        <MacroPill label="protein" value={item.protein} color={COLORS.primary} bg={COLORS.primary + "22"} />
+        <MacroPill label="carbs" value={item.carbs} color="#6c5ce7" bg="#6c5ce722" />
+        <MacroPill label="fat" value={item.fat} color="#e0a800" bg="#fdcb6e33" />
+      </View>
     </View>
-  </View>
   );
 };
 
@@ -346,11 +346,18 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       <View style={styles.headerContainer}>
         <View style={styles.headerTopRow}>
           {onBack ? (
-            <TouchableOpacity onPress={onBack} style={styles.backButton}>
-              <Text style={styles.backButtonText}>←</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={onBack}>
+              <View style={{ backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+                <Text style={{ fontSize: 16, color: COLORS.primary, fontWeight: "700" }}>‹ Back</Text>
+              </View></TouchableOpacity>
           ) : <View style={{ width: 70 }} />}
-          <Text style={styles.screenTitle}>Diet Plan</Text>
+
+          <View style={{ alignItems: "center" }}>
+            <Text style={styles.screenTitle}>Diet Plan</Text>
+            <Text style={{ color: "#fff", opacity: 0.8, textAlign: "center", marginTop: 4 }}>
+              Your personalized nutrition
+            </Text>
+          </View>
           <View style={{ width: 70 }} />
         </View>
 
@@ -587,16 +594,11 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 const createStyles = (COLORS: any) => StyleSheet.create({
   headerContainer: {
     backgroundColor: COLORS.primary,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-    marginBottom: 4,
+    paddingTop: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    elevation: 10,
   },
   headerTopRow: {
     flexDirection: "row",
@@ -647,36 +649,38 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginVertical: 10,
   },
   statCard: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: "#fff",
     flex: 1,
-    marginHorizontal: 3,
-    paddingVertical: 12,
-    borderRadius: 12,
+    marginHorizontal: 4,
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    elevation: 4,
   },
-  statValue: { fontSize: 16, fontWeight: "800", color: COLORS.primary },
-  statLabel: { fontSize: 11, color: COLORS.textSub, marginTop: 3, fontWeight: "600" },
-
+  statValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.primary,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#777",
+    marginTop: 4,
+  },
   generateButton: {
     backgroundColor: COLORS.primary,
-    padding: 14,
+    padding: 16,
     marginHorizontal: 16,
-    marginBottom: 6,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: "center",
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    elevation: 6,
   },
-  generateButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-
+  generateButtonText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 16,
+    letterSpacing: 0.5,
+  },
   actionRow: {
     flexDirection: "row",
     marginHorizontal: 16,
@@ -718,33 +722,54 @@ const createStyles = (COLORS: any) => StyleSheet.create({
 
   topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   dayCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    marginRight: 8,
   },
   dayCircleSelected: {
     backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    elevation: 4,
   },
-  dayText: { color: COLORS.primary, fontWeight: "bold", fontSize: 12 },
-  dayTextSelected: { color: "#fff" },
+  dayText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#555",
+  },
+  dayTextSelected: {
+    color: "#fff",
+  },
 
   // Progress bar
-  progressContainer: { backgroundColor: COLORS.surface, padding: 16, borderRadius: 12, marginBottom: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  progressTitle: { fontWeight: "700", fontSize: 14, color: COLORS.textHeader, marginBottom: 10 },
-  progressBarBackground: { height: 12, backgroundColor: COLORS.background, borderRadius: 6, overflow: "hidden" },
-  progressBarFill: { height: "100%", backgroundColor: COLORS.success, borderRadius: 6 },
-  progressPercent: { marginTop: 6, fontWeight: "600", fontSize: 13, textAlign: "right", color: COLORS.success },
+  progressContainer: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    elevation: 3,
+  },
+  progressTitle: {
+    fontWeight: "700",
+    marginBottom: 10,
+    fontSize: 14,
+  },
+  progressBarBackground: {
+    height: 10,
+    backgroundColor: "#eee",
+    borderRadius: 10,
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: "#22c55e",
+    borderRadius: 10,
+  },
+  progressPercent: {
+    marginTop: 6,
+    fontWeight: "600",
+    textAlign: "right",
+    color: "#22c55e",
+  },
+
 
   mealSection: { marginBottom: 22 },
   mealSectionDone: { opacity: 0.5 },

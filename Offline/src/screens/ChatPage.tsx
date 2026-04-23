@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 
 import {
@@ -12,7 +12,7 @@ import {
     Image,
 } from "react-native";
 import { SPACING, RADIUS } from "../constants/theme";
-import { ChatBubble } from "../components/ChatBubble";
+import { ChatBubble, TypingBubble } from "../components/ChatBubble";
 import { ChatInput } from "../components/ChatInput";
 import { LocalMessage } from "../services/StorageService";
 import LlamaService from "../services/LlamaService";
@@ -44,8 +44,24 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
     const [hasAnalyzed, setHasAnalyzed] = useState(false);
     const [hasAttemptedAutoExplain, setHasAttemptedAutoExplain] = useState(false);
     const [sessionID] = useState(() => initialSessionId || Math.random().toString(36).substring(7));
+    const isSendingRef = useRef(false);
+    const [loadingLabel, setLoadingLabel] = React.useState("Thinking...");
 
     useEffect(() => {
+        // Pre-load model in background so that chat starts instantly
+        setTimeout(async () => {
+            try {
+                const activeModel = await ModelService.getActiveModel();
+                if (activeModel) {
+                    await LlamaService.loadModel(activeModel.filename);
+                    await LlamaService.loadModel(LlamaService.EMBEDDING_MODEL_NAME, true);
+                    console.log("Both models pre-loaded successfully!");
+                }
+            } catch (e) {
+                console.log("Pre-load model failed", e);
+            }
+        }, 0);
+
         if (initialSessionId) {
             StorageService.loadChat(initialSessionId).then((session) => {
                 if (session && session.messages) {
@@ -86,22 +102,35 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
     };
 
     const handleSendWithCustomText = async (text: string) => {
-        if (!text.trim() || isGenerating) return;
+        if (!text.trim() || isGenerating || isSendingRef.current) return;
+        isSendingRef.current = true;
+        
         const userText = text.trim();
         const newMsg: LocalMessage = { id: Date.now().toString(), role: "user", text: userText, timestamp: new Date() };
         setMessages(prev => [...prev, newMsg]);
         setIsGenerating(true);
-        await performChat(userText, [...messages, newMsg]);
+        
+        // Use setTimeout to let React render the UI before the heavy model loads
+        setTimeout(() => {
+            performChat(userText, [...messages, newMsg]);
+        }, 150);
     };
 
     const handleSend = async () => {
-        if (!input.trim() || isGenerating) return;
+        if (!input.trim() || isGenerating || isSendingRef.current) return;
+        isSendingRef.current = true;
+        setLoadingLabel("Loading AI model...");
+        
         const userText = input.trim();
         const newMsg: LocalMessage = { id: Date.now().toString(), role: "user", text: userText, timestamp: new Date() };
         setMessages(prev => [...prev, newMsg]);
         setInput("");
         setIsGenerating(true);
-        await performChat(userText, [...messages, newMsg]);
+        
+        // Use setTimeout to let React render the UI before the heavy model loads
+        setTimeout(() => {
+            performChat(userText, [...messages, newMsg]);
+        }, 150);
     };
 
     const performChat = async (userText: string, currentMessages: LocalMessage[]) => {
@@ -113,7 +142,9 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
                 return;
             }
 
+            setLoadingLabel("Loading AI model...");
             await LlamaService.loadModel(activeModel.filename);
+            setLoadingLabel("Generating response...");
             const profile = await StorageService.getProfile();
 
             // Fetch RAG context
@@ -175,12 +206,14 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
             setMessages(prev => [...prev, { id: Date.now().toString(), role: "assistant", text: "Ghalti! Jawab generate nahi ho saka.", timestamp: new Date() }]);
         } finally {
             setIsGenerating(false);
+            isSendingRef.current = false;
         }
     };
 
-
     const handleStop = () => {
         setIsGenerating(false);
+        isSendingRef.current = false;
+        LlamaService.stopCompletion();
     };
 
     return (
@@ -237,11 +270,7 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
                     <ChatBubble key={msg.id} message={msg} />
                 ))}
 
-                {isGenerating && (
-                    <View style={styles.generatingIndicator}>
-                        <Text style={styles.generatingText}>MediNova is generating...</Text>
-                    </View>
-                )}
+                {isGenerating && <TypingBubble label={loadingLabel} />}
 
             </ScrollView>
 

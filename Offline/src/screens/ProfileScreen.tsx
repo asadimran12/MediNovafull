@@ -92,11 +92,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         {/* HEADER */}
         <View style={styles.header}>
           <View style={styles.headerIconBox}>
-             <Text style={styles.headerIcon}>👤</Text>
+            <Text style={styles.headerIcon}>👤</Text>
           </View>
           <Text style={styles.title}>Health Profile</Text>
           <Text style={styles.subtitle}>
@@ -107,7 +107,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
         {/* BASIC INFO */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Basic Details</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Age</Text>
             <TextInput
@@ -145,7 +145,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
         {/* MEDICAL INFO */}
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Medical History</Text>
-          
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Existing Conditions</Text>
             <TextInput
@@ -156,7 +156,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
               numberOfLines={3}
               textAlignVertical="top"
               value={conditions}
-              onChangeText={setConditions}
+              onChangeText={(text) => {
+                const filterd = text.replace(/[^a-zA-Z\s]/g, "");
+                setConditions(filterd)
+              }}
             />
           </View>
 
@@ -185,11 +188,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
         {/* SECURITY SETTINGS */}
         <View style={styles.securityCard}>
           <View style={styles.securityHeader}>
-             <Text style={styles.securityIcon}>🔐</Text>
-             <View>
-               <Text style={styles.securityTitle}>Account Security</Text>
-               <Text style={styles.securitySubtitle}>Used for password recovery</Text>
-             </View>
+            <Text style={styles.securityIcon}>🔐</Text>
+            <View>
+              <Text style={styles.securityTitle}>Account Security</Text>
+              <Text style={styles.securitySubtitle}>Used for password recovery</Text>
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -217,23 +220,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
 
         {/* FOOTER ACTIONS */}
         <View style={styles.footer}>
-          <TouchableOpacity 
-             style={styles.primaryButton} 
-             onPress={handleSave}
-             activeOpacity={0.8}
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleSave}
+            activeOpacity={0.8}
           >
             <Text style={styles.primaryButtonText}>
-               {isSet ? "Update Profile" : "Save Profile"}
+              {isSet ? "Update Profile" : "Save Profile"}
             </Text>
           </TouchableOpacity>
-          
+
           <View style={styles.secondaryActions}>
-            <TouchableOpacity onPress={onClose} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Text style={styles.skipText}>{isSet ? "Go Back" : "Skip setup"}</Text>
             </TouchableOpacity>
 
             {(age || conditions || gender) && (
-              <TouchableOpacity onPress={handleDelete} hitSlop={{top:10, bottom:10, left:10, right:10}}>
+              <TouchableOpacity onPress={handleDelete} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                 <Text style={styles.deleteText}>Delete Data</Text>
               </TouchableOpacity>
             )}
@@ -254,7 +257,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     paddingTop: SPACING.xl,
     paddingBottom: SPACING.xxl * 2,
   },
-  
+
   // Header
   header: {
     alignItems: "center",

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 
 import {
@@ -32,6 +32,28 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
+  // Native-level lock — prevents queued touches from double-firing
+  // even when the JS thread is frozen during model loading
+  const localLockRef = useRef(false);
+
+  const handleSendPress = () => {
+    if (localLockRef.current || disabled || !inputText.trim()) return;
+    localLockRef.current = true;
+    onSend();
+  };
+
+  const handleStopPress = () => {
+    localLockRef.current = false;
+    onStop();
+  };
+
+  // Release lock when generation ends (isGenerating flips to false)
+  React.useEffect(() => {
+    if (!isGenerating) {
+      localLockRef.current = false;
+    }
+  }, [isGenerating]);
+
   const isSendDisabled = disabled || !inputText.trim();
 
   return (
@@ -51,14 +73,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Stop Button */}
         {isGenerating ? (
-          <TouchableOpacity style={styles.stopBtn} onPress={onStop} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.stopBtn} onPress={handleStopPress} activeOpacity={0.8}>
             <View style={styles.stopIcon} />
           </TouchableOpacity>
         ) : (
           /* Send Button */
           <TouchableOpacity
             style={[styles.sendBtn, isSendDisabled && styles.sendBtnDisabled]}
-            onPress={onSend}
+            onPress={handleSendPress}
             disabled={isSendDisabled}
             activeOpacity={0.8}
           >

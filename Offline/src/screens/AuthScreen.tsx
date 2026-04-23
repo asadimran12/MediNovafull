@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
+  Image,
 } from "react-native";
 import { useRef } from "react";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
@@ -34,6 +35,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -48,7 +51,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
 
   const handleAuth = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert("Error", "Please fill in all fields.");
+      setErrorMsg("Please fill in all fields.");
+      setSuccessMsg("");
       return;
     }
 
@@ -59,11 +63,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
         // ── Normal registration (local only) ───────────────────────────────
         const user = await AuthService.register(username, password);
         if (user) {
-          Alert.alert("Success", "Account created! You can now login.");
+          setSuccessMsg("Account created successfully!");
+          setErrorMsg("");
           setIsRegistering(false);
           setPassword("");
         } else {
-          Alert.alert("Error", "Username already exists.");
+          setErrorMsg("Username already exists.");
+          setSuccessMsg("");
         }
 
       } else if (cloudData && Array.isArray(cloudData.auth.users)) {
@@ -73,7 +79,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
             u.username?.toLowerCase() === username.toLowerCase() &&
             u.passwordHash === password
         );
-        console.log("matchedUser", matchedUser);
 
         if (matchedUser) {
 
@@ -100,7 +105,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
 
           onLogin(matchedUser);
         } else {
-          Alert.alert("Error", "Username or password does not match the cloud backup.");
+          setErrorMsg("Username or password does not match the cloud backup.");
+          setSuccessMsg("");
         }
 
       } else {
@@ -109,11 +115,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
         if (user) {
           onLogin(user);
         } else {
-          Alert.alert("Error", "Invalid username or password.");
+          setErrorMsg("Invalid username or password.");
+          setSuccessMsg("");
         }
       }
     } catch (e) {
-      Alert.alert("Error", "Authentication failed. Please try again.");
+      setErrorMsg("Authentication failed. Please try again.");
+      setSuccessMsg("");
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +134,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
     >
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
-          <Text style={styles.brand}>MediNova</Text>
+          <Image source={require("../assets/images/splash_logo.png")} style={{
+            width: 200,
+            height: 200,
+            resizeMode: "contain",
+            alignSelf: "center",
+            margin: -50
+          }} />
           <Text style={styles.title}>
             {isRegistering ? "Create Account" : "Welcome Back"}
           </Text>
@@ -141,10 +155,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
               <Text style={styles.label}>Username</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. john_doe"
+                placeholder="Enter your username"
                 placeholderTextColor={COLORS.textSub}
                 value={username}
-                onChangeText={setUsername}
+                onChangeText={(text) => {
+                  const cleanedtext = text.replace(/[^a-zA-Z]/g, "");
+                  setUsername(cleanedtext);
+                }}
                 autoCapitalize="none"
               />
             </View>
@@ -154,7 +171,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={styles.passwordInput}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   placeholderTextColor={COLORS.textSub}
                   secureTextEntry={!showPassword}
                   value={password}
@@ -182,6 +199,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
                 </Text>
               )}
             </TouchableOpacity>
+
+            {!!errorMsg && (
+              <Text style={styles.errorMsg}>{errorMsg}</Text>
+            )}
+            {!!successMsg && (
+              <Text style={styles.successMsg}>{successMsg}</Text>
+            )}
 
             <View style={{
               flex: 1,
@@ -371,5 +395,29 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 12,
     lineHeight: 18,
+  },
+  errorMsg: {
+    color: "#E53E3E",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+    backgroundColor: "#FFF5F5",
+    borderRadius: RADIUS.sm,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    borderWidth: 1,
+    borderColor: "#FC8181",
+  },
+  successMsg: {
+    color: "#276749",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+    backgroundColor: "#F0FFF4",
+    borderRadius: RADIUS.sm,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    borderWidth: 1,
+    borderColor: "#68D391",
   },
 });
