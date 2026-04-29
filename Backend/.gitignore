@@ -1,13 +1,16 @@
 # Environment variables — NEVER commit these
 .env
 .env.*
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 
 # Python virtual environment
 venv/
 env/
-__pycache__/
-*.pyc
-*.pyo
+
 
 # Python build artifacts
 *.egg-info/
