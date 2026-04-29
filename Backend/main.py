@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Any, Optional
 from db import get_database
 from routers.routes import router  # ← Router was missing before!
+from admin_router import router as admin_router
 
 app = FastAPI()
 
@@ -18,6 +19,7 @@ app.add_middleware(
 
 # ── Register routers ──────────────────────────────────────────────────────────
 app.include_router(router)      # ← This was the critical missing line
+app.include_router(admin_router)
 
 # ── Request model ─────────────────────────────────────────────────────────────
 class UploadPayload(BaseModel):
