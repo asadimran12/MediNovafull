@@ -87,163 +87,175 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View style={styles.headerIconBox}>
-            <Text style={styles.headerIcon}>👤</Text>
+    <View style={styles.container}>
+      {/* ── Page Header ───────────────────────────── */}
+      <View style={styles.pageHeader}>
+        <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={styles.backBtn}>
+          <View style={styles.backBtnContainer}>
+            <Text style={styles.backBtnText}>‹ Back</Text>
           </View>
-          <Text style={styles.title}>Health Profile</Text>
-          <Text style={styles.subtitle}>
-            Tell us about yourself to receive highly personalized AI guidance. All data stays offline.
-          </Text>
-        </View>
+        </TouchableOpacity>
+        <Text style={styles.pageTitle}>Health Profile</Text>
+        <View style={{ width: 80 }} />
+      </View>
 
-        {/* BASIC INFO */}
-        <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Basic Details</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Age</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 30"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="numeric"
-              value={age}
-              onChangeText={setAge}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Gender</Text>
-            <View style={styles.optionsRow}>
-              {GENDERS.map((g) => {
-                const isSelected = gender === g;
-                return (
-                  <TouchableOpacity
-                    key={g}
-                    activeOpacity={0.8}
-                    style={[styles.optionBtn, isSelected && styles.optionBtnActive]}
-                    onPress={() => setGender(g as UserProfile["gender"])}
-                  >
-                    <Text style={[styles.optionText, isSelected && styles.optionTextActive]}>
-                      {g}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+          {/* INTRO HEADER */}
+          <View style={styles.introHeader}>
+            <View style={styles.headerIconBox}>
+              <Text style={styles.headerIcon}>👤</Text>
             </View>
-          </View>
-        </View>
-
-        {/* MEDICAL INFO */}
-        <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>Medical History</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Existing Conditions</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="e.g. Hypertension, Diabetes, Asthma"
-              placeholderTextColor={COLORS.textMuted}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              value={conditions}
-              onChangeText={(text) => {
-                const filterd = text.replace(/[^a-zA-Z\s]/g, "");
-                setConditions(filterd)
-              }}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Severity Level</Text>
-            <View style={styles.optionsRow}>
-              {SEVERITIES.map((s) => {
-                const isSelected = severity === s;
-                return (
-                  <TouchableOpacity
-                    key={s}
-                    activeOpacity={0.8}
-                    style={[styles.optionBtn, isSelected && styles.optionBtnActive]}
-                    onPress={() => setSeverity(s as UserProfile["severity"])}
-                  >
-                    <Text style={[styles.optionText, isSelected && styles.optionTextActive]}>
-                      {s}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-
-        {/* SECURITY SETTINGS */}
-        <View style={styles.securityCard}>
-          <View style={styles.securityHeader}>
-            <Text style={styles.securityIcon}>🔐</Text>
-            <View>
-              <Text style={styles.securityTitle}>Account Security</Text>
-              <Text style={styles.securitySubtitle}>Used for password recovery</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Security Question</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. What is your pet's name?"
-              placeholderTextColor={COLORS.textMuted}
-              value={forgetPasswordQuestion}
-              onChangeText={setForgetPasswordQuestion}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Your Answer</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your hidden answer"
-              placeholderTextColor={COLORS.textMuted}
-              value={forgetPasswordAnswer}
-              onChangeText={setForgetPasswordAnswer}
-            />
-          </View>
-        </View>
-
-        {/* FOOTER ACTIONS */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleSave}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isSet ? "Update Profile" : "Save Profile"}
+            <Text style={styles.introSubtitle}>
+              Personalize your MediNova experience. This data helps the AI provide more accurate and relevant health guidance.
             </Text>
-          </TouchableOpacity>
+          </View>
 
-          <View style={styles.secondaryActions}>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.skipText}>{isSet ? "Go Back" : "Skip setup"}</Text>
+          {/* BASIC INFO SECTION */}
+          <Text style={styles.sectionLabel}>BASIC DETAILS</Text>
+          <View style={styles.card}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Age</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. 30"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="numeric"
+                value={age}
+                onChangeText={setAge}
+              />
+            </View>
+
+            <View style={[styles.inputGroup, { marginBottom: 0 }]}>
+              <Text style={styles.label}>Gender Identity</Text>
+              <View style={styles.optionsRow}>
+                {GENDERS.map((g) => {
+                  const isSelected = gender === g;
+                  return (
+                    <TouchableOpacity
+                      key={g}
+                      activeOpacity={0.8}
+                      style={[styles.optionBtn, isSelected && styles.optionBtnActive]}
+                      onPress={() => setGender(g as UserProfile["gender"])}
+                    >
+                      <Text style={[styles.optionText, isSelected && styles.optionTextActive]}>
+                        {g}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+
+          {/* MEDICAL HISTORY SECTION */}
+          <Text style={styles.sectionLabel}>MEDICAL CONTEXT</Text>
+          <View style={styles.card}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Chronic Conditions</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="e.g. Type 2 Diabetes, Hypertension"
+                placeholderTextColor={COLORS.textMuted}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                value={conditions}
+                onChangeText={(text) => setConditions(text.replace(/[^a-zA-Z0-9\s,]/g, ""))}
+              />
+              <Text style={styles.helperText}>Separate multiple conditions with commas</Text>
+            </View>
+
+            <View style={[styles.inputGroup, { marginBottom: 0 }]}>
+              <Text style={styles.label}>Condition Severity</Text>
+              <View style={styles.optionsRow}>
+                {SEVERITIES.map((s) => {
+                  const isSelected = severity === s;
+                  return (
+                    <TouchableOpacity
+                      key={s}
+                      activeOpacity={0.8}
+                      style={[styles.optionBtn, isSelected && styles.optionBtnActive]}
+                      onPress={() => setSeverity(s as UserProfile["severity"])}
+                    >
+                      <Text style={[styles.optionText, isSelected && styles.optionTextActive]}>
+                        {s}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+
+          {/* SECURITY SECTION */}
+          <Text style={styles.sectionLabel}>ACCOUNT SECURITY</Text>
+          <View style={styles.securityCard}>
+            <View style={styles.securityHeader}>
+              <View style={styles.securityIconBox}>
+                <Text style={styles.securityIcon}>🔐</Text>
+              </View>
+              <View>
+                <Text style={styles.securityTitle}>Recovery Question</Text>
+                <Text style={styles.securitySubtitle}>Helps you regain access if you forget your password</Text>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Security Question</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Your first school name?"
+                placeholderTextColor={COLORS.textMuted}
+                value={forgetPasswordQuestion}
+                onChangeText={setForgetPasswordQuestion}
+              />
+            </View>
+
+            <View style={[styles.inputGroup, { marginBottom: 0 }]}>
+              <Text style={styles.label}>Answer</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter answer"
+                placeholderTextColor={COLORS.textMuted}
+                secureTextEntry
+                value={forgetPasswordAnswer}
+                onChangeText={setForgetPasswordAnswer}
+              />
+            </View>
+          </View>
+
+          {/* ACTIONS */}
+          <View style={styles.footer}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleSave}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isSet ? "Update Health Profile" : "Save and Continue"}
+              </Text>
             </TouchableOpacity>
 
-            {(age || conditions || gender) && (
-              <TouchableOpacity onPress={handleDelete} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Text style={styles.deleteText}>Delete Data</Text>
-              </TouchableOpacity>
-            )}
+            <View style={styles.secondaryActions}>
+              {(isSet) && (
+                <TouchableOpacity onPress={handleDelete} style={styles.dangerBtn}>
+                  <Text style={styles.deleteText}>Clear Profile</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+          <Text style={styles.privacyNote}>
+            🔒 Your health data is processed locally and never leaves this device.
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -252,42 +264,78 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  pageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 14,
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  pageTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+  },
+  backBtn: {
+    width: 80,
+  },
+  backBtnContainer: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backBtnText: {
+    fontSize: 14,
+    color: "#fff",
+    fontWeight: "700",
+  },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.xxl * 2,
+    paddingBottom: 60,
   },
 
-  // Header
-  header: {
+  // Intro
+  introHeader: {
     alignItems: "center",
-    marginBottom: SPACING.xl,
-  },
-  headerIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(89, 170, 111, 0.15)",
-    justifyContent: "center",
-    alignItems: "center",
+    marginTop: SPACING.xl,
     marginBottom: SPACING.md,
   },
+  headerIconBox: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "rgba(89, 170, 111, 0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.lg,
+  },
   headerIcon: {
-    fontSize: 32,
+    fontSize: 34,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: "900",
-    color: COLORS.textHeader,
-    marginBottom: 6,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 13,
+  introSubtitle: {
+    fontSize: 14,
     color: COLORS.textSub,
     textAlign: "center",
-    lineHeight: 18,
-    paddingHorizontal: SPACING.lg,
+    lineHeight: 20,
+    paddingHorizontal: SPACING.md,
+  },
+
+  // Section labels
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: COLORS.textMuted,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginTop: 24,
+    marginBottom: 10,
+    marginLeft: 4,
   },
 
   // Cards
@@ -297,16 +345,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderRadius: RADIUS.xl,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: SPACING.lg,
     ...SHADOWS.light,
-  },
-  cardSectionTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-    marginBottom: SPACING.md,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
 
   // Security Card
@@ -316,16 +355,24 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     borderRadius: RADIUS.xl,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: SPACING.xl,
+    ...SHADOWS.light,
   },
   securityHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
+    gap: 12,
+  },
+  securityIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 149, 0, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   securityIcon: {
-    fontSize: 28,
-    marginRight: 12,
+    fontSize: 22,
   },
   securityTitle: {
     fontSize: 16,
@@ -336,43 +383,51 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
     marginTop: 2,
+    maxWidth: '90%',
   },
 
   // Form Elements
   inputGroup: {
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
     color: COLORS.textMain,
-    marginBottom: 6,
+    marginBottom: 8,
     marginLeft: 2,
   },
   input: {
     backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderWidth: 1,
     borderColor: COLORS.border,
     fontSize: 15,
     color: COLORS.textMain,
   },
   textArea: {
-    minHeight: 90,
+    minHeight: 100,
+  },
+  helperText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 6,
+    marginLeft: 4,
+    fontStyle: 'italic',
   },
 
   // Toggle Options
   optionsRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
   },
   optionBtn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg,
     alignItems: "center",
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -393,11 +448,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
 
   // Footer Actions
   footer: {
-    marginTop: 10,
+    marginTop: 30,
   },
   primaryButton: {
     backgroundColor: COLORS.button,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: RADIUS.pill,
     alignItems: "center",
     ...SHADOWS.medium,
@@ -412,17 +467,30 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: SPACING.lg,
+    marginTop: 20,
     paddingHorizontal: SPACING.sm,
+  },
+  secondaryBtn: {
+    paddingVertical: 8,
+  },
+  dangerBtn: {
+    paddingVertical: 8,
   },
   skipText: {
     color: COLORS.textSub,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
   },
   deleteText: {
     color: COLORS.danger,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
+  },
+  privacyNote: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 30,
+    fontWeight: '500',
   },
 });

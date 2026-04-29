@@ -10,6 +10,8 @@ import {
     ActivityIndicator,
     StyleSheet,
     TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native'
 import { pick } from "@react-native-documents/picker";
 import storageService from '../services/StorageService'
@@ -23,8 +25,8 @@ interface ImportDataProps {
 }
 
 export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched, onCloudRestoreReady }: ImportDataProps) {
-  const { colors: COLORS } = useTheme();
-  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+    const { colors: COLORS } = useTheme();
+    const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
 
     const [isImporting, setIsImporting] = useState(false);
@@ -36,6 +38,12 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
     const triggerSuccess = (message: string) => {
         setSuccessMessage(message);
         setShowSuccess(true);
+    };
+
+    const handleUsernameChange = (text: string) => {
+        // Only allow characters (A-Z, a-z), remove numbers and special characters
+        const filtered = text.replace(/[^a-zA-Z]/g, '');
+        setCloudUsername(filtered);
     };
 
     const handleImport = async () => {
@@ -70,16 +78,16 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
         try {
             setImportingLabel("Fetching from Cloud...");
             setIsImporting(true);
-            
+
             const baseUrl = 'https://medinovafull-2.onrender.com';
             const url = `${baseUrl}/users/GetAllData?username=${encodeURIComponent(cloudUsername.trim())}`;
-            
+
             console.log("=== CLOUD IMPORT LOGS ===");
             console.log("Attempting to fetch cloud backup for username:", cloudUsername.trim());
             console.log("Endpoint URL:", url);
 
             const response = await fetch(url, { method: "GET" });
-            
+
             console.log("Cloud Import Response Status:", response.status);
 
             if (response.status === 404) {
@@ -98,11 +106,11 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
             setIsImporting(false);
 
             console.log("Cloud Import Data Received:", {
-               hasProfile: !!data.profile,
-               chatsCount: data.chats?.length || 0,
-               plansCount: data.plans?.length || 0,
-               usersCount: data.auth?.users?.length || 0,
-               hasSession: !!data.auth?.session
+                hasProfile: !!data.profile,
+                chatsCount: data.chats?.length || 0,
+                plansCount: data.plans?.length || 0,
+                usersCount: data.auth?.users?.length || 0,
+                hasSession: !!data.auth?.session
             });
             console.log("===========================");
 
@@ -120,8 +128,10 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
     };
 
     return (
-        <View style={styles.container}>
-
+        <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+            style={styles.container}
+        >
             {/* ── Importing Loading Overlay ─────────────────────── */}
             <Modal transparent visible={isImporting} animationType="fade">
                 <View style={styles.overlay}>
@@ -156,9 +166,11 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
                 </View>
             </Modal>
 
-            {/* ── Back Button ───────────────────────────────────── */}
+            {/* ── Back Button (Synced with other pages) ─────────── */}
             <TouchableOpacity onPress={onSkip} style={styles.backBtn}>
-                <Text style={styles.backBtnText}>← Back</Text>
+                <View style={styles.backButtonWhite}>
+                    <Text style={styles.backButtonTextPrimary}>‹ Back</Text>
+                </View>
             </TouchableOpacity>
 
             {/* ── Main Card ────────────────────────────────────── */}
@@ -181,25 +193,15 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
                 </View>
 
                 {/* ── Username input for cloud ── */}
-                <Text style={{ fontSize: 13, fontWeight: '600', color: COLORS.textMain, marginBottom: SPACING.xs }}>
-                    Your MediNova Username
+                <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textHeader, marginBottom: SPACING.xs, marginLeft: 4 }}>
+                    MediNova Username (Letters Only)
                 </Text>
                 <TextInput
-                    style={{
-                        backgroundColor: '#F8FAFC',
-                        borderRadius: RADIUS.md,
-                        paddingHorizontal: SPACING.md,
-                        paddingVertical: SPACING.sm,
-                        color: COLORS.textMain,
-                        fontSize: 15,
-                        borderWidth: 1,
-                        borderColor: '#E2E8F0',
-                        marginBottom: SPACING.md,
-                    }}
-                    placeholder="e.g. john_doe"
+                    style={styles.input}
+                    placeholder="Enter Your User Name"
                     placeholderTextColor={COLORS.textSub}
                     value={cloudUsername}
-                    onChangeText={setCloudUsername}
+                    onChangeText={handleUsernameChange}
                     autoCapitalize="none"
                     autoCorrect={false}
                 />
@@ -214,7 +216,7 @@ export default function ImportData({ onSkip, onImportSuccess, onCloudDataFetched
                     <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -226,16 +228,23 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         backgroundColor: COLORS.background,
     },
 
-    // Back button
+    // Back button (Synced)
     backBtn: {
         position: 'absolute',
-        top: SPACING.xl,
-        left: SPACING.xl,
+        top: 50,
+        left: 20,
     },
-    backBtnText: {
-        color: COLORS.primary,
-        fontWeight: '700',
+    backButtonWhite: {
+        backgroundColor: "#fff",
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        ...SHADOWS.light,
+    },
+    backButtonTextPrimary: {
         fontSize: 16,
+        color: COLORS.primary,
+        fontWeight: "700",
     },
 
     // Main card
@@ -258,6 +267,19 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         textAlign: 'center',
         marginBottom: SPACING.xl,
         lineHeight: 22,
+    },
+
+    // Input style
+    input: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: RADIUS.md,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: 12,
+        color: "black",
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: SPACING.md,
     },
 
     // Primary (local) button

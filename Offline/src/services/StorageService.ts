@@ -251,14 +251,14 @@ class StorageService {
     const chats: ChatSession[] = [];
     for (const file of files) {
       if (!file.name.endsWith(".json")) continue;
-      try { 
-        const chat = JSON.parse(await ReactNativeFS.readFile(file.path, "utf8")); 
+      try {
+        const chat = JSON.parse(await ReactNativeFS.readFile(file.path, "utf8"));
         if (!type) {
-            chats.push(chat);
+          chats.push(chat);
         } else if (type === "report" && chat.type === "report") {
-            chats.push(chat);
+          chats.push(chat);
         } else if (type === "general" && chat.type !== "report") {
-            chats.push(chat);
+          chats.push(chat);
         }
       }
       catch (e) { console.error("Chat parse error:", file.path); }

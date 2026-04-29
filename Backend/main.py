@@ -45,7 +45,7 @@ def checkDB():
 
 @app.post("/upload")
 def upload(payload: UploadPayload):
-    try:
+    try:z
         client, db = get_database()
         data = payload.model_dump()
 
