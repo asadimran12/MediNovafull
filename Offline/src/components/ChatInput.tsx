@@ -84,7 +84,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             disabled={isSendDisabled}
             activeOpacity={0.8}
           >
-            <Text style={styles.sendArrow}>↑</Text>
+            <View style={styles.sendIconContainer}>
+               <View style={styles.sendIconArrow} />
+               <View style={styles.sendIconShaft} />
+            </View>
           </TouchableOpacity>
         )}
       </View>
@@ -132,56 +135,74 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     lineHeight: 22,
   },
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: COLORS.button,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 6,
+    marginLeft: 8,
     shadowColor: COLORS.button,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
   },
   sendBtnDisabled: {
     backgroundColor: COLORS.textMuted,
     shadowOpacity: 0,
     elevation: 0,
   },
-  sendArrow: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "700",
-    lineHeight: 24,
-    marginTop: -1,
+  sendIconContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendIconArrow: {
+    width: 10,
+    height: 10,
+    borderTopWidth: 2.5,
+    borderRightWidth: 2.5,
+    borderColor: '#FFFFFF',
+    transform: [{ rotate: '-45deg' }],
+    position: 'absolute',
+    top: 2,
+  },
+  sendIconShaft: {
+    width: 2.5,
+    height: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 1,
+    position: 'absolute',
+    bottom: 2,
   },
   stopBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: COLORS.danger,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 6,
+    marginLeft: 8,
     shadowColor: COLORS.danger,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
   },
   stopIcon: {
-    width: 13,
-    height: 13,
+    width: 14,
+    height: 14,
     borderRadius: 3,
     backgroundColor: "#FFFFFF",
   },
   hint: {
     textAlign: "center",
     fontSize: 10,
-    color: COLORS.textSub,
-    marginTop: 6,
-    letterSpacing: 0.3,
+    color: COLORS.textMuted,
+    marginTop: 8,
+    letterSpacing: 0.5,
+    fontWeight: '600',
   },
 });

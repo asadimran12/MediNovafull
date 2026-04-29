@@ -8,11 +8,11 @@ import {
   FlatList,
   Keyboard,
   Animated,
-  Alert,
   AppState,
   Image,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from "react-native";
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -76,6 +76,7 @@ function MainApp() {
   const [inputText, setInputText] = useState("");
   const [isReady, setIsReady] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isColdStarting, setIsColdStarting] = useState(false);
   const [status, setStatus] = useState("Preparing Secure AI");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -89,7 +90,26 @@ function MainApp() {
   const [uploadMode, setUploadMode] = useState<'gallery' | 'pdf' | 'camera' | undefined>();
   const [cloudData, setCloudData] = useState<any>(null);
   const [activeReportSessionId, setActiveReportSessionId] = useState<string | null>(null);
+  const [modalConfig, setModalConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: "info" | "success" | "warning" | "danger" | "choice";
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+    secondaryText?: string;
+    onSecondary?: () => void;
+  } | null>(null);
 
+  const showAlert = (config: any) => {
+    setModalConfig({ ...config, visible: true });
+  };
+
+  const hideAlert = () => {
+    setModalConfig(null);
+  };
 
   const MAX_MESSAGES = 40;
   const isChatFull = messages.length >= MAX_MESSAGES;
@@ -218,7 +238,19 @@ function MainApp() {
     if (messages.length > 0 && currentView === "chat") {
       flatListRef.current?.scrollToEnd({ animated: true });
     }
-  }, [messages, currentView]);
+    // Pre-warm model when entering chat
+    if (currentView === "chat" && isReady) {
+      (async () => {
+        const activeModel = await ModelService.getActiveModel();
+        if (activeModel) {
+          const isDownloaded = await ModelService.isModelDownloaded(activeModel.id);
+          if (isDownloaded) {
+            LlamaService.loadModel(activeModel.filename).catch(console.error);
+          }
+        }
+      })();
+    }
+  }, [messages, currentView, isReady]);
 
   // --- Controls ---
   const toggleSidebar = () => {
@@ -265,45 +297,23 @@ function MainApp() {
     if (isSidebarOpen) { toggleSidebar(); }
   };
 
-  const deleteSession = (id: string) => {
-    Alert.alert(
-      "Delete Chat",
-      "Are you sure you want to delete this chat history?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await StorageService.deleteChat(id);
-            setSessions((prev) => prev.filter((s) => s.id !== id));
-            if (currentSessionId === id || sessions.length <= 1) startNewChat();
-          },
-        },
-      ]
-    );
+  const deleteSession = async (id: string) => {
+    await StorageService.deleteChat(id);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    if (currentSessionId === id || sessions.length <= 1) startNewChat();
   };
 
   const handleSaveAsPlan = (msg: LocalMessage) => {
-    Alert.alert(
-      "Save as Plan",
-      "Would you like to save this as a Diet or Exercise plan?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Diet",
-          onPress: async () => {
-            await finalizePlanSave(msg, "diet");
-          },
-        },
-        {
-          text: "Exercise",
-          onPress: async () => {
-            await finalizePlanSave(msg, "exercise");
-          },
-        },
-      ]
-    );
+    showAlert({
+      title: "Save as Plan",
+      message: "Would you like to save this as a Diet or Exercise plan?",
+      type: "choice",
+      cancelText: "Cancel",
+      confirmText: "Diet Plan",
+      secondaryText: "Exercise Plan",
+      onConfirm: () => finalizePlanSave(msg, "diet"),
+      onSecondary: () => finalizePlanSave(msg, "exercise")
+    });
   };
 
   const finalizePlanSave = async (msg: LocalMessage, type: "diet" | "exercise") => {
@@ -316,75 +326,96 @@ function MainApp() {
     };
     await StorageService.savePlan(newPlan);
     await fetchPlans();
-    Alert.alert("Success", `Plan saved to your ${type} collection.`);
+    showAlert({
+      title: "Success",
+      message: `Plan saved to your ${type} collection.`,
+      type: "success",
+      confirmText: "Great!"
+    });
   };
 
   const handleClearAll = () => {
-    Alert.alert("Danger", "Clear all chats and plans?", [
-      { text: "Cancel" },
-      {
-        text: "Clear All",
-        style: "destructive",
-        onPress: async () => {
-          // Basic clear for now - would ideally clear files
-          setMessages([]);
-          setSessions([]);
-          setPlans([]);
-          Alert.alert("Success", "History cleared.");
-        },
-      },
-    ]);
+    showAlert({
+      title: "Confirm Clear",
+      message: "This will permanently remove all your chats and health plans. Are you sure?",
+      type: "danger",
+      confirmText: "Clear All",
+      cancelText: "Keep Data",
+      onConfirm: async () => {
+        setMessages([]);
+        setSessions([]);
+        setPlans([]);
+        showAlert({
+          title: "Cleared",
+          message: "All history has been reset.",
+          type: "success"
+        });
+      }
+    });
   };
 
   const handleSend = async () => {
     if (!inputText.trim() || isTyping || isChatFull) return;
 
-    // Check if model is loaded/ready
-    const activeModel = await ModelService.getActiveModel();
-    if (!activeModel) {
-      Alert.alert("Download Required", "Please download an AI model from Settings to use the chat.");
-      return;
-    }
-
-    const isDownloaded = await ModelService.isModelDownloaded(activeModel.id);
-    if (!isDownloaded) {
-      Alert.alert("Download Required", "The selected model is not downloaded. Visit Settings -> Manage AI Models.");
-      return;
-    }
-
-    try {
-      await LlamaService.loadModel(activeModel.filename);
-    } catch (e) {
-      Alert.alert("Error", "Failed to initialize AI model.");
-      return;
-    }
-
     const userText = inputText.trim();
     setInputText("");
     Keyboard.dismiss();
+
     const userMsg: LocalMessage = {
       id: Math.random().toString(),
       text: userText,
       role: "user",
       timestamp: new Date(),
     };
+
+    // Add user message immediately for responsiveness
     setMessages((prev) => [...prev, userMsg]);
-
-    const systemPrompt = LlamaService.generateSystemPrompt(userProfile);
-    const history: Message[] = [
-      ...messages.map((m) => ({ role: m.role, content: m.text })),
-      { role: "user", content: userText },
-    ];
-
     setIsTyping(true);
-    const astId = Math.random().toString();
-    setMessages((prev) => [
-      ...prev,
-      { id: astId, text: "", role: "assistant", timestamp: new Date() },
-    ]);
 
-    let acc = "";
     try {
+      // Check if model is loaded/ready
+      const activeModel = await ModelService.getActiveModel();
+      if (!activeModel) {
+        setIsTyping(false);
+        showAlert({
+          title: "Download Required",
+          message: "Please download an AI model from Settings to use the chat.",
+          type: "warning",
+          confirmText: "Got it"
+        });
+        return;
+      }
+
+      const isDownloaded = await ModelService.isModelDownloaded(activeModel.id);
+      if (!isDownloaded) {
+        setIsTyping(false);
+        showAlert({
+          title: "Model Not Found",
+          message: "The selected model is not downloaded. Visit Settings -> Manage AI Models.",
+          type: "warning",
+          confirmText: "Go to Settings"
+        });
+        return;
+      }
+
+      // Model setup check (Cold Start happens here if not loaded)
+      setIsColdStarting(true);
+      await LlamaService.loadModel(activeModel.filename);
+      setIsColdStarting(false);
+
+      const systemPrompt = LlamaService.generateSystemPrompt(userProfile);
+      const history: Message[] = [
+        ...messages.map((m) => ({ role: m.role, content: m.text })),
+        { role: "user", content: userText },
+      ];
+
+      const astId = Math.random().toString();
+      setMessages((prev) => [
+        ...prev,
+        { id: astId, text: "", role: "assistant", timestamp: new Date() },
+      ]);
+
+      let acc = "";
       await LlamaService.chat(history, systemPrompt, ({ token }) => {
         acc += token;
         setMessages((prev) =>
@@ -393,8 +424,10 @@ function MainApp() {
       });
     } catch (e) {
       console.error("Chat error:", e);
+      setIsColdStarting(false);
     } finally {
       setIsTyping(false);
+      setIsColdStarting(false);
     }
   };
 
@@ -483,7 +516,7 @@ function MainApp() {
       case "exercise_plans":
         return <ExercisePlansScreen onBack={() => setCurrentView("dashboard")} />;
       case "about":
-        return <AboutScreen onBack={() => setCurrentView("dashboard")} />;
+        return <AboutScreen onBack={() => setCurrentView("settings")} />;
       case "settings":
         return <SettingsScreen
           onClearAll={handleClearAll}
@@ -510,22 +543,22 @@ function MainApp() {
         />;
 
       case "chat_history":
-        return <ChatHistoryPage 
-          historyType="general" 
+        return <ChatHistoryPage
+          historyType="general"
           onSelectChat={(id) => {
             loadSession(id);
             setCurrentView("chat");
-          }} 
+          }}
           onBack={() => setCurrentView("dashboard")}
         />;
 
       case "report_chat_history":
-        return <ChatHistoryPage 
-          historyType="report" 
+        return <ChatHistoryPage
+          historyType="report"
           onSelectChat={(id) => {
             setActiveReportSessionId(id);
             setCurrentView("chat_page");
-          }} 
+          }}
           onBack={() => setCurrentView("report_analysis")}
         />;
 
@@ -589,8 +622,8 @@ function MainApp() {
         );
       default:
         return (
-          <KeyboardAvoidingView 
-            style={{ flex: 1 }} 
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
           >
             <FlatList
@@ -610,7 +643,11 @@ function MainApp() {
                 </TouchableOpacity>
               </View>
             )}
-            {isTyping && <Text style={styles.generatingState}>MediNova is generating...</Text>}
+            {isTyping && (
+              <Text style={styles.generatingState}>
+                {isColdStarting ? "MediNova is initializing (Cold Start)..." : "MediNova is generating..."}
+              </Text>
+            )}
             <ChatInput
               inputText={inputText}
               setInputText={setInputText}
@@ -716,6 +753,74 @@ function MainApp() {
           )}
         </View>
       </SafeAreaView>
+
+      {/* ── Custom App-wide Alert Modal ──────────────── */}
+      {modalConfig && (
+        <Modal
+          transparent
+          visible={modalConfig.visible}
+          animationType="fade"
+          onRequestClose={hideAlert}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={[styles.modalAccentBar, {
+                backgroundColor: modalConfig.type === 'danger' ? COLORS.danger :
+                  modalConfig.type === 'warning' ? COLORS.warning :
+                    modalConfig.type === 'success' ? COLORS.success : COLORS.primary
+              }]} />
+
+              <View style={styles.modalIconContainer}>
+                <Text style={styles.modalIcon}>
+                  {modalConfig.type === 'success' ? '✅' : modalConfig.type === 'danger' ? '⚠️' : modalConfig.type === 'warning' ? '🔔' : 'ℹ️'}
+                </Text>
+              </View>
+
+              <Text style={styles.modalTitle}>{modalConfig.title}</Text>
+              <Text style={styles.modalSubtitle}>{modalConfig.message}</Text>
+
+              <View style={[styles.modalActions, modalConfig.type === 'choice' && { flexDirection: 'column' }]}>
+                <TouchableOpacity
+                  style={[styles.modalBtnConfirm, { backgroundColor: modalConfig.type === 'danger' ? COLORS.danger : COLORS.primary }]}
+                  onPress={() => {
+                    const cb = modalConfig.onConfirm;
+                    hideAlert();
+                    cb?.();
+                  }}
+                >
+                  <Text style={styles.modalBtnConfirmText}>{modalConfig.confirmText || "OK"}</Text>
+                </TouchableOpacity>
+
+                {modalConfig.type === 'choice' && modalConfig.secondaryText && (
+                  <TouchableOpacity
+                    style={[styles.modalBtnConfirm, { marginTop: 10, backgroundColor: COLORS.primary }]}
+                    onPress={() => {
+                      const cb = modalConfig.onSecondary;
+                      hideAlert();
+                      cb?.();
+                    }}
+                  >
+                    <Text style={styles.modalBtnConfirmText}>{modalConfig.secondaryText}</Text>
+                  </TouchableOpacity>
+                )}
+
+                {(modalConfig.cancelText || modalConfig.onCancel) && (
+                  <TouchableOpacity
+                    style={styles.modalBtnCancel}
+                    onPress={() => {
+                      const cb = modalConfig.onCancel;
+                      hideAlert();
+                      cb?.();
+                    }}
+                  >
+                    <Text style={styles.modalBtnCancelText}>{modalConfig.cancelText || "Cancel"}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaProvider>
   );
 }
@@ -811,6 +916,86 @@ function createStyles(COLORS: any) {
       fontSize: 13,
       color: COLORS.textMain,
       lineHeight: 18,
-    }
+    },
+
+    // Modal Styles
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalContainer: {
+      width: "85%",
+      backgroundColor: COLORS.surface,
+      borderRadius: RADIUS.xl,
+      overflow: "hidden",
+      alignItems: "center",
+      paddingBottom: 24,
+      ...SHADOWS.medium,
+    },
+    modalAccentBar: {
+      width: "100%",
+      height: 4,
+    },
+    modalIconContainer: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "rgba(0,0,0,0.05)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 24,
+      marginBottom: 16,
+    },
+    modalIcon: {
+      fontSize: 28,
+    },
+    modalTitle: {
+      fontSize: 19,
+      fontWeight: "800",
+      color: COLORS.textHeader,
+      marginBottom: 8,
+      textAlign: 'center',
+      paddingHorizontal: 20,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      color: COLORS.textSub,
+      textAlign: "center",
+      paddingHorizontal: 30,
+      lineHeight: 20,
+      marginBottom: 24,
+    },
+    modalActions: {
+      width: '100%',
+      paddingHorizontal: 20,
+    },
+    modalBtnConfirm: {
+      width: '100%',
+      paddingVertical: 14,
+      borderRadius: RADIUS.lg,
+      alignItems: "center",
+    },
+    modalBtnConfirmText: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: "#FFF",
+    },
+    modalBtnCancel: {
+      width: '100%',
+      paddingVertical: 14,
+      borderRadius: RADIUS.lg,
+      backgroundColor: COLORS.background,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginTop: 10,
+    },
+    modalBtnCancelText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: COLORS.textMain,
+    },
   });
 }

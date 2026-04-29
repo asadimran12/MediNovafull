@@ -21,6 +21,16 @@ export const AboutScreen: React.FC<AboutScreenProps> = ({ onBack }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onBack} activeOpacity={0.7}>
+          <View style={{ backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+            <Text style={{ fontSize: 16, color: "#fff", fontWeight: "700" }}>‹ Back</Text>
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>About</Text>
+        <View style={{ width: 60 }} />
+      </View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         {/* 1. HERO SECTION */}

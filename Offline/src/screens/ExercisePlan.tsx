@@ -39,20 +39,20 @@ function getExerciseIcon(type: string): string {
 
 /* ─── Exercise Item Card ───────────────────────── */
 const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => {
-  const { colors: COLORS } = useTheme();
-  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
-  
-  return (
-    <View style={styles.exerciseCard}>
-        <Text style={styles.exerciseName}>{item.name}</Text>
-        <Text style={styles.exerciseDetails}>
-            Duration: {item.duration}
-            {item.sets ? ` | Sets: ${item.sets}` : ""}
-            {item.reps ? ` | Reps: ${item.reps}` : ""}
-            {" | "}Intensity: {item.intensity}
-        </Text>
-    </View>
-  );
+    const { colors: COLORS } = useTheme();
+    const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
+    return (
+        <View style={styles.exerciseCard}>
+            <Text style={styles.exerciseName}>{item.name}</Text>
+            <Text style={styles.exerciseDetails}>
+                Duration: {item.duration}
+                {item.sets ? ` | Sets: ${item.sets}` : ""}
+                {item.reps ? ` | Reps: ${item.reps}` : ""}
+                {" | "}Intensity: {item.intensity}
+            </Text>
+        </View>
+    );
 };
 
 function getTodayIndex(): number {
@@ -70,8 +70,8 @@ interface ExercisePlansScreenProps {
 }
 
 export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack }) => {
-  const { colors: COLORS } = useTheme();
-  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+    const { colors: COLORS } = useTheme();
+    const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
     const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayIndex());
     const [activePlan, setActivePlan] = useState<StructuredExercisePlan | null>(null);
@@ -236,11 +236,19 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
             <View style={styles.headerContainer}>
                 <View style={styles.headerTopRow}>
                     {onBack ? (
-                        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-                            <Text style={styles.backButtonText}>←</Text>
+                        <TouchableOpacity onPress={onBack}>
+                            <View style={{ backgroundColor: "#fff", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}>
+                                <Text style={{ fontSize: 16, color: COLORS.primary, fontWeight: "700" }}>‹ Back</Text>
+                            </View>
                         </TouchableOpacity>
                     ) : <View style={{ width: 70 }} />}
-                    <Text style={styles.screenTitle}>Exercise Plan</Text>
+
+                    <View style={{ alignItems: "center" }}>
+                        <Text style={styles.screenTitle}>Exercise Plan</Text>
+                        <Text style={{ color: "#fff", opacity: 0.8, textAlign: "center", marginTop: 4 }}>
+                            Your personalized workout
+                        </Text>
+                    </View>
                     <View style={{ width: 70 }} />
                 </View>
 
@@ -322,8 +330,21 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                             <View style={styles.progressBarBackground}>
                                 <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
                             </View>
-                            <Text style={styles.progressPercent}>{progress}% Completed</Text>
+                            <Text style={styles.progressPercent}>
+                                {completedItems.length}/{totalItems} items · {progress}% done
+                            </Text>
                         </View>
+
+                        {/* Trainer Tip */}
+                        {currentDay?.trainerTip && (
+                            <View style={styles.tipCard}>
+                                <View style={styles.tipHeader}>
+                                    <Text style={styles.tipIcon}>💡</Text>
+                                    <Text style={styles.tipTitle}>AI Coach Tip</Text>
+                                </View>
+                                <Text style={styles.tipText}>{currentDay.trainerTip}</Text>
+                            </View>
+                        )}
 
                         {/* Exercise Sections */}
                         {currentDay?.exercises.map((section: Exercise, si: number) => {
@@ -470,16 +491,11 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
 const createStyles = (COLORS: any) => StyleSheet.create({
     headerContainer: {
         backgroundColor: COLORS.primary,
-        paddingTop: 16,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 8,
-        marginBottom: 4,
+        paddingTop: 20,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+        elevation: 10,
     },
     headerTopRow: {
         flexDirection: "row",
@@ -487,20 +503,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         justifyContent: "space-between",
         paddingHorizontal: 16,
         marginBottom: 16,
-    },
-    backButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: "rgba(255,255,255,0.25)",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    backButtonText: {
-        color: "#fff",
-        fontWeight: "900",
-        fontSize: 22,
-        marginTop: -8
     },
     screenTitle: { fontSize: 22, fontWeight: "800", color: "#fff", textAlign: "center" },
     headerActionRow: {
@@ -573,32 +575,81 @@ const createStyles = (COLORS: any) => StyleSheet.create({
 
     topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
     dayCircle: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        borderWidth: 2,
-        borderColor: COLORS.primary,
-        justifyContent: "center",
-        alignItems: "center",
-        marginRight: 10,
-        backgroundColor: COLORS.surface,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: "#f1f5f9",
+        marginRight: 8,
     },
-    dayCircleSelected: { 
+    dayCircleSelected: {
         backgroundColor: COLORS.primary,
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.35,
-        shadowRadius: 5,
-        elevation: 4,
     },
-    dayText: { color: COLORS.primary, fontWeight: "bold", fontSize: 12 },
-    dayTextSelected: { color: "#fff" },
+    dayText: {
+        fontSize: 13,
+        fontWeight: "600",
+        color: "#555",
+    },
+    dayTextSelected: {
+        color: "#fff",
+    },
 
-    progressContainer: { backgroundColor: COLORS.surface, padding: 16, borderRadius: 12, marginBottom: 20 },
-    progressTitle: { fontWeight: "700", marginBottom: 10, color: COLORS.textHeader },
-    progressBarBackground: { height: 12, backgroundColor: COLORS.background, borderRadius: 6, overflow: "hidden" },
-    progressBarFill: { height: "100%", backgroundColor: COLORS.success },
-    progressPercent: { marginTop: 6, fontWeight: "600", textAlign: "right", color: COLORS.success },
+    progressContainer: {
+        backgroundColor: "#fff",
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 20,
+        elevation: 3,
+    },
+    progressTitle: {
+        fontWeight: "700",
+        marginBottom: 10,
+        fontSize: 14,
+    },
+    progressBarBackground: {
+        height: 10,
+        backgroundColor: "#eee",
+        borderRadius: 10,
+    },
+    progressBarFill: {
+        height: "100%",
+        backgroundColor: "#22c55e",
+        borderRadius: 10,
+    },
+    progressPercent: {
+        marginTop: 6,
+        fontWeight: "600",
+        textAlign: "right",
+        color: "#22c55e",
+    },
+
+    tipCard: {
+        backgroundColor: "rgba(52,152,219,0.08)",
+        borderLeftWidth: 4,
+        borderLeftColor: "#3498db",
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 20,
+    },
+    tipHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 8,
+        gap: 8,
+    },
+    tipIcon: { fontSize: 18 },
+    tipTitle: {
+        fontSize: 14,
+        fontWeight: "800",
+        color: "#2980b9",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+    },
+    tipText: {
+        fontSize: 15,
+        color: "#34495e",
+        lineHeight: 22,
+        fontWeight: "500",
+    },
 
     mealSection: { marginBottom: 22 },
     mealHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },

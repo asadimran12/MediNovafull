@@ -11,6 +11,7 @@ import {
   Alert,
   ScrollView,
   Modal,
+  StatusBar,
 } from "react-native";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import ModelService, { AIModel } from "../services/ModelService";
@@ -42,7 +43,6 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     reAttachActiveDownloads();
 
     return () => {
-      // Unsubscribe UI callbacks when leaving the screen — download itself keeps running
       const activeIds = LlamaService.getActiveDownloadIds();
       activeIds.forEach(id => LlamaService.unsubscribeFromDownload(id));
     };
@@ -51,10 +51,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   const reAttachActiveDownloads = () => {
     const activeIds = LlamaService.getActiveDownloadIds();
     if (activeIds.length > 0) {
-      const filename = activeIds[0]; // Re-attach to first active download
-      setDownloadingId(null); // will be set from ModelService id below
-
-      // Map filename back to model ID
+      const filename = activeIds[0];
       ModelService.getAvailableModels().then(models => {
         const model = models.find(m => m.filename === filename);
         if (!model) return;
@@ -104,7 +101,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     if (!model.downloadUrl) {
       setInfoAlert({
         title: "Manual Setup Required",
-        message: `This is a custom model. Please push '${model.filename}' to your device's Documents folder manually using ADB or a file manager.`,
+        message: `Please push '${model.filename}' to your device manually.`,
         type: "info"
       });
       return;
@@ -116,25 +113,21 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
       await LlamaService.downloadModel(
         model.filename,
         model.downloadUrl,
-        (p) => {
-          setProgress(p);
-        },
+        (p) => setProgress(p),
         async () => {
           await loadStatus();
           setDownloadingId(null);
           setIsPaused(false);
           setInfoAlert({ title: "Success", message: `${model.name} downloaded successfully.`, type: "success" });
         },
-        (err) => {
+        () => {
           setDownloadingId(null);
           setIsPaused(false);
-          setInfoAlert({ title: "Error", message: "Download failed or canceled.", type: "error" });
         }
       );
     } catch (err) {
       setDownloadingId(null);
       setIsPaused(false);
-      setInfoAlert({ title: "Error", message: "Download failed.", type: "error" });
     }
   };
 
@@ -164,85 +157,75 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     await loadStatus();
     try {
       await LlamaService.loadModel(model.filename);
-      setInfoAlert({ title: "Success", message: `${model.name} is now active.`, type: "success" });
+      setInfoAlert({ title: "Model Activated", message: `${model.name} is now ready to use.`, type: "success" });
     } catch (e) {
-      setInfoAlert({ title: "Error", message: "Failed to load model.", type: "error" });
+      setInfoAlert({ title: "Error", message: "Failed to load model into memory.", type: "error" });
     }
   };
 
   const renderModel = ({ item }: { item: typeof models[0] }) => (
     <View style={[styles.modelCard, item.isActive && styles.activeCard]}>
       <View style={styles.cardHeader}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.modelSize}>{item.size}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.modelName}>{item.name}</Text>
+          <View style={styles.metaRow}>
+             <Text style={styles.modelSize}>📦 {item.size}</Text>
+             {recommendedId === item.id && (
+                <View style={styles.recTag}>
+                   <Text style={styles.recTagText}>RECOMMENDED</Text>
+                </View>
+             )}
+          </View>
         </View>
-        <View style={styles.badgeContainer}>
-          {item.isActive && (
+        {item.isActive && (
             <View style={styles.activeBadge}>
               <Text style={styles.activeBadgeText}>ACTIVE</Text>
             </View>
-          )}
-          {recommendedId === item.id && (
-            <View style={styles.recommendedBadge}>
-              <Text style={styles.activeBadgeText}>⭐ RECOMMENDED</Text>
-            </View>
-          )}
-        </View>
+        )}
       </View>
 
       <Text style={styles.modelDesc}>{item.description}</Text>
 
       <View style={styles.actions}>
         {!item.isDownloaded ? (
-          <>
-            {downloadingId === item.id ? (
-              <View style={styles.downloadProgressContainer}>
-                <Text style={styles.progressText}>
-                  {isPaused ? `Paused at ${Math.round(progress || 0)}%` : `Downloading ${Math.round(progress || 0)}%`}
-                </Text>
-                <View style={styles.progressActions}>
-                  {isPaused ? (
-                    <TouchableOpacity style={[styles.controlBtn]} onPress={() => handleResume(item)}>
-                      <Text style={styles.controlBtnText}>Resume</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity style={[styles.controlBtn]} onPress={() => handlePause(item)}>
-                      <Text style={styles.controlBtnText}>Pause</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity style={[styles.controlBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
-                    <Text style={[styles.controlBtnText, styles.dangerText]}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
+          downloadingId === item.id ? (
+            <View style={styles.downloadProgressContainer}>
+              <View style={styles.progressTop}>
+                <Text style={styles.progressPercent}>{Math.round(progress)}%</Text>
+                <Text style={styles.progressStatus}>{isPaused ? "Paused" : "Downloading..."}</Text>
               </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.btn, styles.primaryBtn]}
-                onPress={() => handleDownload(item)}
-                disabled={!!downloadingId}
-              >
-                <Text style={styles.btnText}>Download</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        ) : (
-          <>
-            {!item.isActive && (
-              <TouchableOpacity
-                style={[styles.btn, styles.secondaryBtn]}
-                onPress={() => handleActivate(item)}
-              >
-                <Text style={styles.secondaryBtnText}>Set Active</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.btn, styles.dangerBtn]}
-              onPress={() => handleDelete(item)}
-            >
-              <Text style={styles.dangerBtnText}>Delete</Text>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+              </View>
+              <View style={styles.progressActions}>
+                <TouchableOpacity style={styles.miniBtn} onPress={() => isPaused ? handleResume(item) : handlePause(item)}>
+                  <Text style={styles.miniBtnText}>{isPaused ? "▶ Resume" : "⏸ Pause"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.miniBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
+                  <Text style={[styles.miniBtnText, styles.dangerText]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => handleDownload(item)} disabled={!!downloadingId}>
+              <Text style={styles.btnText}>Download AI Model</Text>
             </TouchableOpacity>
-          </>
+          )
+        ) : (
+          <View style={styles.downloadedActions}>
+            {!item.isActive ? (
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => handleActivate(item)}>
+                <Text style={styles.secondaryBtnText}>Set as Active</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.activePill}>
+                <Text style={styles.activePillText}>Currently in Use</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.deleteIconBtn} onPress={() => handleDelete(item)}>
+               <Text style={{ fontSize: 18 }}>🗑️</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </View>
@@ -250,15 +233,30 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      
+      {/* ── Premium Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={onBack}>
-          <Text style={styles.backText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Models</Text>
+        <View style={styles.headerTop}>
+          {onBack && (
+            <TouchableOpacity onPress={onBack} activeOpacity={0.7}>
+              <View style={styles.backButtonPrimary}>
+                <Text style={styles.backButtonTextWhite}>‹ Back</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>AI Model Manager</Text>
+          </View>
+          <View style={{ width: 70 }} />
+        </View>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 50 }} />
+        <View style={styles.center}>
+           <ActivityIndicator size="large" color={COLORS.primary} />
+           <Text style={styles.loadingText}>Checking local models...</Text>
+        </View>
       ) : (
         <FlatList
           data={models}
@@ -266,43 +264,31 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
-            <View>
-              <Text style={styles.infoText}>
-                You can have multiple models downloaded and switch between them. Active model is used for all AI features.
-              </Text>
-              {recommendedId && (
-                <View style={[styles.infoText, { backgroundColor: COLORS.primary + '11', padding: 12, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#FFB020' }]}>
-                  <Text style={{ fontWeight: 'bold', color: COLORS.textHeader, marginBottom: 4 }}>💡 Device Optimization Hint</Text>
-                  <Text style={{ fontSize: 13, color: COLORS.textSub }}>
-                    Based on your {Math.round(1)} GB detected RAM, we recommend using the
-                    <Text style={{ fontWeight: 'bold' }}> {models.find(m => m.id === recommendedId)?.name.split('-')[0]} </Text>
-                    for smooth performance.
-                  </Text>
-                </View>
-              )}
+            <View style={styles.listHeader}>
+              <View style={styles.tipCard}>
+                 <Text style={styles.tipTitle}>💡 AI Memory Tip</Text>
+                 <Text style={styles.tipText}>
+                    Active models are loaded into RAM. If the app feels slow, use the Recommended model for your device.
+                 </Text>
+              </View>
+              <Text style={styles.sectionTitle}>Available Models</Text>
             </View>
           }
         />
       )}
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        transparent={true}
-        visible={deleteConfirmModel !== null}
-        animationType="fade"
-        onRequestClose={() => setDeleteConfirmModel(null)}
-      >
+      <Modal transparent visible={deleteConfirmModel !== null} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalIconContainer}>
               <Text style={styles.modalIcon}>🗑️</Text>
             </View>
-            <Text style={styles.modalTitle}>Delete Model?</Text>
-            <Text style={styles.modalSubtitle}>Are you sure you want to delete {deleteConfirmModel?.name}? You will have to re-download it to use it again.</Text>
-            
+            <Text style={styles.modalTitle}>Delete AI Model?</Text>
+            <Text style={styles.modalSubtitle}>This will remove {deleteConfirmModel?.name} from your device storage. You can re-download it later.</Text>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setDeleteConfirmModel(null)}>
-                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+                <Text style={styles.modalBtnCancelText}>Keep it</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalBtnDelete} onPress={async () => {
                 if (deleteConfirmModel) {
@@ -318,196 +304,117 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
         </View>
       </Modal>
 
-      {/* Info/Success/Error Modal */}
-      <Modal
-        transparent={true}
-        visible={infoAlert !== null}
-        animationType="fade"
-        onRequestClose={() => setInfoAlert(null)}
-      >
+      {/* Info Alert Modal */}
+      <Modal transparent visible={infoAlert !== null} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <View style={[styles.modalIconContainer, { backgroundColor: infoAlert?.type === 'success' ? '#27AE6015' : infoAlert?.type === 'error' ? '#FF3B3015' : '#4A90E215' }]}>
-              <Text style={styles.modalIcon}>
-                {infoAlert?.type === 'success' ? '✅' : infoAlert?.type === 'error' ? '❌' : 'ℹ️'}
-              </Text>
+            <View style={[styles.modalIconContainer, { backgroundColor: infoAlert?.type === 'success' ? '#D1FAE5' : '#FEE2E2' }]}>
+              <Text style={styles.modalIcon}>{infoAlert?.type === 'success' ? '✅' : 'ℹ️'}</Text>
             </View>
             <Text style={styles.modalTitle}>{infoAlert?.title}</Text>
             <Text style={styles.modalSubtitle}>{infoAlert?.message}</Text>
-            
             <TouchableOpacity style={styles.modalBtnOk} onPress={() => setInfoAlert(null)}>
-              <Text style={styles.modalBtnOkText}>OK</Text>
+              <Text style={styles.modalBtnOkText}>Got it</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
     </View>
   );
 };
 
 const createStyles = (COLORS: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: SPACING.md,
     backgroundColor: COLORS.surface,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backBtn: { padding: SPACING.sm },
-  backText: { color: COLORS.primary, fontWeight: "600", fontSize: 16 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: COLORS.textHeader, marginLeft: SPACING.md },
-  list: { padding: SPACING.md },
-  infoText: {
-    fontSize: 14,
-    color: COLORS.textSub,
-    marginBottom: SPACING.lg,
-    lineHeight: 20,
-  },
-  modelCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
+    borderBottomColor: '#E2E8F0',
     ...SHADOWS.light,
+  },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButtonPrimary: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    ...SHADOWS.light,
+  },
+  backButtonTextWhite: { fontSize: 16, color: "#fff", fontWeight: "700" },
+  headerTitleContainer: { flex: 1, alignItems: 'center' },
+  headerTitle: { fontSize: 20, fontWeight: "900", color: COLORS.textHeader, letterSpacing: -0.5 },
+  
+  list: { padding: 20, paddingBottom: 40 },
+  listHeader: { marginBottom: 24 },
+  sectionTitle: { fontSize: 13, fontWeight: "800", color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 16 },
+  
+  tipCard: { backgroundColor: '#EFF6FF', borderRadius: 16, padding: 16, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: '#3B82F6' },
+  tipTitle: { fontSize: 15, fontWeight: "800", color: '#1E40AF', marginBottom: 4 },
+  tipText: { fontSize: 13, color: '#1E40AF', lineHeight: 18, opacity: 0.8 },
+
+  modelCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    ...SHADOWS.medium,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
   },
   activeCard: { borderColor: COLORS.primary, borderWidth: 2 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: SPACING.xs },
-  badgeContainer: { flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "40%" },
-  modelName: { fontSize: 16, fontWeight: "700", color: COLORS.textMain, flex: 1 },
-  modelSize: { fontSize: 12, fontWeight: "600", color: COLORS.primary },
-  activeBadge: {
-    backgroundColor: COLORS.success || "#27AE60",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill || 20,
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  recommendedBadge: {
-    backgroundColor: "#FFB020",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill || 20,
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  activeBadgeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
-  modelDesc: { fontSize: 13, color: COLORS.textMuted, marginBottom: SPACING.md, lineHeight: 18 },
-  actions: { flexDirection: "row", gap: SPACING.sm },
-  btn: { flex: 1, paddingVertical: 10, borderRadius: RADIUS.md, alignItems: "center" },
-  primaryBtn: { backgroundColor: COLORS.primary },
-  secondaryBtn: { borderWidth: 1, borderColor: COLORS.primary },
-  dangerBtn: { borderWidth: 1, borderColor: COLORS.danger },
-  disabledBtn: { backgroundColor: COLORS.textMuted },
-  btnText: { color: "#FFF", fontWeight: "700" },
-  secondaryBtnText: { color: COLORS.primary, fontWeight: "700" },
-  dangerBtnText: { color: COLORS.danger, fontWeight: "700" },
-  downloadProgressContainer: { flex: 1, backgroundColor: COLORS.surface, borderRadius: RADIUS.md, padding: SPACING.sm, borderWidth: 1, borderColor: COLORS.border },
-  progressText: { fontSize: 13, fontWeight: "600", color: COLORS.primary, marginBottom: SPACING.sm, textAlign: "center" },
-  progressActions: { flexDirection: "row", justifyContent: "space-between", gap: SPACING.xs },
-  controlBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.textMuted, alignItems: "center" },
-  controlBtnText: { color: COLORS.textMain, fontSize: 12, fontWeight: "600" },
-  dangerBorder: { borderColor: COLORS.danger },
-  dangerText: { color: COLORS.danger },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12 },
+  modelName: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader, marginBottom: 4 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  modelSize: { fontSize: 13, fontWeight: "700", color: COLORS.primary },
+  
+  recTag: { backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  recTagText: { fontSize: 10, fontWeight: "900", color: '#92400E' },
 
-  // Modal Custom Styling
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: SPACING.lg,
-  },
-  modalContainer: {
-    width: "100%",
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: SPACING.xl,
-    alignItems: "center",
-    elevation: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 15,
-  },
-  modalIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(255, 59, 48, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: SPACING.lg,
-  },
-  modalIcon: {
-    fontSize: 28,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: COLORS.textHeader,
-    marginBottom: SPACING.sm,
-    textAlign: "center",
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSub,
-    textAlign: "center",
-    marginBottom: SPACING.xl,
-    lineHeight: 22,
-  },
-  modalActions: {
-    flexDirection: "row",
-    width: "100%",
-    justifyContent: "space-between",
-    gap: SPACING.md,
-  },
-  modalBtnCancel: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: RADIUS.lg,
-    backgroundColor: COLORS.background,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  modalBtnCancelText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.textMain,
-  },
-  modalBtnDelete: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: RADIUS.lg,
-    backgroundColor: COLORS.danger || "#FF3B30",
-    alignItems: "center",
-    shadowColor: COLORS.danger || "#FF3B30",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  modalBtnDeleteText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#FFF",
-  },
-  modalBtnOk: {
-    width: "100%",
-    paddingVertical: 14,
-    borderRadius: RADIUS.lg,
-    backgroundColor: COLORS.primary,
-    alignItems: "center",
-  },
-  modalBtnOkText: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#FFF",
-  }
+  activeBadge: { backgroundColor: '#10B981', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  activeBadgeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
+  
+  modelDesc: { fontSize: 14, color: COLORS.textSub, marginBottom: 20, lineHeight: 20 },
+  
+  actions: { width: '100%' },
+  primaryBtn: { backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
+  btnText: { color: "#FFF", fontWeight: "800", fontSize: 15 },
+  
+  downloadedActions: { flexDirection: 'row', gap: 10 },
+  secondaryBtn: { flex: 1, backgroundColor: '#F1F5F9', paddingVertical: 14, borderRadius: 12, alignItems: "center", borderWidth: 1, borderColor: '#E2E8F0' },
+  secondaryBtnText: { color: COLORS.textHeader, fontWeight: "800", fontSize: 15 },
+  
+  activePill: { flex: 1, backgroundColor: '#ECFDF5', paddingVertical: 14, borderRadius: 12, alignItems: "center", borderWidth: 1, borderColor: '#10B981' },
+  activePillText: { color: '#10B981', fontWeight: "800", fontSize: 15 },
+  
+  deleteIconBtn: { width: 52, height: 52, backgroundColor: '#FEF2F2', borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#FEE2E2' },
+
+  downloadProgressContainer: { width: '100%' },
+  progressTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  progressPercent: { fontSize: 18, fontWeight: "900", color: COLORS.primary },
+  progressStatus: { fontSize: 12, fontWeight: "700", color: COLORS.textMuted },
+  progressBarBg: { height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, marginBottom: 16, overflow: 'hidden' },
+  progressBarFill: { height: '100%', backgroundColor: COLORS.primary },
+  progressActions: { flexDirection: 'row', gap: 10 },
+  miniBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center' },
+  miniBtnText: { fontSize: 13, fontWeight: "700", color: COLORS.textHeader },
+  dangerBorder: { borderColor: '#FEE2E2' },
+  dangerText: { color: '#EF4444' },
+
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
+  loadingText: { marginTop: 12, fontSize: 14, color: COLORS.textMuted, fontWeight: "600" },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 20 },
+  modalContainer: { width: "100%", backgroundColor: '#fff', borderRadius: 24, padding: 30, alignItems: "center" },
+  modalIconContainer: { width: 64, height: 64, borderRadius: 32, backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center", marginBottom: 20 },
+  modalIcon: { fontSize: 28 },
+  modalTitle: { fontSize: 22, fontWeight: "900", color: COLORS.textHeader, marginBottom: 10, textAlign: "center" },
+  modalSubtitle: { fontSize: 15, color: COLORS.textSub, textAlign: "center", marginBottom: 30, lineHeight: 22 },
+  modalActions: { flexDirection: "row", gap: 12 },
+  modalBtnCancel: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#F1F5F9', alignItems: "center" },
+  modalBtnCancelText: { fontSize: 15, fontWeight: "700", color: COLORS.textHeader },
+  modalBtnDelete: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#EF4444', alignItems: "center" },
+  modalBtnDeleteText: { fontSize: 15, fontWeight: "800", color: "#FFF" },
+  modalBtnOk: { width: "100%", paddingVertical: 14, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: "center" },
+  modalBtnOkText: { fontSize: 15, fontWeight: "800", color: "#FFF" }
 });

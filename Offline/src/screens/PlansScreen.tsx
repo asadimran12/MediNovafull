@@ -462,6 +462,17 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
               </View>
             )}
 
+            {/* Trainer Tip */}
+            {(currentDay as any).trainerTip && (
+              <View style={styles.tipCard}>
+                <View style={styles.tipHeader}>
+                  <Text style={styles.tipIcon}>🥗</Text>
+                  <Text style={styles.tipTitle}>AI Dietitian Tip</Text>
+                </View>
+                <Text style={styles.tipText}>{(currentDay as any).trainerTip}</Text>
+              </View>
+            )}
+
             {normalizedMeals.map((items, mi) => {
               const title = currentDay?.meals?.[mi]?.type ?? "Meal";
               const done = completedMeals.includes(mi);
@@ -768,6 +779,35 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     fontWeight: "600",
     textAlign: "right",
     color: "#22c55e",
+  },
+
+  tipCard: {
+    backgroundColor: "rgba(39,174,96,0.08)",
+    borderLeftWidth: 4,
+    borderLeftColor: "#27ae60",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  tipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
+  tipIcon: { fontSize: 18 },
+  tipTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#27ae60",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  tipText: {
+    fontSize: 15,
+    color: "#34495e",
+    lineHeight: 22,
+    fontWeight: "500",
   },
 
 
