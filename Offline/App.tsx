@@ -683,7 +683,7 @@ function MainApp() {
               currentUser={currentUser}
             />
             <View style={styles.header}>
-              <TouchableOpacity onPress={toggleSidebar} style={[styles.menuIcon, { zIndex: 10 }]}><Text style={{ fontSize: 24 }}>☰</Text></TouchableOpacity>
+              <TouchableOpacity onPress={toggleSidebar} style={[styles.menuIcon, { zIndex: 10 }]}><Text style={{ fontSize: 24, color: COLORS.textWhite }}>☰</Text></TouchableOpacity>
               {currentView !== "chat" && currentView !== "chat_page" && currentView !== "image_uploader" ? (
                 <View style={styles.logoContainer}>
                   <View style={styles.imageContainer}>

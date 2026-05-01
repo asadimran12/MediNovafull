@@ -85,18 +85,8 @@ class StorageService {
       auth: {}
     };
 
-    // Gather Auth Data (Users & Sessions)
-    const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
-    try {
-      if (await ReactNativeFS.exists(`${authDir}/users.json`)) {
-        exportData.auth.users = JSON.parse(await ReactNativeFS.readFile(`${authDir}/users.json`, "utf8"));
-      }
-      if (await ReactNativeFS.exists(`${authDir}/session.json`)) {
-        exportData.auth.session = JSON.parse(await ReactNativeFS.readFile(`${authDir}/session.json`, "utf8"));
-      }
-    } catch (e) {
-      console.error("Failed to read auth data for export", e);
-    }
+    // Gather Auth Data — only the current user's record
+    exportData.auth = await this.getCurrentUserAuth();
 
     // Determine export path (try Download directory first, fallback to Document directory)
     const exportDir = ReactNativeFS.DownloadDirectoryPath || ReactNativeFS.DocumentDirectoryPath;
@@ -105,6 +95,32 @@ class StorageService {
     await ReactNativeFS.writeFile(exportPath, JSON.stringify(exportData, null, 2), "utf8");
     console.log(`Exported ${exportData.chats.length} chats, ${exportData.plans.length} plans to: ${exportPath}`);
     return exportPath;
+  }
+
+  private async getCurrentUserAuth(): Promise<{ users: any[]; session: any }> {
+    const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
+    const result: { users: any[]; session: any } = { users: [], session: {} };
+    try {
+      let allUsers: any[] = [];
+      let session: any = {};
+
+      if (await ReactNativeFS.exists(`${authDir}/users.json`)) {
+        allUsers = JSON.parse(await ReactNativeFS.readFile(`${authDir}/users.json`, "utf8"));
+      }
+      if (await ReactNativeFS.exists(`${authDir}/session.json`)) {
+        session = JSON.parse(await ReactNativeFS.readFile(`${authDir}/session.json`, "utf8"));
+        result.session = session;
+      }
+
+      // Only export the record that belongs to the active session user
+      if (session.userId && Array.isArray(allUsers)) {
+        const currentUser = allUsers.find((u: any) => u.id === session.userId);
+        if (currentUser) result.users = [currentUser];
+      }
+    } catch (e) {
+      console.error("Failed to read auth data for export", e);
+    }
+    return result;
   }
 
   async getPrimaryUsername(): Promise<string> {
@@ -163,17 +179,8 @@ class StorageService {
           session: {}
         }
       };
-      const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
-      try {
-        if (await ReactNativeFS.exists(`${authDir}/users.json`)) {
-          exportData.auth.users = JSON.parse(await ReactNativeFS.readFile(`${authDir}/users.json`, "utf8"));
-        }
-        if (await ReactNativeFS.exists(`${authDir}/session.json`)) {
-          exportData.auth.session = JSON.parse(await ReactNativeFS.readFile(`${authDir}/session.json`, "utf8"));
-        }
-      } catch (e) {
-        console.error("Failed to read auth data for export", e);
-      }
+      // Gather Auth Data — only the current user's record
+      exportData.auth = await this.getCurrentUserAuth();
 
       // Determine the primary username for cloud backup indexing
       const primaryUsername = await this.getPrimaryUsername();

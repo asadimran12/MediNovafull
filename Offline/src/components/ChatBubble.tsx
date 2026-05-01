@@ -29,11 +29,6 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onSavePlan }) =
         <Text style={[styles.messageText, isUser ? styles.userText : styles.assistantText]}>
           {message.text.trim()}
         </Text>
-        {isAssistant && message.id !== "initial-greeting" && onSavePlan && (
-          <TouchableOpacity onPress={() => onSavePlan(message)} style={styles.savePlanBtn}>
-            <Text style={styles.savePlanBtnText}>★ Save to Plans</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
