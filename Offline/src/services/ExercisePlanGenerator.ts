@@ -68,52 +68,184 @@ function getDailyFocus(day: string): string {
     return focuses[day] || "General Fitness";
 }
 
+// ─── Compact AI prompt: AI freely generates exercise names ───────
+// Output format (tiny ~150 tokens for all 7 days):
+// Mon:Ex1,Ex2,Ex3|Ex4,Ex5,Ex6|Ex7,Ex8,Ex9
+// Separator: | between warmup / main / cooldown
+const EX_KEYS = Object.keys(EXERCISE_DATABASE);
+
+function buildCompactExercisePrompt(profile: UserProfile): string {
+    return `You are a professional fitness trainer. Create a personalised 7-day workout plan.
+User: ${profile.age}y ${profile.gender}, health conditions: ${profile.conditions || "none"}.
+Instructions:
+- Suggest appropriate exercises based on the user's health conditions
+- Output EXACTLY 7 lines, one per day, NO extra text
+- Format: DayAbbr:W1,W2,W3|M1,M2,M3|C1,C2,C3
+- W=warmup(3 exercises), M=main(3 exercises), C=cooldown(3 exercises), separated by |
+- Use 3-letter day abbreviations: Mon,Tue,Wed,Thu,Fri,Sat,Sun
+- Keep exercise names short (2-4 words max)
+Example:
+Mon:Arm Circles,Leg Swings,March|Squats,Push-Ups,Lunges|Stretching,Deep Breathing,Walk`;
+}
+
+function buildCompactExTipsPrompt(profile: UserProfile): string {
+    return `You are a fitness trainer. Write 7 short personalized fitness tips.
+User: ${profile.age}y ${profile.gender}, conditions: ${profile.conditions || "none"}.
+Rules:
+- Output EXACTLY 7 lines
+- Each line: a tip under 15 words
+- NO numbering, NO extra text, JUST 7 lines`;
+}
+
+function parseExerciseLine(line: string): [string[], string[], string[]] | null {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) return null;
+    const sections = line.substring(colonIdx + 1).split("|");
+    if (sections.length < 3) return null;
+    const parse = (s: string) => s.split(",").map(x => x.trim()).filter(Boolean);
+    return [parse(sections[0]), parse(sections[1]), parse(sections[2])];
+}
+
+function resolveExercise(name: string): { desc: string; intensity: "Low" | "Medium" | "High"; sets?: number; reps?: number } {
+    // Exact match
+    if (EXERCISE_DATABASE[name]) return EXERCISE_DATABASE[name];
+    // Fuzzy match
+    const lower = name.toLowerCase();
+    const fuzzy = EX_KEYS.find(k => {
+        const kl = k.toLowerCase();
+        return kl.includes(lower) || lower.includes(kl) ||
+            kl.split(" ").some(word => word.length > 3 && lower.includes(word));
+    });
+    if (fuzzy) return EXERCISE_DATABASE[fuzzy];
+    // Unknown AI-generated exercise → use sensible defaults
+    const isCardio = /run|jog|walk|swim|cycle|jump|skip/i.test(name);
+    const isStretch = /stretch|yoga|cool|breathe|relax/i.test(name);
+    if (isStretch) return { desc: `${name} — focus on controlled breathing.`, intensity: "Low" };
+    if (isCardio) return { desc: `${name} — maintain steady pace.`, intensity: "Medium" };
+    return { desc: `${name} — focus on proper form.`, intensity: "Medium", sets: 3, reps: 10 };
+}
+
+function buildExItem(name: string, duration: string): ExerciseItem {
+    const db = resolveExercise(name);
+    return {
+        name,           // keep AI-generated name as-is
+        duration,
+        intensity: db.intensity,
+        description: db.desc,
+        sets: db.sets,
+        reps: db.reps,
+    };
+}
+
+// Fallback indices used if AI response can't be parsed
+const FALLBACK_EX_ROTATION: [number[], number[], number[]][] = [
+    [[10, 5, 9], [3, 4, 6], [7, 8, 9]],
+    [[10, 5, 9], [3, 4, 6], [7, 8, 9]],
+    [[10, 9, 5], [0, 1, 6], [7, 8, 9]],
+    [[10, 5, 9], [3, 4, 2], [7, 8, 9]],
+    [[10, 9, 5], [0, 1, 2], [7, 8, 9]],
+    [[10, 5, 9], [3, 4, 6], [7, 8, 9]],
+    [[9, 10, 5], [0, 1, 6], [7, 8, 9]],
+];
+
 export async function generateExercisePlan(
     onProgress?: (dayName: string, index: number) => void,
     options?: { autoSave?: boolean }
 ): Promise<StructuredExercisePlan | void> {
     const autoSave = options?.autoSave !== false;
     const profile = await storageService.getProfile();
-    const LlamaService = (await import("./LlamaService")).default;
-    const ModelService = (await import("./ModelService")).default;
 
-    const activeModel = await ModelService.getActiveModel();
-    if (!activeModel) throw new Error("No AI model selected.");
+    onProgress?.("Preparing", 0);
 
-    await KnowledgeBase.initialize();
-    const medicalContext = await KnowledgeBase.getRelevantContext(`exercise for ${profile.conditions}`);
-    await LlamaService.loadModel(activeModel.filename);
-
-    const generatedDays: DayExercisePlan[] = [];
-    for (let i = 0; i < DAY_NAMES.length; i++) {
-        const day = DAY_NAMES[i];
-        onProgress?.(day, i);
-        
-        let success = false;
-        let attempts = 0;
-        while (!success && attempts < 2) {
-            try {
-                const response = await LlamaService.chat([{ role: "user", content: buildExerciseDayPrompt(profile, day) }], "Return JSON.");
-                const parsed = parseMiniDay(response, day);
-                if (parsed) {
-                    generatedDays.push(parsed);
-                    success = true;
-                } else attempts++;
-            } catch (err) {
-                attempts++;
-            }
+    // ── Load AI model ────────────────────────────────────────────
+    let LlamaService: any = null;
+    try {
+        const ls = (await import("./LlamaService")).default;
+        const ms = (await import("./ModelService")).default;
+        const activeModel = await ms.getActiveModel();
+        if (activeModel) {
+            await ls.loadModel(activeModel.filename);
+            LlamaService = ls;
         }
-        if (!success) throw new Error(`Failed on ${day}`);
+    } catch { /* proceed without AI */ }
+
+    // ── Step 1: ONE compact AI call → AI picks exercise names ────
+    let aiLines: string[] = [];
+    let aiTips: string[] = [];
+
+    if (LlamaService) {
+        try {
+            onProgress?.("Generating plan…", 0);
+            const planResponse = await LlamaService.chat(
+                [{ role: "user", content: buildCompactExercisePrompt(profile) }],
+                "You are a professional fitness trainer. Follow the format exactly."
+            );
+            aiLines = planResponse.split("\n").map((l: string) => l.trim()).filter(Boolean);
+        } catch { /* fall back to rotation */ }
+
+        try {
+            onProgress?.("Adding tips…", 6);
+            const tipsResponse = await LlamaService.chat(
+                [{ role: "user", content: buildCompactExTipsPrompt(profile) }],
+                "You are a professional fitness trainer. Follow the format exactly."
+            );
+            aiTips = tipsResponse.split("\n").map((l: string) => l.trim()).filter(Boolean);
+        } catch { /* fall back to defaults */ }
     }
 
+    const defaultTips = [
+        "Warm up before every session to prevent injury.",
+        "Focus on controlled form over speed.",
+        "Rest 60–90 seconds between sets.",
+        "Breathe out on exertion, in on release.",
+        "Stay consistent — small steps lead to big results.",
+        "Cool down and stretch after every workout.",
+        "Listen to your body and rest if needed.",
+    ];
+
+    const durations = ["10 min", "15 min", "12 min", "20 min", "10 min", "30 min", "10 min"];
+
+    // ── Step 2: Build 7-day plan expanding AI names → full items ─
+    const generatedDays: DayExercisePlan[] = DAY_NAMES.map((day, i) => {
+        onProgress?.(day, i);
+
+        let warmupNames: string[], mainNames: string[], cooldownNames: string[];
+
+        const parsed = aiLines.length > i ? parseExerciseLine(aiLines[i]) : null;
+        if (parsed) {
+            [warmupNames, mainNames, cooldownNames] = parsed;
+        } else {
+            const [wi, mi, ci] = FALLBACK_EX_ROTATION[i];
+            warmupNames = wi.map(k => EX_KEYS[k % EX_KEYS.length]);
+            mainNames = mi.map(k => EX_KEYS[k % EX_KEYS.length]);
+            cooldownNames = ci.map(k => EX_KEYS[k % EX_KEYS.length]);
+        }
+
+        const dur = durations[i % durations.length];
+        const tip = aiTips[i]?.length > 5 ? aiTips[i] : defaultTips[i % defaultTips.length];
+
+        return {
+            day,
+            summary: { totalDuration: "45–60 min", intensity: getDailyFocus(day) },
+            trainerTip: tip,
+            exercises: [
+                { type: "Warmup", items: warmupNames.map(n => buildExItem(n, dur)) },
+                { type: "Main", items: mainNames.map(n => buildExItem(n, dur)) },
+                { type: "Cooldown", items: cooldownNames.map(n => buildExItem(n, dur)) },
+            ],
+            notes: ["Stay hydrated.", "Stop immediately if you feel pain.", "Consult a doctor if you have any conditions."],
+        };
+    });
+
     const fullPlan: StructuredExercisePlan = { title: "7-Day Workout Plan", days: generatedDays };
+
     if (autoSave) {
         await storageService.savePlan({
             id: Date.now().toString(),
             type: "exercise",
             title: fullPlan.title,
             content: JSON.stringify(fullPlan),
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
         });
     }
     return fullPlan;
@@ -122,7 +254,7 @@ export async function generateExercisePlan(
 function parseMiniDay(raw: string, day: string): DayExercisePlan | null {
     const cleaned = extractJson(fixJSON(raw));
     let json: any = null;
-    
+
     try {
         json = JSON.parse(cleaned);
     } catch (e) {
@@ -134,7 +266,7 @@ function parseMiniDay(raw: string, day: string): DayExercisePlan | null {
         console.error("All parsing attempts failed for day:", day);
         return null;
     }
-    
+
     try {
         const tip = json.TrainerTip || json.trainertip || json.tip || json.tpt || json.PersonalizedTip || "Focus on form and breathing.";
         const notes = json.Notes || json.notes || json.safety || json.SafetyTips || ["Stay hydrated", "Stop if dizzy"];
@@ -144,7 +276,7 @@ function parseMiniDay(raw: string, day: string): DayExercisePlan | null {
             const first = json[0];
             // If it's a flat list of exercises instead of categories
             if (first && (first.n || first.name) && !first.d && !Array.isArray(first.d)) {
-                 return {
+                return {
                     day,
                     summary: { totalDuration: "45-60 min", intensity: "Medium" },
                     trainerTip: String(tip),
@@ -236,21 +368,21 @@ function expandCategory(raw: any, type: Exercise["type"]): Exercise {
 function fixJSON(text: string) {
     let fixed = text.trim();
     fixed = fixed.replace(/```json|```/gi, "").trim();
-    
+
     // Fix broken multiline strings/missing quotes in lists
-    fixed = fixed.replace(/"\s*\n\s*(\d+\.)/g, ' $1'); 
-    
+    fixed = fixed.replace(/"\s*\n\s*(\d+\.)/g, ' $1');
+
     // Attempt to fix missing commas before keys
     fixed = fixed.replace(/"\s*\n\s*"/g, '",\n"');
-    
+
     // Attempt to fix trailing commas
     fixed = fixed.replace(/,\s*([}\]])/g, '$1');
-    
+
     return fixed;
 }
 
 function extractJson(s: string): string {
-    const start = s.indexOf("{") !== -1 && s.indexOf("[") !== -1 
+    const start = s.indexOf("{") !== -1 && s.indexOf("[") !== -1
         ? Math.min(s.indexOf("{"), s.indexOf("["))
         : Math.max(s.indexOf("{"), s.indexOf("["));
     const end = s.lastIndexOf("}") !== -1 && s.lastIndexOf("]") !== -1

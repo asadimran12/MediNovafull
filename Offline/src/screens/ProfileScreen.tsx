@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal
 } from "react-native";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import StorageService, { UserProfile } from "../services/StorageService";
@@ -34,6 +35,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
   const [isSet, setIsSet] = useState(false);
   const [forgetPasswordQuestion, setForgetPasswordQuestion] = useState("");
   const [forgetPasswordAnswer, setForgetPasswordAnswer] = useState("");
+  const [showDiseaseModal, setShowDiseaseModal] = useState(false);
+  const [showOthersInput, setShowOthersInput] = useState(false);
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [showCustomQuestion, setShowCustomQuestion] = useState(false);
+
+
 
   useEffect(() => {
     loadProfile();
@@ -85,6 +92,58 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
       ]
     );
   };
+
+
+  const toggleCondition = (subcondition: string) => {
+    const current = conditions.split(",").map(s => s.trim()).filter(Boolean)
+    if (current.includes(subcondition)) {
+      current.splice(current.indexOf(subcondition), 1)
+    } else {
+      current.push(subcondition)
+    }
+    setConditions(current.join(", "))
+  }
+
+
+  const Dieases = [
+    {
+      label: "Cardiovascular",
+      value: "cardiovascular",
+      icon: "🫀",
+      examples: "e.g. Hypertension, Heart Attack, Heart Failure",
+      subconditions: [
+        "Hypertension (High Blood Pressure)",
+        "Coronary Artery Disease",
+        "Heart Attack (Myocardial Infarction)",
+        "Heart Failure (Congestive)",
+        "Arrhythmia / Irregular Heartbeat",
+        "Atrial Fibrillation (AFib)",
+        "Stroke / TIA",
+        "Peripheral Artery Disease",
+        "Atherosclerosis",
+        "Cardiomyopathy",
+        "High Cholesterol (Hyperlipidemia)",
+      ],
+    },
+    {
+      label: "Diabetes",
+      value: "diabetes",
+      icon: "🩸",
+      examples: "e.g. Type 1, Type 2, Gestational Diabetes",
+      subconditions: [
+        "Type 1 Diabetes",
+        "Type 2 Diabetes",
+        "Prediabetes",
+        "Gestational Diabetes",
+        "Diabetic Neuropathy",
+        "Diabetic Retinopathy",
+        "Diabetic Nephropathy",
+        "Diabetic Foot Complications",
+        "Insulin Resistance",
+      ],
+    },
+  ]
+
 
   return (
     <View style={styles.container}>
@@ -157,17 +216,83 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
           <View style={styles.card}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Chronic Conditions</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="e.g. Type 2 Diabetes, Hypertension"
-                placeholderTextColor={COLORS.textMuted}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                value={conditions}
-                onChangeText={(text) => setConditions(text.replace(/[^a-zA-Z0-9\s,]/g, ""))}
-              />
-              <Text style={styles.helperText}>Separate multiple conditions with commas</Text>
+
+              {/* Dropdown trigger */}
+              <TouchableOpacity
+                style={[styles.input, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}
+                onPress={() => setShowDiseaseModal(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: conditions && !showOthersInput ? COLORS.textMain : COLORS.textMuted, fontSize: 15, flex: 1 }}>
+                  {!showOthersInput && conditions ? conditions : "Select condition..."}
+                </Text>
+                <Text style={{ color: COLORS.textMuted, fontSize: 16 }}>▾</Text>
+              </TouchableOpacity>
+
+              {/* Others free-text input */}
+              {showOthersInput && (
+                <TextInput
+                  style={[styles.input, { marginTop: 10 }]}
+                  placeholder="Describe your condition..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={conditions}
+                  onChangeText={setConditions}
+                  autoFocus
+                />
+              )}
+
+              {/* Disease picker modal */}
+              <Modal visible={showDiseaseModal} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalSheet}>
+                    <Text style={styles.modalTitle}>Select Condition</Text>
+
+                    {Dieases.map(cat => (
+                      <TouchableOpacity
+                        key={cat.value}
+                        style={styles.modalOption}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setConditions(cat.label);
+                          setShowOthersInput(false);
+                          setShowDiseaseModal(false);
+                        }}
+                      >
+                        <Text style={styles.modalOptionIcon}>{cat.icon}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.modalOptionLabel}>{cat.label}</Text>
+                          <Text style={styles.modalOptionExample}>{cat.examples}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+
+                    {/* Others option */}
+                    <TouchableOpacity
+                      style={styles.modalOption}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setConditions("");
+                        setShowOthersInput(true);
+                        setShowDiseaseModal(false);
+                      }}
+                    >
+                      <Text style={styles.modalOptionIcon}>✏️</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalOptionLabel}>Others</Text>
+                        <Text style={styles.modalOptionExample}>Type your own condition</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.modalDoneBtn} onPress={() => setShowDiseaseModal(false)}>
+                      <Text style={styles.modalDoneText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Modal>
+
+              <Text style={styles.helperText}>
+                {showOthersInput ? "Type your condition above" : "Tap to select your condition"}
+              </Text>
             </View>
 
             <View style={[styles.inputGroup, { marginBottom: 0 }]}>
@@ -207,13 +332,77 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Security Question</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Your first school name?"
-                placeholderTextColor={COLORS.textMuted}
-                value={forgetPasswordQuestion}
-                onChangeText={setForgetPasswordQuestion}
-              />
+
+              {/* Dropdown trigger */}
+              <TouchableOpacity
+                style={[styles.input, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}
+                onPress={() => setShowQuestionModal(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: forgetPasswordQuestion && !showCustomQuestion ? COLORS.textMain : COLORS.textMuted, fontSize: 15, flex: 1 }} numberOfLines={1}>
+                  {!showCustomQuestion && forgetPasswordQuestion ? forgetPasswordQuestion : "Select a security question..."}
+                </Text>
+                <Text style={{ color: COLORS.textMuted, fontSize: 16 }}>▾</Text>
+              </TouchableOpacity>
+
+              {/* Custom question input */}
+              {showCustomQuestion && (
+                <TextInput
+                  style={[styles.input, { marginTop: 10 }]}
+                  placeholder="Type your own question..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={forgetPasswordQuestion}
+                  onChangeText={setForgetPasswordQuestion}
+                  autoFocus
+                />
+              )}
+
+              {/* Question picker modal */}
+              <Modal visible={showQuestionModal} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalSheet}>
+                    <Text style={styles.modalTitle}>Choose a Security Question</Text>
+
+                    {[
+                      { icon: "🏫", q: "What was the name of your first school?" },
+                      { icon: "🐾", q: "What is your childhood pet's name?" },
+                      { icon: "🏙️", q: "What city were you born in?" },
+                    ].map(item => (
+                      <TouchableOpacity
+                        key={item.q}
+                        style={styles.modalOption}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setForgetPasswordQuestion(item.q);
+                          setShowCustomQuestion(false);
+                          setShowQuestionModal(false);
+                        }}
+                      >
+                        <Text style={styles.modalOptionIcon}>{item.icon}</Text>
+                        <Text style={[styles.modalOptionLabel, { flex: 1, flexWrap: "wrap" }]}>{item.q}</Text>
+                      </TouchableOpacity>
+                    ))}
+
+                    {/* Others option */}
+                    <TouchableOpacity
+                      style={styles.modalOption}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setForgetPasswordQuestion("");
+                        setShowCustomQuestion(true);
+                        setShowQuestionModal(false);
+                      }}
+                    >
+                      <Text style={styles.modalOptionIcon}>✏️</Text>
+                      <Text style={styles.modalOptionLabel}>Others — write your own</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.modalDoneBtn} onPress={() => setShowQuestionModal(false)}>
+                      <Text style={styles.modalDoneText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Modal>
             </View>
 
             <View style={[styles.inputGroup, { marginBottom: 0 }]}>
@@ -493,4 +682,61 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     marginTop: 30,
     fontWeight: '500',
   },
+
+  // Disease picker modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: SPACING.lg,
+    paddingBottom: 36,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: COLORS.textHeader,
+    textAlign: "center",
+    marginBottom: SPACING.lg,
+  },
+  modalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.lg,
+    marginBottom: 8,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    gap: 12,
+  },
+  modalOptionIcon: {
+    fontSize: 24,
+  },
+  modalOptionLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.textMain,
+  },
+  modalOptionExample: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  modalDoneBtn: {
+    marginTop: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  modalDoneText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.textMuted,
+  },
 });
+

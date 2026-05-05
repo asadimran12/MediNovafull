@@ -64,31 +64,31 @@ class LlamaService {
     let task = existingTasks.find((t: DownloadTask) => t.id === modelFilename);
 
     if (!task) {
-        if (await ReactNativeFS.exists(localPath)) await ReactNativeFS.unlink(localPath);
-        this.pausedDownloads[modelFilename] = { url: downloadUrl, bytesDownloaded: 0, bytesTotal: 0 };
-        task = RNBackgroundDownloader.download({ id: modelFilename, url: downloadUrl, destination: localPath });
+      if (await ReactNativeFS.exists(localPath)) await ReactNativeFS.unlink(localPath);
+      this.pausedDownloads[modelFilename] = { url: downloadUrl, bytesDownloaded: 0, bytesTotal: 0 };
+      task = RNBackgroundDownloader.download({ id: modelFilename, url: downloadUrl, destination: localPath });
     }
 
     this.activeDownloadTasks[modelFilename] = task;
 
     task.progress((event: any) => {
-        const bd = event?.bytesDownloaded || 0;
-        const bt = event?.bytesTotal || 0;
-        const cb = this.downloadCallbacks[modelFilename];
-        if (cb?.onProgress) cb.onProgress(bt > 0 ? (bd / bt) * 100 : 0);
+      const bd = event?.bytesDownloaded || 0;
+      const bt = event?.bytesTotal || 0;
+      const cb = this.downloadCallbacks[modelFilename];
+      if (cb?.onProgress) cb.onProgress(bt > 0 ? (bd / bt) * 100 : 0);
     })
-    .done(() => {
+      .done(() => {
         delete this.activeDownloadTasks[modelFilename];
         const cb = this.downloadCallbacks[modelFilename];
         delete this.downloadCallbacks[modelFilename];
         if (cb?.onComplete) cb.onComplete();
-    })
-    .error((errorObj: any) => {
+      })
+      .error((errorObj: any) => {
         delete this.activeDownloadTasks[modelFilename];
         const cb = this.downloadCallbacks[modelFilename];
         delete this.downloadCallbacks[modelFilename];
         if (cb?.onError) cb.onError(errorObj?.error || "Unknown error");
-    });
+      });
   }
 
   pauseDownload(modelFilename: string) {
@@ -122,7 +122,7 @@ class LlamaService {
 
   async loadModel(modelFilename: string, isEmbedding: boolean = false) {
     const targetIsEmbedding = isEmbedding || modelFilename === this.EMBEDDING_MODEL_NAME;
-    
+
     // Efficiency checks
     if (targetIsEmbedding && this.embeddingContext) return;
     if (!targetIsEmbedding && this.chatContext && this.currentChatModel === modelFilename) return;
@@ -136,28 +136,28 @@ class LlamaService {
         catch { modelPath = modelFilename; isAsset = true; }
       }
     } else {
-        if (!(await ReactNativeFS.exists(modelPath))) {
-            const extPath = `/data/user/0/com.offline/files/${modelFilename}`;
-            if (await ReactNativeFS.exists(extPath)) { modelPath = extPath; }
-            else throw new Error("Model not found locally.");
-        }
+      if (!(await ReactNativeFS.exists(modelPath))) {
+        const extPath = `/data/user/0/com.offline/files/${modelFilename}`;
+        if (await ReactNativeFS.exists(extPath)) { modelPath = extPath; }
+        else throw new Error("Model not found locally.");
+      }
     }
-    
+
     if (!isAsset && !modelPath.startsWith("file://") && modelPath.startsWith("/")) {
-        modelPath = `file://${modelPath}`;
+      modelPath = `file://${modelPath}`;
     }
 
     try {
       if (targetIsEmbedding) {
         if (this.embeddingContext) await this.embeddingContext.release();
         this.embeddingContext = await initLlama({
-            model: modelPath, is_model_asset: isAsset, n_ctx: 512, embedding: true, pooling_type: 'mean'
+          model: modelPath, is_model_asset: isAsset, n_ctx: 512, embedding: true, pooling_type: 'mean'
         } as any);
         console.log("Embedding context initialized.");
       } else {
         if (this.chatContext) await this.chatContext.release();
         this.chatContext = await initLlama({
-            model: modelPath, is_model_asset: isAsset, n_ctx: 2048, n_threads: 4
+          model: modelPath, is_model_asset: isAsset, n_ctx: 2048, n_threads: 4
         } as any);
         this.currentChatModel = modelFilename;
         console.log("Chat context initialized with", modelFilename);
@@ -197,7 +197,7 @@ class LlamaService {
     if (!this.chatContext) throw new Error("Chat model not loaded.");
     const fullMessages = [{ role: 'system', content: systemPrompt }, ...messages];
     const res = await this.chatContext.completion({
-        messages: fullMessages as any, n_predict: 512, temperature: 0.7, top_p: 0.9, jinja: true
+      messages: fullMessages as any, n_predict: 512, temperature: 0.7, top_p: 0.9, jinja: true
     }, onToken);
     const text = res?.text ?? "";
     console.log("--- AI RESPONSE ---\n", text, "\n-------------------");
@@ -214,7 +214,7 @@ class LlamaService {
     if (!this.chatContext) throw new Error("Chat model not loaded.");
     console.log("--- REPORT DATA RECEIVED ---", reportData);
     const fullMessages = ReportAnalyzechat.generateReportMessages(reportData as any, profile, messages as any);
-    
+
     console.log("--- FINAL PROMPT TO MODEL ---");
     console.log(JSON.stringify(fullMessages, null, 2));
 
