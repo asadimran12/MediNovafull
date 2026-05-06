@@ -235,9 +235,6 @@ function MainApp() {
   }, [messages.length, currentSessionId, isReady, isTyping]);
 
   useEffect(() => {
-    if (messages.length > 0 && currentView === "chat") {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }
     // Pre-warm model when entering chat
     if (currentView === "chat" && isReady) {
       (async () => {
@@ -250,7 +247,7 @@ function MainApp() {
         }
       })();
     }
-  }, [messages, currentView, isReady]);
+  }, [currentView, isReady]);
 
   // --- Controls ---
   const toggleSidebar = () => {
@@ -414,6 +411,9 @@ function MainApp() {
         ...prev,
         { id: astId, text: "", role: "assistant", timestamp: new Date() },
       ]);
+
+      // Yield to the event loop so the UI can clear the Cold Start message
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       let acc = "";
       await LlamaService.chat(history, systemPrompt, ({ token }) => {
@@ -634,6 +634,16 @@ function MainApp() {
               )}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
+              onContentSizeChange={() => {
+                if (currentView === "chat") {
+                  flatListRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
+              onLayout={() => {
+                if (currentView === "chat") {
+                  flatListRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
             />
             {isChatFull && (
               <View style={styles.fullNotice}>
@@ -683,7 +693,7 @@ function MainApp() {
               currentUser={currentUser}
             />
             <View style={styles.header}>
-              <TouchableOpacity onPress={toggleSidebar} style={[styles.menuIcon, { zIndex: 10 }]}><Text style={{ fontSize: 24, color: COLORS.textWhite }}>☰</Text></TouchableOpacity>
+              <TouchableOpacity onPress={toggleSidebar} style={[styles.menuIcon, { zIndex: 10 }]}><Text style={{ fontSize: 24, color: COLORS.textHeader }}>☰</Text></TouchableOpacity>
               {currentView !== "chat" && currentView !== "chat_page" && currentView !== "image_uploader" ? (
                 <View style={styles.logoContainer}>
                   <View style={styles.imageContainer}>

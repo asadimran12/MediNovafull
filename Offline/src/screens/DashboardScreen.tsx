@@ -51,8 +51,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
 
       {/* ── MODEL RECOMMENDATION BANNER ── */}
       {!hasModel && (
-        <TouchableOpacity 
-          style={styles.setupBanner} 
+        <TouchableOpacity
+          style={styles.setupBanner}
           onPress={() => onNavigate("model_manager")}
           activeOpacity={0.9}
         >
@@ -250,44 +250,46 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   heroCard: {
     backgroundColor: "#1A4C3B",
     borderRadius: RADIUS.xl,
-    flex: 1,                    // fills remaining vertical space
     marginBottom: SPACING.md,
     overflow: "hidden",
     position: "relative",
+    minHeight: 190,
+    justifyContent: "center",
     ...SHADOWS.medium,
   },
+
   heroImageTarget: {
     position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
-    width: "52%",
+    width: "45%",
   },
+
   heroImage: {
     width: "100%",
     height: "100%",
   },
   heroFade: {
     position: "absolute",
-    left: "47%",
+    left: "54%",
     top: 0,
     bottom: 0,
-    width: 100,
+    width: 96,
     flexDirection: "row",
     zIndex: 5,
   },
+
+
   heroContent: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: "60%",
+    width: "65%",
     paddingHorizontal: 20,
-    paddingVertical: 22,
+    paddingVertical: 24,
     justifyContent: "center",
-    gap: 12,
+    gap: 10,
     zIndex: 10,
   },
+
   heroBadge: {
     flexDirection: "row",
     alignItems: "center",
