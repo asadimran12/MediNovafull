@@ -4,14 +4,11 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Dimensions,
+  useWindowDimensions,
   Image,
 } from "react-native";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
-
-const { width, height } = Dimensions.get("window");
-const COLUMN_WIDTH = (width - SPACING.lg * 3) / 2;
 
 interface DashboardScreenProps {
   onNavigate: (view: any) => void;
@@ -23,7 +20,14 @@ interface DashboardScreenProps {
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
   const { colors: COLORS } = useTheme();
-  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+  const { width, height } = useWindowDimensions();
+  
+  // Proportional scaling based on typical phone dimensions (390x844)
+  const vScale = Math.min(Math.max(height / 800, 0.7), 1);
+  const fScale = Math.min(Math.max(width / 390, 0.85), 1);
+  const COLUMN_WIDTH = (width - SPACING.lg * 3) / 2;
+
+  const styles = React.useMemo(() => createStyles(COLORS, COLUMN_WIDTH, vScale, fScale), [COLORS, COLUMN_WIDTH, vScale, fScale]);
   const { onNavigate, onOpenSettings, userName, hasModel, recommendedModelName } = props;
 
   const modules = [
@@ -158,13 +162,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = (props) => {
 };
 
 // ── Styles ─────────────────────────────────────────────────────
-const createStyles = (COLORS: any) => StyleSheet.create({
+const createStyles = (COLORS: any, COLUMN_WIDTH: number, vScale: number, fScale: number) => StyleSheet.create({
   outerContainer: {
     flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.md,
+    paddingTop: SPACING.md * vScale,
+    paddingBottom: SPACING.md * vScale,
+    justifyContent: "space-between", // Distribute vertical space evenly to avoid overflow
   },
 
   /* ── NAV ── */
@@ -172,8 +177,8 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 2,
-    height: 44,
+    marginBottom: 2 * vScale,
+    height: 44 * vScale,
   },
   headerLogo: {
     width: 140,
@@ -231,16 +236,16 @@ const createStyles = (COLORS: any) => StyleSheet.create({
 
   /* ── WELCOME ── */
   welcomeSection: {
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm * vScale,
+    marginTop: SPACING.sm * vScale,
   },
   welcomeText: {
-    fontSize: 14,
+    fontSize: 14 * fScale,
     color: COLORS.textSub,
     fontWeight: "500",
   },
   userNameText: {
-    fontSize: 26,
+    fontSize: 26 * fScale,
     fontWeight: "900",
     color: COLORS.textHeader,
     letterSpacing: -0.5,
@@ -250,10 +255,10 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   heroCard: {
     backgroundColor: "#1A4C3B",
     borderRadius: RADIUS.xl,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.md * vScale,
     overflow: "hidden",
     position: "relative",
-    minHeight: 190,
+    minHeight: 190 * vScale,
     justifyContent: "center",
     ...SHADOWS.medium,
   },
@@ -284,9 +289,9 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   heroContent: {
     width: "65%",
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingVertical: 24 * vScale,
     justifyContent: "center",
-    gap: 10,
+    gap: 10 * vScale,
     zIndex: 10,
   },
 
@@ -311,22 +316,22 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     letterSpacing: 1.2,
   },
   heroTitle: {
-    fontSize: 26,
+    fontSize: 26 * fScale,
     fontWeight: "900",
     color: "#FFFFFF",
-    lineHeight: 32,
+    lineHeight: 32 * fScale,
     letterSpacing: -0.3,
   },
   heroSubtitle: {
-    fontSize: 13,
+    fontSize: 13 * fScale,
     color: "rgba(255,255,255,0.82)",
-    lineHeight: 19,
+    lineHeight: 19 * fScale,
     fontWeight: "400",
   },
   heroButton: {
     backgroundColor: "#59AA6F",
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: 18 * fScale,
+    paddingVertical: 10 * vScale,
     borderRadius: 30,
     alignSelf: "flex-start",
     ...SHADOWS.light,
@@ -334,7 +339,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   heroButtonLabel: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 13,
+    fontSize: 13 * fScale,
   },
 
   /* ── MODULES ── */
@@ -354,26 +359,26 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     backgroundColor: COLORS.surface,
     width: COLUMN_WIDTH,
     borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
+    padding: SPACING.md * vScale,
+    marginBottom: SPACING.sm * vScale,
     borderWidth: 1,
     borderColor: COLORS.border,
-    minHeight: 108,
+    minHeight: 108 * vScale,
     ...SHADOWS.light,
   },
   iconBox: {
-    width: 38,
-    height: 38,
+    width: 38 * fScale,
+    height: 38 * fScale,
     borderRadius: RADIUS.md,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 6 * vScale,
   },
   moduleIcon: {
-    fontSize: 20,
+    fontSize: 20 * fScale,
   },
   moduleTitle: {
-    fontSize: 14,
+    fontSize: 14 * fScale,
     fontWeight: "800",
     color: COLORS.textHeader,
     marginBottom: 2,
@@ -397,7 +402,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   /* ── FOOTER ── */
   footer: {
     alignItems: "center",
-    paddingTop: 4,
+    paddingTop: 4 * vScale,
   },
   privacyBadge: {
     backgroundColor: "rgba(89,170,111,0.12)",

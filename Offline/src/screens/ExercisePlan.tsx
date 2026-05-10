@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 
 import {
@@ -9,14 +9,12 @@ import {
     StyleSheet,
     ActivityIndicator,
     Modal,
-    Alert,
     Switch,
     TextInput,
+    Animated,
 } from "react-native";
 
 import NotificationService, { ReminderTimes } from "../services/NotificationService";
-
-
 import storageService, { HealthPlan } from "../services/StorageService";
 import {
     StructuredExercisePlan,
@@ -26,7 +24,105 @@ import {
     loadLatestExercisePlan,
 } from "../services/ExercisePlanGenerator";
 
-/* ─── Exercise Icons ───────────────────────────── */
+/* ─── Pop Message ──────────────────────────────────────────── */
+type PopType = "success" | "error";
+
+interface PopMessageProps {
+    message: string;
+    type: PopType;
+    onHide: () => void;
+}
+
+const PopMessage: React.FC<PopMessageProps> = ({ message, type, onHide }) => {
+    const translateY = useRef(new Animated.Value(-80)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.spring(translateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }),
+            Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        ]).start();
+
+        const timer = setTimeout(() => {
+            Animated.parallel([
+                Animated.timing(translateY, { toValue: -80, duration: 300, useNativeDriver: true }),
+                Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+            ]).start(() => onHide());
+        }, 3000);
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    const isSuccess = type === "success";
+
+    return (
+        <Animated.View
+            style={[
+                popStyles.container,
+                isSuccess ? popStyles.success : popStyles.error,
+                { transform: [{ translateY }], opacity },
+            ]}
+        >
+            <View style={[popStyles.iconCircle, isSuccess ? popStyles.iconSuccess : popStyles.iconError]}>
+                <Text style={popStyles.icon}>{isSuccess ? "✓" : "✕"}</Text>
+            </View>
+            <Text style={[popStyles.message, isSuccess ? popStyles.messageSuccess : popStyles.messageError]}>
+                {message}
+            </Text>
+            <TouchableOpacity onPress={onHide} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={[popStyles.close, isSuccess ? popStyles.messageSuccess : popStyles.messageError]}>✕</Text>
+            </TouchableOpacity>
+        </Animated.View>
+    );
+};
+
+const popStyles = StyleSheet.create({
+    container: {
+        position: "absolute",
+        top: 12,
+        left: 16,
+        right: 16,
+        zIndex: 9999,
+        flexDirection: "row",
+        alignItems: "center",
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        gap: 12,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 10,
+    },
+    success: {
+        backgroundColor: "#EDFBF3",
+        borderWidth: 1.5,
+        borderColor: "#6EE0A0",
+    },
+    error: {
+        backgroundColor: "#FEF0F0",
+        borderWidth: 1.5,
+        borderColor: "#F5A0A0",
+    },
+    iconCircle: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        justifyContent: "center",
+        alignItems: "center",
+        flexShrink: 0,
+    },
+    iconSuccess: { backgroundColor: "#22C55E" },
+    iconError: { backgroundColor: "#EF4444" },
+    icon: { color: "#fff", fontSize: 13, fontWeight: "800" },
+    message: { flex: 1, fontSize: 14, fontWeight: "600", lineHeight: 20 },
+    messageSuccess: { color: "#14532D" },
+    messageError: { color: "#7F1D1D" },
+    close: { fontSize: 14, fontWeight: "700", opacity: 0.5 },
+});
+
+/* ─── Exercise Icons ───────────────────────────────────────── */
 const EXERCISE_ICONS: Record<string, string> = {
     Warmup: "🔥",
     Main: "💪",
@@ -37,11 +133,10 @@ function getExerciseIcon(type: string): string {
     return EXERCISE_ICONS[type] ?? "🏋️‍♂️";
 }
 
-/* ─── Exercise Item Card ───────────────────────── */
+/* ─── Exercise Item Card ───────────────────────────────────── */
 const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => {
     const { colors: COLORS } = useTheme();
     const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
-
     return (
         <View style={styles.exerciseCard}>
             <Text style={styles.exerciseName}>{item.name}</Text>
@@ -55,23 +150,35 @@ const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => {
     );
 };
 
+/* ─── Helpers ──────────────────────────────────────────────── */
 function getTodayIndex(): number {
-    const day = new Date().getDay(); // 0 is Sunday, 1 is Monday...
-    return (day + 6) % 7; // Map so index 0 = Monday, ..., index 6 = Sunday
+    return (new Date().getDay() + 6) % 7;
 }
 
 function formatDate(iso: string) {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
 interface ExercisePlansScreenProps {
     onBack?: () => void;
 }
 
+/* ─── Main Screen ──────────────────────────────────────────── */
 export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack }) => {
     const { colors: COLORS } = useTheme();
     const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+
+    /* ─── Pop message state ─ */
+    const [popMsg, setPopMsg] = useState<{ message: string; type: PopType } | null>(null);
+    const showSuccess = (message: string) => setPopMsg({ message, type: "success" });
+    const showError = (message: string) => setPopMsg({ message, type: "error" });
+
+    /* ─── Confirm modal (replaces Alert confirm) ─ */
+    const [confirmModal, setConfirmModal] = useState<{
+        title: string; body: string; onConfirm: () => void;
+    } | null>(null);
+    const showConfirm = (title: string, body: string, onConfirm: () => void) =>
+        setConfirmModal({ title, body, onConfirm });
 
     const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayIndex());
     const [activePlan, setActivePlan] = useState<StructuredExercisePlan | null>(null);
@@ -90,45 +197,48 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     useEffect(() => {
         NotificationService.getReminders().then(res => {
             setReminders({
-                exercise: { enabled: res.exercise.enabled, hour: res.exercise.hour.toString().padStart(2, '0'), minute: res.exercise.minute.toString().padStart(2, '0') }
+                exercise: {
+                    enabled: res.exercise.enabled,
+                    hour: res.exercise.hour.toString().padStart(2, "0"),
+                    minute: res.exercise.minute.toString().padStart(2, "0"),
+                },
             });
         });
     }, []);
 
     const handleSaveReminders = async () => {
-        if (reminders) {
+        if (!reminders) return;
+        try {
             const currentObj = await NotificationService.getReminders();
             const finalConfig: ReminderTimes = {
                 ...currentObj,
                 exercise: {
                     enabled: reminders.exercise.enabled,
                     hour: Math.max(0, Math.min(23, parseInt(reminders.exercise.hour) || 0)),
-                    minute: Math.max(0, Math.min(59, parseInt(reminders.exercise.minute) || 0))
-                }
+                    minute: Math.max(0, Math.min(59, parseInt(reminders.exercise.minute) || 0)),
+                },
             };
-
             await NotificationService.applyReminderConfig(finalConfig);
-
             setReminders({
-                exercise: { enabled: finalConfig.exercise.enabled, hour: finalConfig.exercise.hour.toString().padStart(2, '0'), minute: finalConfig.exercise.minute.toString().padStart(2, '0') }
+                exercise: {
+                    enabled: finalConfig.exercise.enabled,
+                    hour: finalConfig.exercise.hour.toString().padStart(2, "0"),
+                    minute: finalConfig.exercise.minute.toString().padStart(2, "0"),
+                },
             });
-
             setShowReminderModal(false);
-            Alert.alert("Saved", "Exercise reminder updated successfully");
+            showSuccess("Exercise reminder updated successfully!");
+        } catch {
+            showError("Failed to save reminder. Please try again.");
         }
     };
 
-    const updateExerciseReminder = (field: 'enabled' | 'hour' | 'minute', value: any) => {
-        if (field === 'hour' || field === 'minute') {
-            value = value.replace(/[^0-9]/g, ''); // only allow digits
-        }
-        setReminders(prev => prev ? {
-            ...prev,
-            exercise: { ...prev.exercise, [field]: value }
-        } : null);
+    const updateExerciseReminder = (field: "enabled" | "hour" | "minute", value: any) => {
+        if (field === "hour" || field === "minute") value = value.replace(/[^0-9]/g, "");
+        setReminders(prev => prev ? { ...prev, exercise: { ...prev.exercise, [field]: value } } : null);
     };
 
-    /* Load plans */
+    /* ─── Load plans ─ */
     const loadPlans = useCallback(async () => {
         const all = await storageService.getPlans("exercise");
         setSavedPlans(all);
@@ -142,11 +252,9 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     }, [activePlan]);
 
     useEffect(() => { loadPlans(); }, []);
-
-    /* Reset completion when day changes */
     useEffect(() => { setCompletedItems([]); }, [selectedDayIndex]);
 
-    /* Generate (no auto-save) */
+    /* ─── Generate plan ─ */
     const handleGeneratePlan = async () => {
         setLoading(true);
         setPendingPlan(null);
@@ -161,46 +269,49 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                 setSelectedDayIndex(getTodayIndex());
             }
         } catch (err: any) {
-            Alert.alert("Generation Failed", err?.message ?? "Please try again.");
+            showError(err?.message ?? "Generation failed. Please try again.");
         } finally {
             setLoading(false);
             setProgressDay("");
         }
     };
 
-    /* Save pending plan */
+    /* ─── Save pending plan ─ */
     const handleSavePlan = async () => {
         if (!pendingPlan) return;
-        const id = Date.now().toString();
-        await storageService.savePlan({
-            id,
-            type: "exercise",
-            title: pendingPlan.title,
-            content: JSON.stringify(pendingPlan),
-            createdAt: new Date().toISOString(),
-        });
-        setActivePlan(pendingPlan);
-        setActivePlanId(id);
-        setPendingPlan(null);
-        await loadPlans();
-        Alert.alert("Saved!", "Your exercise plan has been saved.");
+        try {
+            const id = Date.now().toString();
+            await storageService.savePlan({
+                id,
+                type: "exercise",
+                title: pendingPlan.title,
+                content: JSON.stringify(pendingPlan),
+                createdAt: new Date().toISOString(),
+            });
+            setActivePlan(pendingPlan);
+            setActivePlanId(id);
+            setPendingPlan(null);
+            await loadPlans();
+            showSuccess("Exercise plan saved successfully!");
+        } catch {
+            showError("Failed to save the plan. Please try again.");
+        }
     };
 
-    /* Delete a saved plan */
+    /* ─── Delete plan ─ */
     const handleDeletePlan = (id: string) => {
-        Alert.alert("Delete Plan", "Remove this saved plan?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Delete", style: "destructive",
-                onPress: async () => {
-                    await storageService.deletePlan(id);
-                    await loadPlans();
-                },
-            },
-        ]);
+        showConfirm("Delete Plan", "Remove this saved plan?", async () => {
+            try {
+                await storageService.deletePlan(id);
+                await loadPlans();
+                showSuccess("Plan deleted.");
+            } catch {
+                showError("Could not delete the plan.");
+            }
+        });
     };
 
-    /* Use a saved plan */
+    /* ─── Use saved plan ─ */
     const handleUsePlan = (plan: HealthPlan) => {
         try {
             const parsed = JSON.parse(plan.content) as StructuredExercisePlan;
@@ -208,11 +319,14 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
             setActivePlanId(plan.id);
             setPendingPlan(null);
             setSelectedDayIndex(getTodayIndex());
-        } catch { /* ignore */ }
-        setShowManageModal(false);
+            setShowManageModal(false);
+            showSuccess(`Now using "${plan.title}"`);
+        } catch {
+            showError("Could not load that plan. It may be corrupted.");
+        }
     };
 
-    /* Derived */
+    /* ─── Derived ─ */
     const displayPlan = pendingPlan ?? activePlan;
     const days = displayPlan?.days ?? [];
     const currentDay = days[selectedDayIndex];
@@ -224,15 +338,43 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
 
     const toggleItem = (si: number, ii: number) => {
         const key = `${si}-${ii}`;
-        setCompletedItems((prev) =>
-            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-        );
+        setCompletedItems(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
     };
 
     return (
         <View style={{ flex: 1, backgroundColor: COLORS.background }}>
 
-            {/* ── Professional Green Header ── */}
+            {/* ── Pop Message ── */}
+            {popMsg && (
+                <PopMessage
+                    message={popMsg.message}
+                    type={popMsg.type}
+                    onHide={() => setPopMsg(null)}
+                />
+            )}
+
+            {/* ── Confirm Modal ── */}
+            <Modal visible={!!confirmModal} transparent animationType="fade" onRequestClose={() => setConfirmModal(null)}>
+                <View style={styles.confirmOverlay}>
+                    <View style={[styles.confirmBox, { backgroundColor: COLORS.surface }]}>
+                        <Text style={styles.confirmTitle}>{confirmModal?.title}</Text>
+                        <Text style={styles.confirmBody}>{confirmModal?.body}</Text>
+                        <View style={styles.confirmActions}>
+                            <TouchableOpacity style={styles.confirmCancel} onPress={() => setConfirmModal(null)}>
+                                <Text style={[styles.confirmCancelText, { color: COLORS.textSub }]}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.confirmDelete}
+                                onPress={() => { confirmModal?.onConfirm(); setConfirmModal(null); }}
+                            >
+                                <Text style={styles.confirmDeleteText}>Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* ── Header ── */}
             <View style={styles.headerContainer}>
                 <View style={styles.headerTopRow}>
                     {onBack ? (
@@ -296,9 +438,9 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                 </View>
             )}
 
+            {/* ── Day Tabs + Content ── */}
             {days.length > 0 ? (
                 <>
-                    {/* Day Tabs */}
                     <View style={styles.topBar}>
                         <ScrollView
                             horizontal
@@ -322,7 +464,6 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                         </ScrollView>
                     </View>
 
-                    {/* Day Content */}
                     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 50 }}>
                         {/* Progress */}
                         <View style={styles.progressContainer}>
@@ -352,10 +493,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                                 section.items.length > 0 &&
                                 section.items.every((_, ii) => completedItems.includes(`${si}-${ii}`));
                             return (
-                                <View
-                                    key={si}
-                                    style={[styles.mealSection, sectionDone && styles.sectionCompleted]}
-                                >
+                                <View key={si} style={[styles.mealSection, sectionDone && styles.sectionCompleted]}>
                                     <View style={styles.mealHeader}>
                                         <Text style={styles.mealIcon}>{getExerciseIcon(section.type)}</Text>
                                         <Text style={styles.mealTitle}>{section.type}</Text>
@@ -400,7 +538,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                             <Text style={styles.modalEmpty}>No saved plans yet.</Text>
                         ) : (
                             <ScrollView style={{ maxHeight: 400 }}>
-                                {savedPlans.map((plan) => {
+                                {savedPlans.map(plan => {
                                     const isActive = plan.id === activePlanId;
                                     return (
                                         <View key={plan.id} style={[styles.planRow, isActive && styles.planRowActive]}>
@@ -454,21 +592,21 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                                         maxLength={2}
                                         selectTextOnFocus
                                         value={reminders.exercise.hour}
-                                        onChangeText={t => updateExerciseReminder('hour', t)}
+                                        onChangeText={t => updateExerciseReminder("hour", t)}
                                     />
-                                    <Text style={{ fontWeight: 'bold' }}>:</Text>
+                                    <Text style={{ fontWeight: "bold", color: COLORS.textHeader }}>:</Text>
                                     <TextInput
                                         style={styles.timeInput}
                                         keyboardType="number-pad"
                                         maxLength={2}
                                         selectTextOnFocus
                                         value={reminders.exercise.minute}
-                                        onChangeText={t => updateExerciseReminder('minute', t)}
+                                        onChangeText={t => updateExerciseReminder("minute", t)}
                                     />
                                 </View>
                                 <Switch
                                     value={reminders.exercise.enabled}
-                                    onValueChange={v => updateExerciseReminder('enabled', v)}
+                                    onValueChange={v => updateExerciseReminder("enabled", v)}
                                     trackColor={{ false: COLORS.border, true: COLORS.primary }}
                                 />
                             </View>
@@ -487,7 +625,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     );
 };
 
-/* ─── Styles ────────────────────────────────────────────── */
+/* ─── Styles ───────────────────────────────────────────────── */
 const createStyles = (COLORS: any) => StyleSheet.create({
     headerContainer: {
         backgroundColor: COLORS.primary,
@@ -505,11 +643,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         marginBottom: 16,
     },
     screenTitle: { fontSize: 22, fontWeight: "800", color: "#fff", textAlign: "center" },
-    headerActionRow: {
-        flexDirection: "row",
-        justifyContent: "center",
-        gap: 12,
-    },
+    headerActionRow: { flexDirection: "row", justifyContent: "center", gap: 12 },
     headerActionBtn: {
         backgroundColor: COLORS.surface,
         paddingVertical: 8,
@@ -539,12 +673,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     },
     generateButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 
-    actionRow: {
-        flexDirection: "row",
-        marginHorizontal: 16,
-        marginVertical: 10,
-        gap: 10,
-    },
+    actionRow: { flexDirection: "row", marginHorizontal: 16, marginVertical: 10, gap: 10 },
     actionBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: "center" },
     saveBtn: {
         backgroundColor: COLORS.primary,
@@ -554,11 +683,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         shadowRadius: 8,
         elevation: 5,
     },
-    regenBtn: {
-        backgroundColor: "#fff",
-        borderWidth: 1.5,
-        borderColor: COLORS.primary,
-    },
+    regenBtn: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: COLORS.primary },
     actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
     unsavedBadge: {
@@ -574,53 +699,16 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     unsavedBadgeText: { color: COLORS.fullNoticeText || "#856404", fontSize: 12, fontWeight: "600" },
 
     topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-    dayCircle: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: "#f1f5f9",
-        marginRight: 8,
-    },
-    dayCircleSelected: {
-        backgroundColor: COLORS.primary,
-    },
-    dayText: {
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#555",
-    },
-    dayTextSelected: {
-        color: "#fff",
-    },
+    dayCircle: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: "#f1f5f9", marginRight: 8 },
+    dayCircleSelected: { backgroundColor: COLORS.primary },
+    dayText: { fontSize: 13, fontWeight: "600", color: "#555" },
+    dayTextSelected: { color: "#fff" },
 
-    progressContainer: {
-        backgroundColor: "#fff",
-        padding: 16,
-        borderRadius: 16,
-        marginBottom: 20,
-        elevation: 3,
-    },
-    progressTitle: {
-        fontWeight: "700",
-        marginBottom: 10,
-        fontSize: 14,
-    },
-    progressBarBackground: {
-        height: 10,
-        backgroundColor: "#eee",
-        borderRadius: 10,
-    },
-    progressBarFill: {
-        height: "100%",
-        backgroundColor: "#22c55e",
-        borderRadius: 10,
-    },
-    progressPercent: {
-        marginTop: 6,
-        fontWeight: "600",
-        textAlign: "right",
-        color: "#22c55e",
-    },
+    progressContainer: { backgroundColor: "#fff", padding: 16, borderRadius: 16, marginBottom: 20, elevation: 3 },
+    progressTitle: { fontWeight: "700", marginBottom: 10, fontSize: 14, color: COLORS.textHeader },
+    progressBarBackground: { height: 10, backgroundColor: "#eee", borderRadius: 10 },
+    progressBarFill: { height: "100%", backgroundColor: "#22c55e", borderRadius: 10 },
+    progressPercent: { marginTop: 6, fontWeight: "600", textAlign: "right", color: "#22c55e" },
 
     tipCard: {
         backgroundColor: "rgba(52,152,219,0.08)",
@@ -630,26 +718,10 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         padding: 16,
         marginBottom: 20,
     },
-    tipHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 8,
-        gap: 8,
-    },
+    tipHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 8 },
     tipIcon: { fontSize: 18 },
-    tipTitle: {
-        fontSize: 14,
-        fontWeight: "800",
-        color: "#2980b9",
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-    },
-    tipText: {
-        fontSize: 15,
-        color: "#34495e",
-        lineHeight: 22,
-        fontWeight: "500",
-    },
+    tipTitle: { fontSize: 14, fontWeight: "800", color: "#2980b9", textTransform: "uppercase", letterSpacing: 0.5 },
+    tipText: { fontSize: 15, color: "#34495e", lineHeight: 22, fontWeight: "500" },
 
     mealSection: { marginBottom: 22 },
     mealHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
@@ -669,11 +741,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     exerciseCard: { flex: 1 },
     exerciseName: { fontWeight: "700", fontSize: 15, marginBottom: 6, color: COLORS.textHeader },
     exerciseDetails: { fontSize: 13, color: COLORS.textSub },
-    circle: {
-        width: 28, height: 28, borderRadius: 14,
-        borderWidth: 2, borderColor: COLORS.border,
-        justifyContent: "center", alignItems: "center", marginLeft: 12,
-    },
+    circle: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: COLORS.border, justifyContent: "center", alignItems: "center", marginLeft: 12 },
     circleCompleted: { backgroundColor: COLORS.success, borderColor: COLORS.success },
     tick: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 
@@ -682,45 +750,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     emptyTitle: { fontSize: 20, fontWeight: "800", color: COLORS.textHeader, marginBottom: 8 },
     emptySubtitle: { fontSize: 14, color: COLORS.textSub, textAlign: "center" },
 
-    // Modal
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
-    modalSheet: {
-        backgroundColor: COLORS.surface,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 20,
-        paddingBottom: 34,
-    },
-    modalHandle: {
-        width: 40, height: 4, backgroundColor: "#ddd",
-        borderRadius: 2, alignSelf: "center", marginBottom: 16,
-    },
+    modalSheet: { backgroundColor: COLORS.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 },
+    modalHandle: { width: 40, height: 4, backgroundColor: "#ddd", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
     modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader, marginBottom: 16 },
-    modalEmpty: { color: COLORS.textMuted, textAlign: "center", marginVertical: 30, fontSize: 15 },
-    planRow: {
-        flexDirection: "row", alignItems: "center",
-        backgroundColor: COLORS.background, borderRadius: 12,
-        padding: 14, marginBottom: 10, gap: 10,
-    },
+    modalEmpty: { color: COLORS.textSub, textAlign: "center", marginVertical: 30, fontSize: 15 },
+    planRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.background, borderRadius: 12, padding: 14, marginBottom: 10, gap: 10 },
     planRowTitle: { fontWeight: "700", fontSize: 14, color: COLORS.textHeader },
     planRowDate: { fontSize: 12, color: COLORS.textSub, marginTop: 2 },
+    planRowActive: { borderWidth: 1.5, borderColor: COLORS.primary, backgroundColor: COLORS.surface },
+    inUseBadge: { marginTop: 4, alignSelf: "flex-start", backgroundColor: "rgba(39,174,96,0.12)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+    inUseBadgeText: { color: "#27ae60", fontSize: 11, fontWeight: "700" },
     useBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
     useBtnDisabled: { backgroundColor: "#27ae60" },
     useBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
-    inUseBadge: {
-        marginTop: 4,
-        alignSelf: "flex-start",
-        backgroundColor: "rgba(39,174,96,0.12)",
-        borderRadius: 6,
-        paddingHorizontal: 7,
-        paddingVertical: 2,
-    },
-    inUseBadgeText: { color: "#27ae60", fontSize: 11, fontWeight: "700" },
-    planRowActive: {
-        borderWidth: 1.5,
-        borderColor: COLORS.primary,
-        backgroundColor: COLORS.surface,
-    },
     deleteBtn: { backgroundColor: "rgba(255,69,58,0.15)", paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
     deleteBtnText: { fontSize: 16, color: COLORS.danger },
     modalCloseBtn: { marginTop: 16, backgroundColor: COLORS.background, padding: 14, borderRadius: 12, alignItems: "center" },
@@ -737,16 +780,20 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         elevation: 4,
         marginTop: 10,
     },
-    modalPrimaryBtnText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "800",
-        letterSpacing: 0.3,
-    },
+    modalPrimaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: 0.3 },
 
-    // Reminders
     reminderRow: { flexDirection: "row", alignItems: "center", marginBottom: 15, backgroundColor: COLORS.background, padding: 12, borderRadius: 10 },
-    reminderTitle: { fontWeight: "700", fontSize: 16, color: COLORS.textHeader },
     timeInputContainer: { flexDirection: "row", alignItems: "center", marginRight: 15 },
     timeInput: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8, fontSize: 16, fontWeight: "600", textAlign: "center", minWidth: 40, marginHorizontal: 4, color: COLORS.textHeader },
+
+    /* ── Confirm modal ── */
+    confirmOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 32 },
+    confirmBox: { width: "100%", borderRadius: 18, padding: 24, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 12 },
+    confirmTitle: { fontSize: 17, fontWeight: "800", color: COLORS.textHeader, marginBottom: 8 },
+    confirmBody: { fontSize: 14, color: COLORS.textSub, lineHeight: 20, marginBottom: 24 },
+    confirmActions: { flexDirection: "row", gap: 12 },
+    confirmCancel: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.border, alignItems: "center" },
+    confirmCancelText: { fontWeight: "700", fontSize: 15 },
+    confirmDelete: { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: "#EF4444", alignItems: "center" },
+    confirmDeleteText: { color: "#fff", fontWeight: "800", fontSize: 15 },
 });

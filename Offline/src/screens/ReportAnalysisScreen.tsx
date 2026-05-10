@@ -89,24 +89,6 @@ export const ReportAnalysisScreen: React.FC<ReportAnalysisScreenProps> = ({ onBa
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          {/* ── Online Analyze Report 2.0 Card ── */}
-          <TouchableOpacity
-            style={styles.premiumCard}
-            activeOpacity={0.9}
-            onPress={() => Alert.alert("MediNova 2.0", "Cloud-based advanced medical analysis is coming soon in the next update!")}
-          >
-            <View style={styles.premiumBadge}>
-              <Text style={styles.premiumBadgeText}>NEW</Text>
-            </View>
-            <View style={[styles.iconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Text style={styles.gridIcon}>⚡</Text>
-            </View>
-            <View style={styles.cardInfo}>
-              <Text style={styles.premiumTitle}>Online Analyze 2.0</Text>
-              <Text style={styles.premiumSubtitle}>Advanced Cloud AI Processing</Text>
-            </View>
-            <Text style={styles.premiumChevron}>›</Text>
-          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.howItWorks} onPress={() => Alert.alert("Coming Soon", "Detailed instructions will be added here.")}>
