@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, File, UploadFile
-from controllers.controller import get_all_data, reportanalyze, report_analyze_image
+from controllers.controller import get_all_data , getAllUsers
 
 router = APIRouter(prefix="/users", tags=["users"])
 

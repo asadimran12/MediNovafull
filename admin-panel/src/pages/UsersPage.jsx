@@ -5,10 +5,23 @@ import UserModal from '../components/UserModal';
 import { showToast } from '../components/Toast';
 
 function CreateModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ username:'', password:'', age:'', gender:'', conditions:'', severity:'' });
+  const [form, setForm] = useState({ username: '', password: '', age: '', gender: '', conditions: '', severity: '' });
   const [loading, setLoading] = useState(false);
 
-  function set(k, v) { setForm(f => ({...f, [k]: v})); }
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  useEffect(() => {
+    getAllUsers();
+  }, []);
+
+  async function getAllUsers() {
+    try {
+      console.log(BACKEND_URL);
+      const res = await fetch(`${BACKEND_URL}/users/GetAllUsers`);
+      console.log(res);
+      setUsers(res || []);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -19,7 +32,7 @@ function CreateModal({ onClose, onCreated }) {
       showToast(`User "${form.username}" created!`, 'success');
       onCreated();
       onClose();
-    } catch(e) { showToast(e.message, 'error'); }
+    } catch (e) { showToast(e.message, 'error'); }
     finally { setLoading(false); }
   }
 
@@ -78,10 +91,10 @@ function CreateModal({ onClose, onCreated }) {
 }
 
 export default function UsersPage() {
-  const [users,   setUsers]   = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState('');
-  const [modal,   setModal]   = useState(null);
+  const [search, setSearch] = useState('');
+  const [modal, setModal] = useState(null);
   const [creating, setCreating] = useState(false);
 
   async function load() {
@@ -89,7 +102,7 @@ export default function UsersPage() {
       setLoading(true);
       const res = await fetchUsers();
       setUsers(res.users || []);
-    } catch(e) { showToast(e.message, 'error'); }
+    } catch (e) { showToast(e.message, 'error'); }
     finally { setLoading(false); }
   }
 
@@ -106,7 +119,7 @@ export default function UsersPage() {
       await deleteUser(username);
       showToast(`Deleted "${username}"`, 'success');
       load();
-    } catch(e) { showToast(e.message, 'error'); }
+    } catch (e) { showToast(e.message, 'error'); }
   }
 
   return (
