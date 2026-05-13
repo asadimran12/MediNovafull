@@ -14,6 +14,8 @@ import {
   Platform,
   Modal,
 } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
+import notifee, { EventType } from "@notifee/react-native";
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 
 // Services
@@ -122,10 +124,26 @@ function MainApp() {
   useEffect(() => {
     NotificationService.init().catch(e => console.error("[Notifee] Init error:", e));
 
+    const unsubscribeForeground = notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.PRESS && detail.notification?.data?.navigateTo === 'settings') {
+        setCurrentView('settings');
+      }
+    });
+    notifee.getInitialNotification().then(initialNotification => {
+      if (initialNotification && initialNotification.notification.data?.navigateTo === 'settings') {
+        setCurrentView('settings');
+      }
+    });
+
     (async () => {
       try {
         setStatus("Syncing Health Data");
         await StorageService.init();
+
+        const netState = await NetInfo.fetch();
+        if (netState.isConnected) {
+          NotificationService.SendExportReminder().catch(console.error);
+        }
 
         // Initial Auth Check
         const userId = await AuthService.getCurrentUserId();
@@ -149,6 +167,13 @@ function MainApp() {
     // AppState Listener for Load/Offload
     const subscription = AppState.addEventListener("change", async (nextAppState) => {
       if (appState.current.match(/inactive|background/) && nextAppState === "active") {
+
+        const netState = await NetInfo.fetch();
+        if (netState.isConnected && netState.isInternetReachable !== false) {
+          NotificationService.SendExportReminder().catch(console.error);
+        }
+
+
         console.log("App foregrounded, reloading active model...");
         const activeModel = await ModelService.getActiveModel();
         if (activeModel) {
@@ -158,6 +183,7 @@ function MainApp() {
         console.log("App backgrounded, offloading model...");
         LlamaService.offloadChatModel().catch(console.error);
       }
+
       appState.current = nextAppState;
     });
 
@@ -166,6 +192,7 @@ function MainApp() {
       LlamaService.cleanup();
     };
   }, []);
+
 
   const initializeSession = async (allChats: ChatSession[]) => {
     const emptySession = allChats.find(
