@@ -112,9 +112,6 @@ export default function LoginPage({ onLogin }) {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-[10px] text-text-muted/60 font-mono uppercase tracking-widest">
-            default: admin / admin123
-          </p>
         </div>
       </div>
     </div>
