@@ -28,6 +28,7 @@ class UploadPayload(BaseModel):
     profile:          Optional[Any] = None
     chats:            Optional[Any] = None
     plans:            Optional[Any] = None
+    activeModelName:  Optional[str] = None
     auth:             Optional[Any] = None
 
 # ── Routes ────────────────────────────────────────────────────────────────────
