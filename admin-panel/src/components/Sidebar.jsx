@@ -1,15 +1,55 @@
 import splash_logo from "../assets/splash_logo.png";
+import NavButton from "./NavButton";
+import { useLocation } from "react-router-dom";
 
-export default function Sidebar({ connected, onSignOut }) {
+export default function Sidebar({ connected, onSignOut, isOpen, onClose }) {
+
+  const location = useLocation();
+
+  const Menu = [
+    {
+      path: "/admin/dashboard",
+      label: "Dashboard",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m0 0l-7 7-7-7m3-3v10a1 1 0 001 1h3m0 0h.01M17 15h.01" />
+        </svg>
+      )
+    },
+    {
+      path: "/admin/users",
+      label: "Users",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      )
+    }
+  ];
+
   return (
-    <aside className="fixed top-0 left-0 h-screen w-64 bg-surface/95 backdrop-blur-md border-r border-border flex flex-col z-50 shadow-[4px_0_24px_-12px_rgba(76,122,97,0.1)] transition-all">
-      {/* Logo Area */}
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 h-screen w-64 bg-surface/95 backdrop-blur-md border-r border-border flex flex-col z-50 shadow-[4px_0_24px_-12px_rgba(76,122,97,0.1)] transition-transform duration-300 ease-in-out md:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Logo Area */}
       <div className="px-6 pt-8 pb-6 border-b border-border/60">
         <div className="flex items-center gap-4">
-          <img 
-            src={splash_logo} 
-            alt="Logo" 
-            className="w-12 h-12 object-contain drop-shadow-md" 
+          <img
+            src={splash_logo}
+            alt="Logo"
+            className="w-12 h-12 object-contain drop-shadow-md"
           />
           <div className="flex flex-col justify-center">
             <span className="font-syne text-[#4C7A61] font-bold text-lg tracking-wide">
@@ -24,11 +64,16 @@ export default function Sidebar({ connected, onSignOut }) {
 
       {/* Nav */}
       <nav className="flex-1 px-4 py-6 flex flex-col gap-2">
-        {/* Active Nav Item */}
-        <div className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-semibold text-left bg-[#4C7A61]/10 text-[#4C7A61] border border-[#4C7A61]/20 shadow-sm transition-all cursor-default">
-          <span className="text-lg drop-shadow-sm">👥</span>
-          <span className="font-sans tracking-wide">Manage Users</span>
-        </div>
+        {Menu.map((item, index) => (
+          <NavButton
+            key={index}
+            path={item.path}
+            label={item.label}
+            icon={item.icon}
+            active={location.pathname === item.path}
+            onClick={onClose}
+          />
+        ))}
       </nav>
 
       {/* Bottom Area */}
@@ -61,5 +106,6 @@ export default function Sidebar({ connected, onSignOut }) {
         </button>
       </div>
     </aside>
+    </>
   );
 }

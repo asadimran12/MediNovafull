@@ -78,7 +78,7 @@ class StorageService {
     const allChats = await this.getAllChats();
 
 
-    const activeModelID = await this.getItem("activeModel");
+    const activeModelID = await this.getItem("active_model_id");
     const activeModel = AVAILABLE_MODELS.find((m: any) => m.id === activeModelID);
 
     // Gather all data
@@ -175,11 +175,15 @@ class StorageService {
   async exportAllDataOnCloud() {
     try {
       const allChats = await this.getAllChats();
+      const activeModelID = await this.getItem("active_model_id");
+      const activeModel = AVAILABLE_MODELS.find((m:any) => m.id === activeModelID);
+
       const exportData: any = {
         timestamp: new Date().toISOString(),
         profile: await this.getProfile(),
         chats: allChats,
         plans: await this.getPlans(),
+        activeModelName: activeModel ? activeModel.MiniName : "None",
         auth: {
           users: [],
           session: {}

@@ -14,6 +14,7 @@ def get_all_data(username: str):
 def getAllUsers():
     client, db = get_database()
     data = db.collection.find()
+    print("data", data)
     data = list(data)
     
     if data is None:
