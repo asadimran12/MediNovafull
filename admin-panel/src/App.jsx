@@ -7,6 +7,8 @@ import Toast        from './components/Toast';
 
 import DashboardPage from './pages/DashboardPage';
 
+import { fetchStats } from './api';
+
 export default function App() {
   const [authed,    setAuthed]    = useState(false);
   const [connected, setConnected] = useState(false);
@@ -17,8 +19,8 @@ export default function App() {
     if (!authed) return;
     const check = async () => {
       try {
-        const res = await fetch('/admin/stats');
-        setConnected(res.ok);
+        const res = await fetchStats();
+        setConnected(true);
       } catch { setConnected(false); }
     };
     check();
