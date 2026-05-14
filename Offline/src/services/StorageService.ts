@@ -1,5 +1,6 @@
 import * as ReactNativeFS from "react-native-fs";
 import { BACKEND_URL } from "@env";
+import { AVAILABLE_MODELS } from "./ModelService";
 
 export interface LocalMessage {
   id: string;
@@ -76,12 +77,17 @@ class StorageService {
 
     const allChats = await this.getAllChats();
 
+
+    const activeModelID = await this.getItem("activeModel");
+    const activeModel = AVAILABLE_MODELS.find((m: any) => m.id === activeModelID);
+
     // Gather all data
     const exportData: any = {
       timestamp: new Date().toISOString(),
       profile: await this.getProfile(),
       chats: allChats,
       plans: await this.getPlans(),
+      activeModelName: activeModel ? activeModel.MiniName : "None",
       auth: {}
     };
 

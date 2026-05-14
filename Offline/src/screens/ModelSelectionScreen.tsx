@@ -65,8 +65,8 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
     setIsPaused(false);
     try {
       await LlamaService.downloadModel(
-        model.filename, 
-        model.downloadUrl, 
+        model.filename,
+        model.downloadUrl,
         (p) => {
           setProgress(p);
         },
@@ -74,7 +74,7 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
           await ModelService.setActiveModel(model.id);
           setDownloadingId(null);
           setIsPaused(false);
-          Alert.alert("Success", `${model.name} downloaded and set as active.`);
+          Alert.alert("Success", `${model.MiniName} downloaded and set as active.`);
           onComplete();
         },
         (err) => {
@@ -111,7 +111,7 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
     <View style={styles.modelCard}>
       <View style={styles.modelInfo}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Text style={styles.modelName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.modelName} numberOfLines={1}>{item.MiniName}</Text>
           {recommendedId === item.id && (
             <View style={styles.recommendedBadge}>
               <Text style={styles.recommendedBadgeText}>⭐ BEST CHOICE</Text>
@@ -126,37 +126,37 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
         )}
         <Text style={styles.modelDesc}>{item.description}</Text>
       </View>
-      
+
       {downloadingId === item.id ? (
         <View style={styles.progressContainer}>
           <Text style={styles.progressText}>
             {isPaused ? `Paused at ${Math.round(progress || 0)}%` : `Downloading ${Math.round(progress || 0)}%`}
           </Text>
           <View style={styles.progressActions}>
-             {isPaused ? (
-               <TouchableOpacity style={[styles.controlBtn]} onPress={() => handleResume(item)}>
-                  <Text style={styles.controlBtnText}>Resume</Text>
-               </TouchableOpacity>
-             ) : (
-               <TouchableOpacity style={[styles.controlBtn]} onPress={() => handlePause(item)}>
-                  <Text style={styles.controlBtnText}>Pause</Text>
-               </TouchableOpacity>
-             )}
-             <TouchableOpacity style={[styles.controlBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
-                <Text style={[styles.controlBtnText, styles.dangerText]}>Cancel</Text>
-             </TouchableOpacity>
+            {isPaused ? (
+              <TouchableOpacity style={[styles.controlBtn]} onPress={() => handleResume(item)}>
+                <Text style={styles.controlBtnText}>Resume</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[styles.controlBtn]} onPress={() => handlePause(item)}>
+                <Text style={styles.controlBtnText}>Pause</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={[styles.controlBtn, styles.dangerBorder]} onPress={() => handleCancelDownload(item)}>
+              <Text style={[styles.controlBtnText, styles.dangerText]}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       ) : item.isDownloaded ? (
-        <TouchableOpacity 
-          style={[styles.downloadBtn, { backgroundColor: COLORS.success }]} 
+        <TouchableOpacity
+          style={[styles.downloadBtn, { backgroundColor: COLORS.success }]}
           onPress={() => handleUseLocal(item)}
         >
           <Text style={styles.downloadBtnText}>Use This Model</Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity 
-          style={styles.downloadBtn} 
+        <TouchableOpacity
+          style={styles.downloadBtn}
           onPress={() => handleDownload(item)}
           disabled={!!downloadingId}
         >
@@ -191,8 +191,8 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
       {recommendedId && (
         <View style={styles.recommendationBanner}>
           <Text style={styles.recommendationText}>
-            💡 Based on your phone's hardware, we recommend the 
-            <Text style={{ fontWeight: '800' }}> {models.find(m => m.id === recommendedId)?.name} </Text> 
+            💡 Based on your phone's hardware, we recommend the
+            <Text style={{ fontWeight: '800' }}> {models.find(m => m.id === recommendedId)?.MiniName} </Text>
             for the best experience.
           </Text>
         </View>
@@ -224,7 +224,7 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
                 <Text style={styles.closeIcon}>✕</Text>
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.guideStep}>
                 <Text style={styles.stepNumber}>1</Text>
@@ -258,8 +258,8 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
                 </View>
               </View>
 
-              <TouchableOpacity 
-                style={styles.gotItBtn} 
+              <TouchableOpacity
+                style={styles.gotItBtn}
                 onPress={() => setGuideVisible(false)}
               >
                 <Text style={styles.gotItBtnText}>Got it!</Text>
@@ -332,18 +332,18 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     color: COLORS.textMain,
     flex: 1,
   },
-  recommendedBadge: { 
-    backgroundColor: "#FFB020", 
-    paddingHorizontal: 10, 
-    paddingVertical: 5, 
+  recommendedBadge: {
+    backgroundColor: "#FFB020",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: RADIUS.pill || 20,
     flexDirection: "row",
     alignItems: "center"
   },
-  recommendedBadgeText: { 
-    color: "#FFF", 
-    fontSize: 10, 
-    fontWeight: "900" 
+  recommendedBadgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "900"
   },
   modelSize: {
     fontSize: 12,

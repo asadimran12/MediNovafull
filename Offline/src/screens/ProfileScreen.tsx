@@ -39,7 +39,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
   const [showOthersInput, setShowOthersInput] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [showCustomQuestion, setShowCustomQuestion] = useState(false);
-
+  const [showAnswer, setShowAnswer] = useState(false);
 
 
   useEffect(() => {
@@ -407,14 +407,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
 
             <View style={[styles.inputGroup, { marginBottom: 0 }]}>
               <Text style={styles.label}>Answer</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter answer"
-                placeholderTextColor={COLORS.textMuted}
-                secureTextEntry
-                value={forgetPasswordAnswer}
-                onChangeText={setForgetPasswordAnswer}
-              />
+              <View style={{ justifyContent: 'center' }}>
+                <TextInput
+                  style={[styles.input, { paddingRight: 50 }]}
+                  placeholder="Enter answer"
+                  placeholderTextColor={COLORS.textMuted}
+                  secureTextEntry={!showAnswer}
+                  value={forgetPasswordAnswer}
+                  onChangeText={setForgetPasswordAnswer}
+                />
+                <TouchableOpacity
+                  style={{ position: 'absolute', right: 16 }}
+                  onPress={() => setShowAnswer(!showAnswer)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={{ fontSize: 18 }}>{showAnswer ? '🙈' : '👁️'}</Text>
+
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 

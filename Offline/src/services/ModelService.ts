@@ -4,6 +4,7 @@ import StorageService from "./StorageService";
 
 export interface AIModel {
   id: string;
+  MiniName: string;
   name: string;
   description: string;
   size: string;
@@ -12,9 +13,10 @@ export interface AIModel {
   isCustom?: boolean;
 }
 
-const AVAILABLE_MODELS: AIModel[] = [
+export const AVAILABLE_MODELS: AIModel[] = [
   {
     id: "qwen-0.5b",
+    MiniName: "MediQ Mini",
     name: "Qwen 2.5 (0.5B) - Recommended",
     description: "Fast, efficient, and great for most medical queries. Low memory usage.",
     size: "350 MB",
@@ -23,6 +25,7 @@ const AVAILABLE_MODELS: AIModel[] = [
   },
   {
     id: "qwen-1.5b",
+    MiniName: "MediQ Pro",
     name: "Qwen 2.5 (1.5B) - Advanced",
     description: "Higher intelligence, better reasoning. Requires more device storage and RAM.",
     size: "950 MB",
@@ -60,7 +63,7 @@ class ModelService {
   async isModelDownloaded(modelId: string): Promise<boolean> {
     const model = AVAILABLE_MODELS.find(m => m.id === modelId);
     if (!model) return false;
-    
+
     const internalPath = `${ReactNativeFS.DocumentDirectoryPath}/${model.filename}`;
     if (await ReactNativeFS.exists(internalPath)) return true;
 
@@ -127,7 +130,7 @@ class ModelService {
     try {
       const totalMemory = await DeviceInfo.getTotalMemory(); // in bytes
       const ramGB = totalMemory / (1024 * 1024 * 1024);
-      
+
       console.log(`[ModelService] Detected ${ramGB.toFixed(2)} GB RAM`);
 
       if (ramGB < 3.5) {

@@ -167,7 +167,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     <View style={[styles.modelCard, item.isActive && styles.activeCard]}>
       <View style={styles.cardHeader}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.modelName}>{item.name}</Text>
+          <Text style={styles.modelName}>{item.MiniName}</Text>
           <View style={styles.metaRow}>
              <Text style={styles.modelSize}>📦 {item.size}</Text>
              {recommendedId === item.id && (

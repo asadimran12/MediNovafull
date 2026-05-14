@@ -483,6 +483,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   },
   historyList: {
     marginBottom: 10,
+    marginTop: 5,
   },
   emptyHistoryText: {
     fontSize: 13,
@@ -494,11 +495,14 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   histItemContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 30,
+    marginLeft: 10,
     marginRight: 10,
     paddingVertical: 8,
+    paddingLeft: 20,
     paddingRight: 15,
-    borderRadius: 8,
+    borderRadius: 10,
+    marginBottom: 4,
+
   },
   histItemTouchable: {
     flex: 1,
