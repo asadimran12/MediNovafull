@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_URL || '';
+const BASE = import.meta.env.VITE_API_URL || 'https://medinovafull-2.onrender.com';
 
 async function request(path, options = {}) {
   const res = await fetch(BASE + path, {
