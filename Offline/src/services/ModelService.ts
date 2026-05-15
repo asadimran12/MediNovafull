@@ -32,6 +32,16 @@ export const AVAILABLE_MODELS: AIModel[] = [
     downloadUrl: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
     filename: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
   },
+  {
+    id: "medinova-master",
+    MiniName: "MediNova AI",
+    name: "MediNova Master (Custom GGUF)",
+    description: "Your custom medical AI model hosted on Hugging Face.",
+    size: "398 MB",
+    downloadUrl: "https://huggingface.co/ImranAsad/MediNovaMaster/resolve/main/MedinovaMaster.gguf",
+    filename: "MedinovaMaster.gguf",
+    isCustom: true,
+  },
 ];
 
 class ModelService {
