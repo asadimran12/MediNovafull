@@ -5,6 +5,12 @@ from typing import Any, Optional
 from db import get_database
 from routers.routes import router  # ← Router was missing before!
 from admin_router import router as admin_router
+import stripe
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 app = FastAPI()
 
