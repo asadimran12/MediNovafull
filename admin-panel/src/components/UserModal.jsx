@@ -1,5 +1,11 @@
 import { useState } from 'react';
 
+const MODEL_NAMES = {
+  "qwen-0.5b": "MediQ Mini",
+  "medinova-master": "MediNova AI",
+  "qwen-1.5b": "MediQ Pro"
+};
+
 function Field({ label, value }) {
   return (
     <div className="bg-surface2 rounded-lg px-4 py-3">
@@ -44,7 +50,7 @@ export default function UserModal({ user, onClose }) {
             <Field 
               label="Unlocked Paid Models" 
               value={profile.unlockedModels && profile.unlockedModels.length > 0 
-                ? profile.unlockedModels.map(m => `${m.modelId} ($${m.amount})`).join(', ') 
+                ? profile.unlockedModels.map(m => `${MODEL_NAMES[m.modelId] || m.modelId} ($${m.amount})`).join(', ') 
                 : 'None'} 
             />
             <Field label="Account Created" value={user.timestamp ? new Date(user.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'} />
