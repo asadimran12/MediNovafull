@@ -25,7 +25,7 @@ export default function UserTable({ users = [], onView, loading }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-text-muted font-mono text-xs uppercase tracking-wider">
-              {['Username', 'Age', 'Gender', 'Conditions', 'Severity'].map(h => (
+              {['Username', 'Age', 'Gender', 'Conditions', 'Severity', 'Revenue'].map(h => (
                 <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
               ))}
             </tr>
@@ -35,7 +35,7 @@ export default function UserTable({ users = [], onView, loading }) {
               <>{[...Array(3)].map((_, i) => <SkeletonRow key={i} />)}</>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-16 text-center text-text-muted">
+                <td colSpan={6} className="px-4 py-16 text-center text-text-muted">
                   <div className="text-4xl mb-3">🔍</div>
                   <div>No users found</div>
                 </td>
@@ -44,6 +44,8 @@ export default function UserTable({ users = [], onView, loading }) {
               users.map(u => {
                 const profile = u.profile || {};
                 const conditions = (profile.conditions || '').slice(0, 30) + ((profile.conditions || '').length > 30 ? '…' : '');
+                const unlockedModels = profile.unlockedModels || [];
+                const revenue = unlockedModels.reduce((sum, m) => sum + (m.amount || 0), 0);
                 return (
                   <tr
                     key={u.primary_username}
@@ -61,6 +63,7 @@ export default function UserTable({ users = [], onView, loading }) {
                     <td className="px-4 py-3 text-text-muted">{profile.gender || '—'}</td>
                     <td className="px-4 py-3 text-text-muted max-w-[160px] truncate" title={profile.conditions}>{conditions || '—'}</td>
                     <td className="px-4 py-3"><SeverityBadge severity={profile.severity} /></td>
+                    <td className="px-4 py-3 text-green-400 font-mono">{revenue > 0 ? `$${revenue}` : '—'}</td>
                   </tr>
                 );
               })

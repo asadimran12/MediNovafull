@@ -41,6 +41,12 @@ export default function UserModal({ user, onClose }) {
             <Field label="Model Downloaded" value={user.activeModelName} />
 
             <Field label="Conditions" value={profile.conditions} />
+            <Field 
+              label="Unlocked Paid Models" 
+              value={profile.unlockedModels && profile.unlockedModels.length > 0 
+                ? profile.unlockedModels.map(m => `${m.modelId} ($${m.amount})`).join(', ') 
+                : 'None'} 
+            />
             <Field label="Account Created" value={user.timestamp ? new Date(user.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'} />
           </div>
         </div>
