@@ -187,7 +187,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
                 placeholderTextColor={COLORS.textMuted}
                 keyboardType="numeric"
                 value={age}
-                onChangeText={setAge}
+                onChangeText={(text) => {
+                  if (!isNaN(Number(text))) {
+                    setAge(text);
+                  }
+                }}
               />
             </View>
 

@@ -71,7 +71,7 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
             });
         } else {
             const initialText = reportData
-                ? `I see your report titled '${reportData.title}'. What would you like to know about it?`
+                ? `I have scanned your report. What you want to know about it ?`
                 : "Hello! How can I help you analyze your report today?";
             setMessages([{ id: "1", role: "assistant", text: initialText, timestamp: new Date() }]);
         }
@@ -104,12 +104,12 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
     const handleSendWithCustomText = async (text: string) => {
         if (!text.trim() || isGenerating || isSendingRef.current) return;
         isSendingRef.current = true;
-        
+
         const userText = text.trim();
         const newMsg: LocalMessage = { id: Date.now().toString(), role: "user", text: userText, timestamp: new Date() };
         setMessages(prev => [...prev, newMsg]);
         setIsGenerating(true);
-        
+
         // Use setTimeout to let React render the UI before the heavy model loads
         setTimeout(() => {
             performChat(userText, [...messages, newMsg]);
@@ -120,13 +120,13 @@ export default function ChatPage({ onBack, reportData, imageUri, initialSessionI
         if (!input.trim() || isGenerating || isSendingRef.current) return;
         isSendingRef.current = true;
         setLoadingLabel("Loading AI model...");
-        
+
         const userText = input.trim();
         const newMsg: LocalMessage = { id: Date.now().toString(), role: "user", text: userText, timestamp: new Date() };
         setMessages(prev => [...prev, newMsg]);
         setInput("");
         setIsGenerating(true);
-        
+
         // Use setTimeout to let React render the UI before the heavy model loads
         setTimeout(() => {
             performChat(userText, [...messages, newMsg]);

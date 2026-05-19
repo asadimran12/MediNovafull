@@ -13,6 +13,7 @@ import {
   TextInput,
   Animated,
 } from "react-native";
+import { ChevronDown } from "lucide-react-native";
 
 import NotificationService, { ReminderTimes } from "../services/NotificationService";
 import storageService, { HealthPlan } from "../services/StorageService";
@@ -24,6 +25,13 @@ import {
   sanitisePlan,
   safeParseDietPlan,
 } from "../services/DietPlanGenerator";
+import {
+  StructuredExercisePlan,
+  Exercise,
+  ExerciseItem,
+  generateExercisePlan,
+  loadLatestExercisePlan,
+} from "../services/ExercisePlanGenerator";
 
 interface PlansScreenProps {
   type: "diet" | "exercise";
@@ -160,6 +168,18 @@ function getMealIcon(type: string): string {
   return MEAL_ICONS[type?.toLowerCase()] ?? "🍴";
 }
 
+/* ─── Exercise Icons ───────────────────────────────────────── */
+const EXERCISE_ICONS: Record<string, string> = {
+  Warmup: "🤸",
+  Main: "🏋️",
+  Cooldown: "🧘",
+  Optional: "⭐",
+};
+
+function getExerciseIcon(type: string): string {
+  return EXERCISE_ICONS[type] ?? "🏃";
+}
+
 /* ─── MacroPill ────────────────────────────────────────────── */
 const MacroPill = ({
   label, value, color, bg,
@@ -188,6 +208,24 @@ const FoodItemCard = ({ item }: { item: MealItem }) => {
         <MacroPill label="protein" value={item.protein} color={COLORS.primary} bg={COLORS.primary + "22"} />
         <MacroPill label="carbs" value={item.carbs} color="#6c5ce7" bg="#6c5ce722" />
         <MacroPill label="fat" value={item.fat} color="#e0a800" bg="#fdcb6e33" />
+      </View>
+    </View>
+  );
+};
+
+/* ─── ExerciseItemCard ─────────────────────────────────────────── */
+const ExerciseItemCard = ({ item }: { item: ExerciseItem }) => {
+  const { colors: COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
+  return (
+    <View style={styles.foodCard}>
+      <Text style={styles.foodName}>{item.name}</Text>
+      <Text style={{ fontSize: 13, color: COLORS.textSub, marginBottom: 8, lineHeight: 18 }}>{item.description}</Text>
+      <View style={styles.pillRow}>
+        <MacroPill label="duration" value={item.duration} color="#e17055" bg="#ffeaa744" />
+        <MacroPill label="intensity" value={item.intensity} color={COLORS.primary} bg={COLORS.primary + "22"} />
+        {item.sets ? <MacroPill label="sets" value={item.sets} color="#6c5ce7" bg="#6c5ce722" /> : null}
+        {item.reps ? <MacroPill label="reps" value={item.reps} color="#e0a800" bg="#fdcb6e33" /> : null}
       </View>
     </View>
   );
@@ -260,9 +298,9 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   };
 
   const [selectedDayIndex, setSelectedDayIndex] = useState(getTodayIndex());
-  const [activePlan, setActivePlan] = useState<StructuredDietPlan | null>(null);
+  const [activePlan, setActivePlan] = useState<any | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
-  const [pendingPlan, setPendingPlan] = useState<StructuredDietPlan | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [progressDay, setProgressDay] = useState<string>("");
   const [planNumbers, setPlanNumbers] = useState({ totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 });
@@ -270,6 +308,31 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   const [showManageModal, setShowManageModal] = useState(false);
   const [completedMeals, setCompletedMeals] = useState<number[]>([]);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const headerProgress = useRef(new Animated.Value(1)).current;
+
+  const toggleHeader = () => {
+    const toValue = isHeaderVisible ? 0 : 1;
+    setIsHeaderVisible(v => !v);
+    Animated.timing(headerProgress, {
+      toValue,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const headerMaxHeight = headerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 500],
+  });
+  const headerOpacity = headerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+  const chevronRotation = headerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['180deg', '0deg'],
+  });
 
   type UIConfig = Record<"breakfast" | "lunch" | "snack" | "dinner", { enabled: boolean; hour: string; minute: string }>;
   const [reminders, setReminders] = useState<UIConfig | null>(null);
@@ -321,18 +384,18 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 
   /* ─── Load plans ─ */
   const loadPlans = useCallback(async () => {
-    const all = await storageService.getPlans("diet");
+    const all = await storageService.getPlans(type);
     setSavedPlans(all);
     if (all.length > 0 && !activePlan) {
-      const latest = await loadLatestDietPlan();
+      const latest = type === "diet" ? await loadLatestDietPlan() : await loadLatestExercisePlan();
       if (latest?.days?.length) {
         setActivePlan(latest);
         setActivePlanId(all[0].id);
       }
     }
-  }, [activePlan]);
+  }, [activePlan, type]);
 
-  useEffect(() => { if (type === "diet") loadPlans(); }, []);
+  useEffect(() => { loadPlans(); }, [loadPlans]);
 
   /* ─── Generate plan ─ */
   const handleGeneratePlan = async () => {
@@ -340,13 +403,24 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       setLoading(true);
       setPendingPlan(null);
       setProgressDay("Starting...");
-      const result = await generateDietPlan(
-        (dayName, index) => setProgressDay(`Generating ${dayName} (${index + 1}/7)...`),
-        { autoSave: false }
-      );
-      if (result) {
-        setPendingPlan(sanitisePlan(result));
-        setSelectedDayIndex(getTodayIndex());
+      if (type === "diet") {
+        const result = await generateDietPlan(
+          (dayName, index) => setProgressDay(`Generating ${dayName} (${index + 1}/7)...`),
+          { autoSave: false }
+        );
+        if (result) {
+          setPendingPlan(sanitisePlan(result));
+          setSelectedDayIndex(getTodayIndex());
+        }
+      } else {
+        const result = await generateExercisePlan(
+          (dayName, index) => setProgressDay(`Generating ${dayName} (${index + 1}/7)...`),
+          { autoSave: false }
+        );
+        if (result) {
+          setPendingPlan(result);
+          setSelectedDayIndex(getTodayIndex());
+        }
       }
     } catch (err: any) {
       showError(err?.message ?? "Generation failed. Please try again.");
@@ -363,7 +437,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       const id = Date.now().toString();
       await storageService.savePlan({
         id,
-        type: "diet",
+        type: type,
         title: pendingPlan.title,
         content: JSON.stringify(pendingPlan),
         createdAt: new Date().toISOString(),
@@ -372,7 +446,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
       setActivePlanId(id);
       setPendingPlan(null);
       await loadPlans();
-      showSuccess("Diet plan saved successfully!");
+      showSuccess(`${type === "diet" ? "Diet" : "Exercise"} plan saved successfully!`);
     } catch {
       showError("Failed to save the plan. Please try again.");
     }
@@ -393,16 +467,34 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
 
   /* ─── Use saved plan ─ */
   const handleUsePlan = (plan: HealthPlan) => {
-    const parsed = safeParseDietPlan(plan.content);
-    if (parsed) {
-      setActivePlan(sanitisePlan(parsed));
-      setActivePlanId(plan.id);
-      setPendingPlan(null);
-      setSelectedDayIndex(getTodayIndex());
-      setShowManageModal(false);
-      showSuccess(`Now using "${plan.title}"`);
+    if (type === "diet") {
+      const parsed = safeParseDietPlan(plan.content);
+      if (parsed) {
+        setActivePlan(sanitisePlan(parsed));
+        setActivePlanId(plan.id);
+        setPendingPlan(null);
+        setSelectedDayIndex(getTodayIndex());
+        setShowManageModal(false);
+        showSuccess(`Now using "${plan.title}"`);
+      } else {
+        showError("Could not load that plan. It may be corrupted.");
+      }
     } else {
-      showError("Could not load that plan. It may be corrupted.");
+      try {
+        const parsed = JSON.parse(plan.content);
+        if (parsed && parsed.days) {
+          setActivePlan(parsed);
+          setActivePlanId(plan.id);
+          setPendingPlan(null);
+          setSelectedDayIndex(getTodayIndex());
+          setShowManageModal(false);
+          showSuccess(`Now using "${plan.title}"`);
+        } else {
+          showError("Could not load that plan.");
+        }
+      } catch {
+        showError("Could not load that plan. It may be corrupted.");
+      }
     }
   };
 
@@ -419,23 +511,14 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
     }
   }, [currentDay]);
 
-  const normalizedMeals = currentDay ? normalizeMeals(currentDay.meals ?? []) : [];
+  const normalizedMeals = currentDay && type === "diet" ? normalizeMeals(currentDay.meals ?? []) : [];
   useEffect(() => { setCompletedMeals([]); }, [selectedDayIndex]);
 
-  const totalMeals = normalizedMeals.length;
+  const totalMeals = type === "diet" ? normalizedMeals.length : (currentDay?.exercises?.length || 0);
   const mealProgress = totalMeals === 0 ? 0 : Math.round((completedMeals.length / totalMeals) * 100);
   const toggleMeal = (mi: number) => setCompletedMeals(prev => prev.includes(mi) ? prev.filter(i => i !== mi) : [...prev, mi]);
 
-  /* ─── Exercise fallback ─ */
-  if (type === "exercise") {
-    return (
-      <View style={styles.empty}>
-        <Text style={{ fontSize: 16, color: "#888" }}>No exercise plan available.</Text>
-      </View>
-    );
-  }
-
-  /* ─── Diet UI ─ */
+  /* ─── UI ─ */
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
 
@@ -480,8 +563,10 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
             </TouchableOpacity>
           ) : <View style={{ width: 70 }} />}
           <View style={{ alignItems: "center" }}>
-            <Text style={styles.screenTitle}>Diet Plan</Text>
-            <Text style={{ color: "#fff", opacity: 0.8, textAlign: "center", marginTop: 4 }}>Your personalized nutrition</Text>
+            <Text style={styles.screenTitle}>{type === "diet" ? "Diet Plan" : "Exercise Plan"}</Text>
+            <Text style={{ color: "#fff", opacity: 0.8, textAlign: "center", marginTop: 4 }}>
+              {type === "diet" ? "Your personalized nutrition" : "Your workout schedule"}
+            </Text>
           </View>
           <View style={{ width: 70 }} />
         </View>
@@ -495,61 +580,93 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
         </View>
       </View>
 
-      {/* ── Stats ── */}
-      <View style={styles.statsContainer}>
-        {[
-          { label: "Calories", value: planNumbers.totalCalories },
-          { label: "Protein", value: planNumbers.totalProtein },
-          { label: "Carbs", value: planNumbers.totalCarbs },
-          { label: "Fat", value: planNumbers.totalFat },
-        ].map(item => (
-          <View key={item.label} style={styles.statCard}>
-            <Text style={styles.statValue}>{item.value}</Text>
-            <Text style={styles.statLabel}>{item.label}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* ── Action Buttons ── */}
-      {pendingPlan ? (
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleSavePlan}>
-            <Text style={styles.actionBtnText}>💾 Save Plan</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.regenBtn]} onPress={handleGeneratePlan} disabled={loading}>
-            <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>🔄 Regenerate</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
-          onPress={handleGeneratePlan}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-              <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.generateButtonText}>{progressDay}</Text>
-            </View>
+      <Animated.View
+        style={{
+          opacity: headerOpacity,
+          maxHeight: headerMaxHeight,
+          overflow: 'hidden',
+        }}
+      >
+        {/* ── Stats ── */}
+        <View style={styles.statsContainer}>
+          {type === "diet" ? (
+            [
+              { label: "Calories", value: planNumbers.totalCalories },
+              { label: "Protein", value: planNumbers.totalProtein },
+              { label: "Carbs", value: planNumbers.totalCarbs },
+              { label: "Fat", value: planNumbers.totalFat },
+            ].map(item => (
+              <View key={item.label} style={styles.statCard}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </View>
+            ))
           ) : (
-            <Text style={styles.generateButtonText}>✨ Generate Diet Plan</Text>
+            [
+              { label: "Total Time", value: currentDay?.summary?.totalDuration ?? "-" },
+              { label: "Focus", value: currentDay?.summary?.intensity ?? "-" },
+            ].map(item => (
+              <View key={item.label} style={[styles.statCard, { flex: 1 }]}>
+                <Text style={styles.statValue}>{item.value}</Text>
+                <Text style={styles.statLabel}>{item.label}</Text>
+              </View>
+            ))
           )}
-        </TouchableOpacity>
-      )}
-
-      {pendingPlan && (
-        <View style={styles.unsavedBadge}>
-          <Text style={styles.unsavedBadgeText}>⚠️ Preview — not saved yet</Text>
         </View>
-      )}
+
+        {/* ── Action Buttons ── */}
+        {pendingPlan ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleSavePlan}>
+              <Text style={styles.actionBtnText}>💾 Save Plan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, styles.regenBtn]} onPress={handleGeneratePlan} disabled={loading}>
+              <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>🔄 Regenerate</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
+            onPress={handleGeneratePlan}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.generateButtonText}>{progressDay}</Text>
+              </View>
+            ) : (
+              <Text style={styles.generateButtonText}>✨ Generate {type === "diet" ? "Diet" : "Exercise"} Plan</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {pendingPlan && (
+          <View style={styles.unsavedBadge}>
+            <Text style={styles.unsavedBadgeText}>⚠️ Preview — not saved yet</Text>
+          </View>
+        )}
+      </Animated.View>
+
+      {/* ── Toggle Header Button ── */}
+      <View style={{ alignItems: 'center', marginTop: 10, marginBottom: 5 }}>
+        <TouchableOpacity
+          onPress={toggleHeader}
+          style={{ padding: 6, backgroundColor: COLORS.surface, borderRadius: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } }}
+        >
+          <Animated.View style={{ transform: [{ rotate: chevronRotation }] }}>
+            <ChevronDown size={24} color={COLORS.textSub} />
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
 
       {/* ── Day Tabs + Content ── */}
       {days.length > 0 ? (
         <>
           <View style={styles.topBar}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10 }}>
-              {days.map((day, index) => {
+              {days.map((day: { day?: string }, index: number) => {
                 const sel = selectedDayIndex === index;
                 return (
                   <TouchableOpacity key={index} onPress={() => setSelectedDayIndex(index)} style={[styles.dayCircle, sel && styles.dayCircleSelected]}>
@@ -563,57 +680,80 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 50 }}>
             {totalMeals > 0 && (
               <View style={styles.progressContainer}>
-                <Text style={styles.progressTitle}>Today's Meal Progress</Text>
+                <Text style={styles.progressTitle}>Today's {type === "diet" ? "Meal" : "Workout"} Progress</Text>
                 <View style={styles.progressBarBackground}>
                   <View style={[styles.progressBarFill, { width: `${mealProgress}%` }]} />
                 </View>
-                <Text style={styles.progressPercent}>{completedMeals.length}/{totalMeals} meals · {mealProgress}% done</Text>
+                <Text style={styles.progressPercent}>{completedMeals.length}/{totalMeals} {type === "diet" ? "meals" : "workouts"} · {mealProgress}% done</Text>
               </View>
             )}
 
             {(currentDay as any).trainerTip && (
               <View style={styles.tipCard}>
                 <View style={styles.tipHeader}>
-                  <Text style={styles.tipIcon}>🥗</Text>
-                  <Text style={styles.tipTitle}>AI Dietitian Tip</Text>
+                  <Text style={styles.tipIcon}>{type === "diet" ? "🥗" : "💡"}</Text>
+                  <Text style={styles.tipTitle}>{type === "diet" ? "AI Dietitian Tip" : "Trainer Tip"}</Text>
                 </View>
                 <Text style={styles.tipText}>{(currentDay as any).trainerTip}</Text>
               </View>
             )}
 
-            {normalizedMeals.map((items, mi) => {
-              const title = currentDay?.meals?.[mi]?.type ?? "Meal";
-              const done = completedMeals.includes(mi);
-              return (
-                <View key={mi} style={[styles.mealSection, done && styles.mealSectionDone]}>
-                  <View style={styles.mealHeader}>
-                    <Text style={styles.mealIcon}>{getMealIcon(title)}</Text>
-                    <Text style={styles.mealTitle}>{title}</Text>
-                    {done && <Text style={styles.mealDoneCheck}>✔</Text>}
-                    <TouchableOpacity style={[styles.mealCircle, done && styles.mealCircleDone]} onPress={() => toggleMeal(mi)}>
-                      {done && <Text style={styles.mealTick}>✓</Text>}
-                    </TouchableOpacity>
+            {type === "diet" ? (
+              normalizedMeals.map((items, mi) => {
+                const title = currentDay?.meals?.[mi]?.type ?? "Meal";
+                const done = completedMeals.includes(mi);
+                return (
+                  <View key={mi} style={[styles.mealSection, done && styles.mealSectionDone]}>
+                    <View style={styles.mealHeader}>
+                      <Text style={styles.mealIcon}>{getMealIcon(title)}</Text>
+                      <Text style={styles.mealTitle}>{title}</Text>
+                      {done && <Text style={styles.mealDoneCheck}>✔</Text>}
+                      <TouchableOpacity style={[styles.mealCircle, done && styles.mealCircleDone]} onPress={() => toggleMeal(mi)}>
+                        {done && <Text style={styles.mealTick}>✓</Text>}
+                      </TouchableOpacity>
+                    </View>
+                    {items.map((item, ii) => <FoodItemCard key={ii} item={item} />)}
                   </View>
-                  {items.map((item, ii) => <FoodItemCard key={ii} item={item} />)}
-                </View>
-              );
-            })}
+                );
+              })
+            ) : (
+              (currentDay.exercises || []).map((exerciseGroup: Exercise, ei: number) => {
+                const title = exerciseGroup.type;
+                const done = completedMeals.includes(ei);
+                return (
+                  <View key={ei} style={[styles.mealSection, done && styles.mealSectionDone]}>
+                    <View style={styles.mealHeader}>
+                      <Text style={styles.mealIcon}>{getExerciseIcon(title)}</Text>
+                      <Text style={styles.mealTitle}>{title}</Text>
+                      {done && <Text style={styles.mealDoneCheck}>✔</Text>}
+                      <TouchableOpacity style={[styles.mealCircle, done && styles.mealCircleDone]} onPress={() => toggleMeal(ei)}>
+                        {done && <Text style={styles.mealTick}>✓</Text>}
+                      </TouchableOpacity>
+                    </View>
+                    {exerciseGroup.items.map((item, ii) => <ExerciseItemCard key={ii} item={item} />)}
+                  </View>
+                );
+              })
+            )}
           </ScrollView>
         </>
       ) : (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>🥗</Text>
-          <Text style={styles.emptyTitle}>No Diet Plan Yet</Text>
-          <Text style={styles.emptySubtitle}>Tap "Generate Diet Plan" above to create a personalised 7-day meal plan.</Text>
+          <Text style={styles.emptyIcon}>{type === "diet" ? "🥗" : "🏋️"}</Text>
+          <Text style={styles.emptyTitle}>No {type === "diet" ? "Diet" : "Exercise"} Plan Yet</Text>
+          <Text style={styles.emptySubtitle}>Tap "Generate {type === "diet" ? "Diet" : "Exercise"} Plan" above to create a personalised 7-day {type === "diet" ? "meal" : "workout"} plan.</Text>
         </View>
       )}
+
+
+
 
       {/* ── Manage Plans Modal ── */}
       <Modal visible={showManageModal} transparent animationType="slide" onRequestClose={() => setShowManageModal(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowManageModal(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>📋 Saved Diet Plans</Text>
+            <Text style={styles.modalTitle}>📋 Saved {type === "diet" ? "Diet" : "Exercise"} Plans</Text>
             {savedPlans.length === 0 ? (
               <Text style={styles.modalEmpty}>No saved plans yet.</Text>
             ) : (
@@ -698,7 +838,7 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
   unsavedBadge: { alignSelf: "center", backgroundColor: COLORS.fullNoticeBg, borderWidth: 1, borderColor: COLORS.fullNoticeBorder, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 6 },
   unsavedBadgeText: { color: COLORS.fullNoticeText, fontSize: 12, fontWeight: "600" },
-  topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border, marginTop: 20 },
   dayCircle: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: "#f1f5f9", marginRight: 8 },
   dayCircleSelected: { backgroundColor: COLORS.primary },
   dayText: { fontSize: 13, fontWeight: "600", color: "#555" },

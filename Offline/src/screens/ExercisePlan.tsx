@@ -13,6 +13,7 @@ import {
     TextInput,
     Animated,
 } from "react-native";
+import { ChevronDown } from "lucide-react-native";
 
 import NotificationService, { ReminderTimes } from "../services/NotificationService";
 import storageService, { HealthPlan } from "../services/StorageService";
@@ -190,6 +191,31 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
     const [savedPlans, setSavedPlans] = useState<HealthPlan[]>([]);
     const [showManageModal, setShowManageModal] = useState(false);
     const [showReminderModal, setShowReminderModal] = useState(false);
+    const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+    const headerProgress = useRef(new Animated.Value(1)).current;
+
+    const toggleHeader = () => {
+        const toValue = isHeaderVisible ? 0 : 1;
+        setIsHeaderVisible(v => !v);
+        Animated.timing(headerProgress, {
+            toValue,
+            duration: 300,
+            useNativeDriver: false,
+        }).start();
+    };
+
+    const headerMaxHeight = headerProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 500],
+    });
+    const headerOpacity = headerProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+    });
+    const chevronRotation = headerProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['180deg', '0deg'],
+    });
 
     type UIConfig = { exercise: { enabled: boolean; hour: string; minute: string } };
     const [reminders, setReminders] = useState<UIConfig | null>(null);
@@ -404,39 +430,59 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                 </View>
             </View>
 
-            {/* ── Action Buttons ── */}
-            {pendingPlan ? (
-                <View style={styles.actionRow}>
-                    <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleSavePlan}>
-                        <Text style={styles.actionBtnText}>💾 Save Plan</Text>
+            {/* ── Stats/Actions ── */}
+            <Animated.View
+                style={{
+                    opacity: headerOpacity,
+                    maxHeight: headerMaxHeight,
+                    overflow: 'hidden',
+                }}
+            >
+                {pendingPlan ? (
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleSavePlan}>
+                            <Text style={styles.actionBtnText}>💾 Save Plan</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.actionBtn, styles.regenBtn]} onPress={handleGeneratePlan} disabled={loading}>
+                            <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>🔄 Generate Another</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
+                        onPress={handleGeneratePlan}
+                        disabled={loading}
+                        activeOpacity={0.85}
+                    >
+                        {loading ? (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                                <ActivityIndicator color="#fff" size="small" />
+                                <Text style={styles.generateButtonText}>{progressDay}</Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.generateButtonText}>✨ Generate Exercise Plan</Text>
+                        )}
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.actionBtn, styles.regenBtn]} onPress={handleGeneratePlan} disabled={loading}>
-                        <Text style={[styles.actionBtnText, { color: COLORS.primary }]}>🔄 Generate Another</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <TouchableOpacity
-                    style={[styles.generateButton, loading && { backgroundColor: "#aaa" }]}
-                    onPress={handleGeneratePlan}
-                    disabled={loading}
-                    activeOpacity={0.85}
-                >
-                    {loading ? (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                            <ActivityIndicator color="#fff" size="small" />
-                            <Text style={styles.generateButtonText}>{progressDay}</Text>
-                        </View>
-                    ) : (
-                        <Text style={styles.generateButtonText}>✨ Generate Exercise Plan</Text>
-                    )}
-                </TouchableOpacity>
-            )}
+                )}
 
-            {pendingPlan && (
-                <View style={styles.unsavedBadge}>
-                    <Text style={styles.unsavedBadgeText}>⚠️ Preview — not saved yet</Text>
-                </View>
-            )}
+                {pendingPlan && (
+                    <View style={styles.unsavedBadge}>
+                        <Text style={styles.unsavedBadgeText}>⚠️ Preview — not saved yet</Text>
+                    </View>
+                )}
+            </Animated.View>
+
+            {/* ── Toggle Button ── */}
+            <View style={{ alignItems: 'center', marginTop: 10, marginBottom: 5 }}>
+                <TouchableOpacity
+                    onPress={toggleHeader}
+                    style={{ padding: 6, backgroundColor: COLORS.surface, borderRadius: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } }}
+                >
+                    <Animated.View style={{ transform: [{ rotate: chevronRotation }] }}>
+                        <ChevronDown size={24} color={COLORS.textSub} />
+                    </Animated.View>
+                </TouchableOpacity>
+            </View>
 
             {/* ── Day Tabs + Content ── */}
             {days.length > 0 ? (
@@ -672,6 +718,17 @@ const createStyles = (COLORS: any) => StyleSheet.create({
         elevation: 5,
     },
     generateButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+    unsavedBadge: {
+        alignSelf: "center",
+        backgroundColor: COLORS.fullNoticeBg || "#fff3cd",
+        borderWidth: 1,
+        borderColor: COLORS.fullNoticeBorder || "#ffc107",
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        marginBottom: 6,
+    },
+    unsavedBadgeText: { color: COLORS.fullNoticeText || "#856404", fontSize: 12, fontWeight: "600" },
 
     actionRow: { flexDirection: "row", marginHorizontal: 16, marginVertical: 10, gap: 10 },
     actionBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: "center" },
@@ -685,18 +742,6 @@ const createStyles = (COLORS: any) => StyleSheet.create({
     },
     regenBtn: { backgroundColor: "#fff", borderWidth: 1.5, borderColor: COLORS.primary },
     actionBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-
-    unsavedBadge: {
-        alignSelf: "center",
-        backgroundColor: COLORS.fullNoticeBg || "#fff3cd",
-        borderWidth: 1,
-        borderColor: COLORS.fullNoticeBorder || "#ffc107",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-        marginBottom: 6,
-    },
-    unsavedBadgeText: { color: COLORS.fullNoticeText || "#856404", fontSize: 12, fontWeight: "600" },
 
     topBar: { backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.border },
     dayCircle: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: "#f1f5f9", marginRight: 8 },

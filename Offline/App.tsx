@@ -122,28 +122,28 @@ function MainApp() {
 
   // --- Initialization & Lifecycle ---
   useEffect(() => {
-    NotificationService.init().catch(e => console.error("[Notifee] Init error:", e));
+    // NotificationService.init().catch(e => console.error("[Notifee] Init error:", e));
 
-    const unsubscribeForeground = notifee.onForegroundEvent(({ type, detail }) => {
-      if (type === EventType.PRESS && detail.notification?.data?.navigateTo === 'settings') {
-        setCurrentView('settings');
-      }
-    });
-    notifee.getInitialNotification().then(initialNotification => {
-      if (initialNotification && initialNotification.notification.data?.navigateTo === 'settings') {
-        setCurrentView('settings');
-      }
-    });
+    // const unsubscribeForeground = notifee.onForegroundEvent(({ type, detail }) => {
+    //   if (type === EventType.PRESS && detail.notification?.data?.navigateTo === 'settings') {
+    //     setCurrentView('settings');
+    //   }
+    // });
+    // notifee.getInitialNotification().then(initialNotification => {
+    //   if (initialNotification && initialNotification.notification.data?.navigateTo === 'settings') {
+    //     setCurrentView('settings');
+    //   }
+    // });
 
     (async () => {
       try {
         setStatus("Syncing Health Data");
         await StorageService.init();
 
-        const netState = await NetInfo.fetch();
-        if (netState.isConnected) {
-          NotificationService.SendExportReminder().catch(console.error);
-        }
+        // const netState = await NetInfo.fetch();
+        // if (netState.isConnected) {
+        //   NotificationService.SendExportReminder().catch(console.error);
+        // }
 
         // Initial Auth Check
         const userId = await AuthService.getCurrentUserId();
