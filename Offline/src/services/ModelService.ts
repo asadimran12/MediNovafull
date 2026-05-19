@@ -11,6 +11,8 @@ export interface AIModel {
   downloadUrl: string;
   filename: string;
   isCustom?: boolean;
+  plan?: string;
+  price?: number;
 }
 
 export const AVAILABLE_MODELS: AIModel[] = [
@@ -22,15 +24,8 @@ export const AVAILABLE_MODELS: AIModel[] = [
     size: "350 MB",
     downloadUrl: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
     filename: "qwen2.5-0.5b-instruct-q4_k_m.gguf",
-  },
-  {
-    id: "qwen-1.5b",
-    MiniName: "MediQ Pro",
-    name: "Qwen 2.5 (1.5B) - Advanced",
-    description: "Higher intelligence, better reasoning. Requires more device storage and RAM.",
-    size: "950 MB",
-    downloadUrl: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-    filename: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    plan: "free",
+    price: 0,
   },
   {
     id: "medinova-master",
@@ -41,6 +36,19 @@ export const AVAILABLE_MODELS: AIModel[] = [
     downloadUrl: "https://huggingface.co/ImranAsad/MediNovaMaster/resolve/main/MedinovaMaster.gguf",
     filename: "MedinovaMaster.gguf",
     isCustom: true,
+    plan: "free",
+    price: 0,
+  },
+  {
+    id: "qwen-1.5b",
+    MiniName: "MediQ Pro",
+    name: "Qwen 2.5 (1.5B) - Advanced",
+    description: "Higher intelligence, better reasoning. Requires more device storage and RAM.",
+    size: "950 MB",
+    downloadUrl: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    filename: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    plan: "paid",
+    price: 50,
   },
 ];
 

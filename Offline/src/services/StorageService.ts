@@ -33,6 +33,12 @@ export interface UserProfile {
   severity?: "Low" | "Medium" | "High" | "";
   forgetPasswordQuestion?: string;
   forgetPasswordAnswer?: string;
+  unlockedModels?: {
+    modelId: string;
+    mode: "free" | "paid";
+    amount: number;
+    unlockedAt: string;
+  }[];
   isSet: boolean;
 }
 
@@ -176,7 +182,7 @@ class StorageService {
     try {
       const allChats = await this.getAllChats();
       const activeModelID = await this.getItem("active_model_id");
-      const activeModel = AVAILABLE_MODELS.find((m:any) => m.id === activeModelID);
+      const activeModel = AVAILABLE_MODELS.find((m: any) => m.id === activeModelID);
 
       const exportData: any = {
         timestamp: new Date().toISOString(),
@@ -324,6 +330,35 @@ class StorageService {
 
   async deleteProfile() {
     if (await ReactNativeFS.exists(this.profilePath)) await ReactNativeFS.unlink(this.profilePath);
+  }
+
+  async unlockModel(modelId: string, mode: "free" | "paid", amount: number) {
+    const profile = await this.getProfile();
+    if (!profile.unlockedModels) {
+      profile.unlockedModels = [];
+    }
+    if (!profile.unlockedModels.find(m => m.modelId === modelId)) {
+      profile.unlockedModels.push({
+        modelId,
+        mode,
+        amount,
+        unlockedAt: new Date().toISOString()
+      });
+      await this.saveProfile(profile);
+      try {
+        await this.exportAllDataOnCloud();
+      } catch (e) {
+        console.error("Failed to backup unlocked model to cloud", e);
+      }
+    }
+  }
+
+  async isModelUnlocked(modelId: string): Promise<boolean> {
+    const model = AVAILABLE_MODELS.find((m: any) => m.id === modelId);
+    if (model && model.plan !== "paid") return true;
+
+    const profile = await this.getProfile();
+    return !!profile.unlockedModels?.find(m => m.modelId === modelId);
   }
 
   // ─── Generic Storage ────────────────────────────────────────────────────────

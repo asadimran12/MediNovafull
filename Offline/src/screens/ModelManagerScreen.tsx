@@ -12,11 +12,13 @@ import {
   ScrollView,
   Modal,
   StatusBar,
+  TextInput,
 } from "react-native";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import ModelService, { AIModel } from "../services/ModelService";
 import LlamaService from "../services/LlamaService";
-
+import StorageService from "../services/StorageService";
+import { BACKEND_URL } from "@env";
 interface ModelManagerScreenProps {
   onBack: () => void;
 }
@@ -25,7 +27,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
-  const [models, setModels] = useState<(AIModel & { isDownloaded: boolean; isActive: boolean })[]>([]);
+  const [models, setModels] = useState<(AIModel & { isDownloaded: boolean; isActive: boolean; isUnlocked: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -36,6 +38,14 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   // States for Custom Modals
   const [deleteConfirmModel, setDeleteConfirmModel] = useState<AIModel | null>(null);
   const [infoAlert, setInfoAlert] = useState<{ title: string; message: string; type: "success" | "error" | "info" } | null>(null);
+
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [selectedPaidModel, setSelectedPaidModel] = useState<AIModel | null>(null);
+  const [cardNumber, setCardNumber] = useState("4242424242424242");
+  const [expMonth, setExpMonth] = useState("12");
+  const [expYear, setExpYear] = useState("2026");
+  const [cvc, setCvc] = useState("123");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     loadStatus();
@@ -85,7 +95,8 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     const enriched = await Promise.all(all.map(async (m) => ({
       ...m,
       isDownloaded: await ModelService.isModelDownloaded(m.id),
-      isActive: active?.id === m.id
+      isActive: active?.id === m.id,
+      isUnlocked: await StorageService.isModelUnlocked(m.id)
     })));
 
     setModels(enriched);
@@ -97,7 +108,13 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     setRecommendedId(recId);
   };
 
-  const handleDownload = async (model: AIModel) => {
+  const handleDownload = async (model: AIModel & { isUnlocked?: boolean }) => {
+    const unlocked = await StorageService.isModelUnlocked(model.id);
+    if (model.plan === "paid" && !unlocked) {
+      setSelectedPaidModel(model);
+      setShowSubscriptionModal(true);
+      return;
+    }
     if (!model.downloadUrl) {
       setInfoAlert({
         title: "Manual Setup Required",
@@ -148,6 +165,65 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
     setIsPaused(false);
   };
 
+  const submitPayment = async () => {
+    if (!selectedPaidModel) return;
+    setIsProcessing(true);
+
+    try {
+      const username = await StorageService.getPrimaryUsername();
+
+      const payload = {
+        username: username || "guest",
+        name: selectedPaidModel.MiniName,
+        price: selectedPaidModel.price,
+        card_number: cardNumber,
+        exp_month: parseInt(expMonth),
+        exp_year: parseInt(expYear),
+        cvc: cvc
+      };
+
+      const response = await fetch(`${BACKEND_URL}/users/Addpayment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        await StorageService.unlockModel(selectedPaidModel.id, "paid", selectedPaidModel.price || 0);
+        setInfoAlert({ title: "Success!", message: "Payment successful. You unlocked the model!", type: "success" });
+        setShowSubscriptionModal(false);
+        // Start the download now that it is paid for!
+        setDownloadingId(selectedPaidModel.id);
+        setProgress(0);
+        setIsPaused(false);
+        await LlamaService.downloadModel(
+          selectedPaidModel.filename,
+          selectedPaidModel.downloadUrl,
+          (p) => setProgress(p),
+          async () => {
+            await loadStatus();
+            setDownloadingId(null);
+            setIsPaused(false);
+            setInfoAlert({ title: "Success", message: `${selectedPaidModel.name} downloaded successfully.`, type: "success" });
+          },
+          () => {
+            setDownloadingId(null);
+            setIsPaused(false);
+          }
+        );
+        setSelectedPaidModel(null);
+      } else {
+        setInfoAlert({ title: "Payment Failed", message: data.message, type: "error" });
+      }
+    } catch (error) {
+      setInfoAlert({ title: "Network Error", message: "Could not reach the server. Is the backend running?", type: "error" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleDelete = async (model: AIModel) => {
     setDeleteConfirmModel(model);
   };
@@ -169,18 +245,33 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
         <View style={{ flex: 1 }}>
           <Text style={styles.modelName}>{item.MiniName}</Text>
           <View style={styles.metaRow}>
-             <Text style={styles.modelSize}>📦 {item.size}</Text>
-             {recommendedId === item.id && (
-                <View style={styles.recTag}>
-                   <Text style={styles.recTagText}>RECOMMENDED</Text>
+            <Text style={styles.modelSize}>📦 {item.size}</Text>
+            {item.plan === "paid" ? (
+              item.isUnlocked ? (
+                <View style={[styles.recTag, { backgroundColor: '#D1FAE5' }]}>
+                  <Text style={[styles.recTagText, { color: '#10B981' }]}>✅ PURCHASED</Text>
                 </View>
-             )}
+              ) : (
+                <View style={[styles.recTag, { backgroundColor: '#FEE2E2' }]}>
+                  <Text style={[styles.recTagText, { color: '#EF4444' }]}>💎 ${item.price}</Text>
+                </View>
+              )
+            ) : (
+              <View style={[styles.recTag, { backgroundColor: '#D1FAE5' }]}>
+                <Text style={[styles.recTagText, { color: '#10B981' }]}>🆓 FREE</Text>
+              </View>
+            )}
+            {recommendedId === item.id && (
+              <View style={styles.recTag}>
+                <Text style={styles.recTagText}>RECOMMENDED</Text>
+              </View>
+            )}
           </View>
         </View>
         {item.isActive && (
-            <View style={styles.activeBadge}>
-              <Text style={styles.activeBadgeText}>ACTIVE</Text>
-            </View>
+          <View style={styles.activeBadge}>
+            <Text style={styles.activeBadgeText}>ACTIVE</Text>
+          </View>
         )}
       </View>
 
@@ -208,7 +299,9 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
             </View>
           ) : (
             <TouchableOpacity style={styles.primaryBtn} onPress={() => handleDownload(item)} disabled={!!downloadingId}>
-              <Text style={styles.btnText}>Download AI Model</Text>
+              <Text style={styles.btnText}>
+                {item.plan === "paid" && !item.isUnlocked ? `Unlock for $${item.price}` : "Download AI Model"}
+              </Text>
             </TouchableOpacity>
           )
         ) : (
@@ -223,7 +316,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
               </View>
             )}
             <TouchableOpacity style={styles.deleteIconBtn} onPress={() => handleDelete(item)}>
-               <Text style={{ fontSize: 18 }}>🗑️</Text>
+              <Text style={{ fontSize: 18 }}>🗑️</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -234,7 +327,7 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       {/* ── Premium Header ── */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -254,8 +347,8 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
 
       {loading ? (
         <View style={styles.center}>
-           <ActivityIndicator size="large" color={COLORS.primary} />
-           <Text style={styles.loadingText}>Checking local models...</Text>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Checking local models...</Text>
         </View>
       ) : (
         <FlatList
@@ -266,10 +359,10 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
           ListHeaderComponent={
             <View style={styles.listHeader}>
               <View style={styles.tipCard}>
-                 <Text style={styles.tipTitle}>💡 AI Memory Tip</Text>
-                 <Text style={styles.tipText}>
-                    Active models are loaded into RAM. If the app feels slow, use the Recommended model for your device.
-                 </Text>
+                <Text style={styles.tipTitle}>💡 AI Memory Tip</Text>
+                <Text style={styles.tipText}>
+                  Active models are loaded into RAM. If the app feels slow, use the Recommended model for your device.
+                </Text>
               </View>
               <Text style={styles.sectionTitle}>Available Models</Text>
             </View>
@@ -319,6 +412,84 @@ export const ModelManagerScreen: React.FC<ModelManagerScreenProps> = ({ onBack }
           </View>
         </View>
       </Modal>
+
+      {/* Subscription Modal */}
+      <Modal
+        visible={showSubscriptionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSubscriptionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { padding: 20, paddingTop: 30 }]}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 15, right: 15 }}
+              onPress={() => setShowSubscriptionModal(false)}
+            >
+              <Text style={{ fontSize: 24, color: COLORS.textMuted }}>✕</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.modalTitle}>Unlock Premium Model</Text>
+
+            <View style={{ width: '100%', marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.textMain }}>{selectedPaidModel?.MiniName}</Text>
+              <Text style={{ fontSize: 14, color: COLORS.primary, fontWeight: '700', marginTop: 4 }}>Price: ${selectedPaidModel?.price}</Text>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.textMain, marginBottom: 8 }}>Card Number</Text>
+              <TextInput
+                style={styles.inputField}
+                value={cardNumber}
+                onChangeText={setCardNumber}
+                keyboardType="numeric"
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.textMain, marginBottom: 8 }}>Exp Month</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={expMonth}
+                    onChangeText={setExpMonth}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.textMain, marginBottom: 8 }}>Exp Year</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={expYear}
+                    onChangeText={setExpYear}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '700', color: COLORS.textMain, marginBottom: 8 }}>CVC</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={cvc}
+                    onChangeText={setCvc}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, { marginTop: 25 }]}
+                onPress={submitPayment}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.btnText}>Pay ${selectedPaidModel?.price} & Download</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -344,11 +515,11 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   backButtonTextWhite: { fontSize: 16, color: "#fff", fontWeight: "700" },
   headerTitleContainer: { flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: 20, fontWeight: "900", color: COLORS.textHeader, letterSpacing: -0.5 },
-  
+
   list: { padding: 20, paddingBottom: 40 },
   listHeader: { marginBottom: 24 },
   sectionTitle: { fontSize: 13, fontWeight: "800", color: COLORS.textMuted, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 16 },
-  
+
   tipCard: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 16, padding: 16, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: '#3B82F6' },
   tipTitle: { fontSize: 15, fontWeight: "800", color: '#3B82F6', marginBottom: 4 },
   tipText: { fontSize: 13, color: COLORS.textSub, lineHeight: 18, opacity: 0.9 },
@@ -367,26 +538,26 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   modelName: { fontSize: 18, fontWeight: "800", color: COLORS.textHeader, marginBottom: 4 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   modelSize: { fontSize: 13, fontWeight: "700", color: COLORS.primary },
-  
+
   recTag: { backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   recTagText: { fontSize: 10, fontWeight: "900", color: '#92400E' },
 
   activeBadge: { backgroundColor: '#10B981', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
   activeBadgeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
-  
+
   modelDesc: { fontSize: 14, color: COLORS.textSub, marginBottom: 20, lineHeight: 20 },
-  
+
   actions: { width: '100%' },
   primaryBtn: { backgroundColor: COLORS.primary, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
   btnText: { color: "#FFF", fontWeight: "800", fontSize: 15 },
-  
+
   downloadedActions: { flexDirection: 'row', gap: 10 },
   secondaryBtn: { flex: 1, backgroundColor: COLORS.background, paddingVertical: 6, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: COLORS.border },
   secondaryBtnText: { color: COLORS.textHeader, fontWeight: "800", fontSize: 13 },
-  
+
   activePill: { flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingVertical: 6, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: '#10B981' },
   activePillText: { color: '#10B981', fontWeight: "800", fontSize: 13 },
-  
+
   deleteIconBtn: { width: 42, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' },
 
   downloadProgressContainer: { width: '100%' },
@@ -416,5 +587,15 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   modalBtnDelete: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#EF4444', alignItems: "center" },
   modalBtnDeleteText: { fontSize: 15, fontWeight: "800", color: "#FFF" },
   modalBtnOk: { width: "100%", paddingVertical: 14, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: "center" },
-  modalBtnOkText: { fontSize: 15, fontWeight: "800", color: "#FFF" }
+  modalBtnOkText: { fontSize: 15, fontWeight: "800", color: "#FFF" },
+  inputField: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: COLORS.textMain,
+    backgroundColor: COLORS.background,
+    width: '100%'
+  }
 });

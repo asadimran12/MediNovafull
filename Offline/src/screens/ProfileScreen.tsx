@@ -62,7 +62,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onClose, onSave })
   };
 
   const handleSave = async () => {
+    const existingProfile = await StorageService.getProfile();
     const profile: UserProfile = {
+      ...existingProfile,
       age,
       gender,
       conditions,

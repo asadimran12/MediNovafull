@@ -12,10 +12,13 @@ import {
   Dimensions,
   Modal,
   ScrollView,
+  TextInput,
 } from "react-native";
 import { SPACING, RADIUS, SHADOWS } from "../constants/theme";
 import ModelService, { AIModel } from "../services/ModelService";
 import LlamaService, { ProgressCallback } from "../services/LlamaService";
+import StorageService from "../services/StorageService";
+import { BACKEND_URL } from "@env";
 
 interface ModelSelectionScreenProps {
   onComplete: () => void;
@@ -25,7 +28,7 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
   const { colors: COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS), [COLORS]);
 
-  const [models, setModels] = useState<(AIModel & { isDownloaded: boolean })[]>([]);
+  const [models, setModels] = useState<(AIModel & { isDownloaded: boolean; isUnlocked: boolean })[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -33,6 +36,17 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
 
   const [isPaused, setIsPaused] = useState(false);
   const [recommendedId, setRecommendedId] = useState<string | null>(null);
+
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [selectedPaidModel, setSelectedPaidModel] = useState<AIModel | null>(null);
+  const [cardNumber, setCardNumber] = useState("4242424242424242");
+  const [expMonth, setExpMonth] = useState("12");
+  const [expYear, setExpYear] = useState("2026");
+  const [cvc, setCvc] = useState("123");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  console.log("BACKEND_URL", BACKEND_URL);
+  console.log("models", models);
 
   useEffect(() => {
     loadModels();
@@ -48,7 +62,8 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
     const available = await ModelService.getAvailableModels();
     const enriched = await Promise.all(available.map(async (m) => ({
       ...m,
-      isDownloaded: await ModelService.isModelDownloaded(m.id)
+      isDownloaded: await ModelService.isModelDownloaded(m.id),
+      isUnlocked: await StorageService.isModelUnlocked(m.id)
     })));
     setModels(enriched);
     setLoading(false);
@@ -59,7 +74,13 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
     onComplete();
   };
 
-  const handleDownload = async (model: AIModel) => {
+  const handleDownload = async (model: AIModel & { isUnlocked?: boolean }) => {
+    const unlocked = await StorageService.isModelUnlocked(model.id);
+    if (model.plan === "paid" && !unlocked) {
+      setSelectedPaidModel(model);
+      setShowSubscriptionModal(true);
+      return;
+    }
     setDownloadingId(model.id);
     setProgress(0);
     setIsPaused(false);
@@ -107,13 +128,91 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
     setIsPaused(false);
   };
 
+  const submitPayment = async () => {
+    if (!selectedPaidModel) return;
+    setIsProcessing(true);
+
+    try {
+      const username = await StorageService.getPrimaryUsername();
+
+      const payload = {
+        username: username || "guest",
+        name: selectedPaidModel.MiniName,
+        price: selectedPaidModel.price,
+        card_number: cardNumber,
+        exp_month: parseInt(expMonth),
+        exp_year: parseInt(expYear),
+        cvc: cvc
+      };
+
+      const response = await fetch(`${BACKEND_URL}/users/Addpayment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        await StorageService.unlockModel(selectedPaidModel.id, "paid", selectedPaidModel.price || 0);
+        Alert.alert("Success!", "Payment successful. You unlocked the model!");
+        setShowSubscriptionModal(false);
+        // Start the download now that it is paid for!
+        setDownloadingId(selectedPaidModel.id);
+        setProgress(0);
+        setIsPaused(false);
+        await LlamaService.downloadModel(
+          selectedPaidModel.filename,
+          selectedPaidModel.downloadUrl,
+          (p) => setProgress(p),
+          async () => {
+            await ModelService.setActiveModel(selectedPaidModel.id);
+            setDownloadingId(null);
+            setIsPaused(false);
+            Alert.alert("Success", `${selectedPaidModel.MiniName} downloaded and activated.`);
+            onComplete();
+          },
+          () => {
+            setDownloadingId(null);
+            setIsPaused(false);
+            Alert.alert("Error", "Download failed after purchase.");
+          }
+        );
+        setSelectedPaidModel(null);
+      } else {
+        Alert.alert("Payment Failed", data.message);
+      }
+    } catch (error) {
+      Alert.alert("Network Error", "Could not reach the server. Is the backend running?");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const renderModel = ({ item }: { item: typeof models[0] }) => (
     <View style={styles.modelCard}>
       <View style={styles.modelInfo}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Text style={styles.modelName} numberOfLines={1}>{item.MiniName}</Text>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Text style={styles.modelName} numberOfLines={1}>{item.MiniName}</Text>
+            {item.plan === "paid" ? (
+              item.isUnlocked ? (
+                <View style={[styles.recommendedBadge, { backgroundColor: COLORS.success, paddingHorizontal: 6, paddingVertical: 3 }]}>
+                  <Text style={styles.recommendedBadgeText}>✅ PURCHASED</Text>
+                </View>
+              ) : (
+                <View style={[styles.recommendedBadge, { backgroundColor: COLORS.danger, paddingHorizontal: 6, paddingVertical: 3 }]}>
+                  <Text style={styles.recommendedBadgeText}>💎 ${item.price}</Text>
+                </View>
+              )
+            ) : (
+              <View style={[styles.recommendedBadge, { backgroundColor: COLORS.success, paddingHorizontal: 6, paddingVertical: 3 }]}>
+                <Text style={styles.recommendedBadgeText}>🆓 FREE</Text>
+              </View>
+            )}
+          </View>
           {recommendedId === item.id && (
-            <View style={styles.recommendedBadge}>
+            <View style={[styles.recommendedBadge, { marginLeft: 8 }]}>
               <Text style={styles.recommendedBadgeText}>⭐ BEST CHOICE</Text>
             </View>
           )}
@@ -160,7 +259,9 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
           onPress={() => handleDownload(item)}
           disabled={!!downloadingId}
         >
-          <Text style={styles.downloadBtnText}>Download & Use</Text>
+          <Text style={styles.downloadBtnText}>
+            {item.plan === "paid" && !item.isUnlocked ? `Unlock for $${item.price}` : "Download & Use"}
+          </Text>
         </TouchableOpacity>
       )}
     </View>
@@ -263,6 +364,80 @@ export const ModelSelectionScreen: React.FC<ModelSelectionScreenProps> = ({ onCo
                 onPress={() => setGuideVisible(false)}
               >
                 <Text style={styles.gotItBtnText}>Got it!</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Subscription Modal */}
+      <Modal
+        visible={showSubscriptionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSubscriptionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Unlock Premium Model</Text>
+              <TouchableOpacity onPress={() => setShowSubscriptionModal(false)}>
+                <Text style={styles.closeIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.stepTitle}>You selected: {selectedPaidModel?.MiniName}</Text>
+              <Text style={styles.stepDesc}>Price: ${selectedPaidModel?.price}</Text>
+
+              <Text style={[styles.stepTitle, { marginTop: 20 }]}>Card Number</Text>
+              <TextInput
+                style={styles.inputField}
+                value={cardNumber}
+                onChangeText={setCardNumber}
+                keyboardType="numeric"
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.stepTitle}>Exp Month</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={expMonth}
+                    onChangeText={setExpMonth}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.stepTitle}>Exp Year</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={expYear}
+                    onChangeText={setExpYear}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.stepTitle}>CVC</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={cvc}
+                    onChangeText={setCvc}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.gotItBtn}
+                onPress={submitPayment}
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.gotItBtnText}>Pay ${selectedPaidModel?.price} & Download</Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -468,5 +643,15 @@ const createStyles = (COLORS: any) => StyleSheet.create({
   controlBtn: { flex: 1, paddingVertical: 8, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.textMuted, alignItems: "center" },
   controlBtnText: { color: COLORS.textMain, fontSize: 12, fontWeight: "600" },
   dangerBorder: { borderColor: COLORS.danger },
-  dangerText: { color: COLORS.danger }
+  dangerText: { color: COLORS.danger },
+  inputField: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    fontSize: 16,
+    color: COLORS.textMain,
+    backgroundColor: COLORS.background,
+    marginTop: 8
+  }
 });
