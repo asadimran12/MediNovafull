@@ -13,7 +13,7 @@ import {
     TextInput,
     Animated,
 } from "react-native";
-import { ChevronDown } from "lucide-react-native";
+import { ChevronUp } from "lucide-react-native";
 
 import NotificationService, { ReminderTimes } from "../services/NotificationService";
 import storageService, { HealthPlan } from "../services/StorageService";
@@ -479,7 +479,7 @@ export const ExercisePlansScreen: React.FC<ExercisePlansScreenProps> = ({ onBack
                     style={{ padding: 6, backgroundColor: COLORS.surface, borderRadius: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } }}
                 >
                     <Animated.View style={{ transform: [{ rotate: chevronRotation }] }}>
-                        <ChevronDown size={24} color={COLORS.textSub} />
+                        <ChevronUp size={24} color={COLORS.textSub} />
                     </Animated.View>
                 </TouchableOpacity>
             </View>

@@ -186,19 +186,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin, onForgetPasswor
               </View>
             </View>
 
-            <TouchableOpacity
-              style={[styles.authButton, isLoading && styles.disabledButton]}
-              onPress={handleAuth}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.authButtonText}>
-                  {isRegistering ? "Sign Up" : "Login"}
-                </Text>
-              )}
-            </TouchableOpacity>
+<TouchableOpacity
+  style={[
+    styles.authButton,
+    isLoading || (isRegistering && password.length < 6)
+      ? styles.disabledButton
+      : null
+  ]}
+  onPress={handleAuth}
+  disabled={isLoading || (isRegistering && password.length < 6)}
+>
+  {isLoading ? (
+    <ActivityIndicator color="#FFF" />
+  ) : (
+    <Text style={styles.authButtonText}>
+      {isRegistering ? "Sign Up" : "Login"}
+    </Text>
+  )}
+</TouchableOpacity>
 
             {!!errorMsg && (
               <Text style={styles.errorMsg}>{errorMsg}</Text>

@@ -165,30 +165,30 @@ function MainApp() {
     })();
 
     // AppState Listener for Load/Offload
-    const subscription = AppState.addEventListener("change", async (nextAppState) => {
-      if (appState.current.match(/inactive|background/) && nextAppState === "active") {
+    // const subscription = AppState.addEventListener("change", async (nextAppState) => {
+    //   if (appState.current.match(/inactive|background/) && nextAppState === "active") {
 
-        const netState = await NetInfo.fetch();
-        if (netState.isConnected && netState.isInternetReachable !== false) {
-          NotificationService.SendExportReminder().catch(console.error);
-        }
+    //     const netState = await NetInfo.fetch();
+    //     if (netState.isConnected && netState.isInternetReachable !== false) {
+    //       NotificationService.SendExportReminder().catch(console.error);
+    //     }
 
 
-        console.log("App foregrounded, reloading active model...");
-        const activeModel = await ModelService.getActiveModel();
-        if (activeModel) {
-          LlamaService.loadModel(activeModel.filename).catch(console.error);
-        }
-      } else if (nextAppState.match(/inactive|background/)) {
-        console.log("App backgrounded, offloading model...");
-        LlamaService.offloadChatModel().catch(console.error);
-      }
+    //     console.log("App foregrounded, reloading active model...");
+    //     const activeModel = await ModelService.getActiveModel();
+    //     if (activeModel) {
+    //       LlamaService.loadModel(activeModel.filename).catch(console.error);
+    //     }
+    //   } else if (nextAppState.match(/inactive|background/)) {
+    //     console.log("App backgrounded, offloading model...");
+    //     LlamaService.offloadChatModel().catch(console.error);
+    //   }
 
-      appState.current = nextAppState;
-    });
+    //   appState.current = nextAppState;
+    // });
 
     return () => {
-      subscription.remove();
+      // subscription.remove();
       LlamaService.cleanup();
     };
   }, []);

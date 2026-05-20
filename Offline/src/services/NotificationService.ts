@@ -132,24 +132,24 @@ class NotificationService {
         }
     }
 
-    async SendExportReminder() {
-        await notifee.displayNotification({
-            id: 'export-reminder',
-            title: '🌐 Internet Restored!',
-            body: 'You are back online. Remember to export your health data to the cloud.',
-            data: {
-                navigateTo: 'settings'
-            },
+    // async SendExportReminder() {
+    //     await notifee.displayNotification({
+    //         id: 'export-reminder',
+    //         title: '🌐 Internet Restored!',
+    //         body: 'You are back online. Remember to export your health data to the cloud.',
+    //         data: {
+    //             navigateTo: 'settings'
+    //         },
 
-            android: {
-                channelId: CHANNEL_ID,
-                pressAction: {
-                    id: 'default',
-                },
-            },
-        });
-        console.log(`[NotificationService] Successfully scheduled export-reminder`);
-    }
+    //         android: {
+    //             channelId: CHANNEL_ID,
+    //             pressAction: {
+    //                 id: 'default',
+    //             },
+    //         },
+    //     });
+    //     console.log(`[NotificationService] Successfully scheduled export-reminder`);
+    // }
 
 
 }
