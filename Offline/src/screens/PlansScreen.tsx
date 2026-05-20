@@ -88,6 +88,7 @@ const PopMessage: React.FC<PopMessageProps> = ({ message, type, onHide }) => {
 
   const isSuccess = type === "success";
 
+
   return (
     <Animated.View
       style={[
@@ -311,6 +312,7 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const headerProgress = useRef(new Animated.Value(1)).current;
 
+
   const toggleHeader = () => {
     const toValue = isHeaderVisible ? 0 : 1;
     setIsHeaderVisible(v => !v);
@@ -346,7 +348,8 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
         dinner: { enabled: res.dinner.enabled, hour: res.dinner.hour.toString().padStart(2, "0"), minute: res.dinner.minute.toString().padStart(2, "0") },
       });
     });
-  }, []);
+  }
+  , []);
 
   const handleSaveReminders = async () => {
     if (!reminders) return;
@@ -512,12 +515,56 @@ export const PlansScreen: React.FC<PlansScreenProps> = ({ type, plans, onBack })
   }, [currentDay]);
 
   const normalizedMeals = currentDay && type === "diet" ? normalizeMeals(currentDay.meals ?? []) : [];
-  useEffect(() => { setCompletedMeals([]); }, [selectedDayIndex]);
+useEffect(() => {
+  loadCompletedMeals();
+}, [selectedDayIndex]);
 
+
+const getWeekKey = () => {
+  const now = new Date();
+  const mondayOffset = (now.getDay() + 6) % 7; // Monday as week start
+  const firstDay = new Date(now);
+  firstDay.setDate(now.getDate() - mondayOffset);
+  return `meal_progress_${firstDay.toISOString().split("T")[0]}`;
+};
+
+const loadCompletedMeals = async () => {
+  try {
+    const weekKey = getWeekKey();
+
+    const saved = await storageService.getItem(weekKey);
+
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const todayKey = `${selectedDayIndex}`;
+      setCompletedMeals(parsed[todayKey] || []);
+    } else {
+      setCompletedMeals([]);
+    }
+  } catch (error) {
+    console.log("Load meals error:", error);
+  }
+};
   const totalMeals = type === "diet" ? normalizedMeals.length : (currentDay?.exercises?.length || 0);
   const mealProgress = totalMeals === 0 ? 0 : Math.round((completedMeals.length / totalMeals) * 100);
-  const toggleMeal = (mi: number) => setCompletedMeals(prev => prev.includes(mi) ? prev.filter(i => i !== mi) : [...prev, mi]);
+const toggleMeal = async (mi: number) => {
+  try {
+    const weekKey = getWeekKey();
+    const saved = await storageService.getItem(weekKey);
+    const parsed = saved ? JSON.parse(saved) : {};
+    const todayKey = `${selectedDayIndex}`;
 
+    const updatedMeals = completedMeals.includes(mi)
+      ? completedMeals.filter(i => i !== mi)
+      : [...completedMeals, mi];
+
+    parsed[todayKey] = updatedMeals;
+    await storageService.setItem(weekKey, JSON.stringify(parsed));
+    setCompletedMeals(updatedMeals);
+  } catch (error) {
+    console.log("Save meal error:", error);
+  }
+};
   /* ─── UI ─ */
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
