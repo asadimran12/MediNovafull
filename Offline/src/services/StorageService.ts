@@ -1,6 +1,31 @@
 import * as ReactNativeFS from "react-native-fs";
 import { BACKEND_URL } from "@env";
 import { AVAILABLE_MODELS } from "./ModelService";
+import "react-native-get-random-values";
+
+import CryptoJS from "crypto-js";
+
+const SECRET_KEY = "MediNovaOffline";
+
+export const encryptData = (data: any) => {
+  return CryptoJS.AES.encrypt(
+    JSON.stringify(data),
+    SECRET_KEY
+  ).toString();
+};
+
+export const decryptData = (encrypted: string) => {
+  const bytes = CryptoJS.AES.decrypt(
+    encrypted,
+    SECRET_KEY
+  );
+
+  return JSON.parse(
+    bytes.toString(CryptoJS.enc.Utf8)
+  );
+};
+
+
 
 export interface LocalMessage {
   id: string;
@@ -78,36 +103,45 @@ class StorageService {
     await ReactNativeFS.writeFile(`${this.chatsDir}/${chat.id}.json`, JSON.stringify(chat), "utf8");
   }
 
-  async exportAllDataLocally(): Promise<string> {
-    await this.init();
+async exportAllDataLocally(): Promise<string> {
+  await this.init();
 
+  try {
     const allChats = await this.getAllChats();
 
-
-    const activeModelID = await this.getItem("active_model_id");
-    const activeModel = AVAILABLE_MODELS.find((m: any) => m.id === activeModelID);
-
-    // Gather all data
-    const exportData: any = {
+    const exportData = {
       timestamp: new Date().toISOString(),
       profile: await this.getProfile(),
       chats: allChats,
       plans: await this.getPlans(),
-      activeModelName: activeModel ? activeModel.MiniName : "None",
-      auth: {}
+      auth: await this.getCurrentUserAuth(),
     };
 
-    // Gather Auth Data — only the current user's record
-    exportData.auth = await this.getCurrentUserAuth();
+    const encrypted = encryptData(exportData);
 
-    // Determine export path (try Download directory first, fallback to Document directory)
-    const exportDir = ReactNativeFS.DownloadDirectoryPath || ReactNativeFS.DocumentDirectoryPath;
-    const exportPath = `${exportDir}/MediNova_Export_${Date.now()}.json`;
+    const exportDir = ReactNativeFS.DownloadDirectoryPath || `${ReactNativeFS.ExternalDirectoryPath}/Download`;
 
-    await ReactNativeFS.writeFile(exportPath, JSON.stringify(exportData, null, 2), "utf8");
-    console.log(`Exported ${exportData.chats.length} chats, ${exportData.plans.length} plans to: ${exportPath}`);
+    // Ensure export directory exists
+    if (!(await ReactNativeFS.exists(exportDir))) {
+      await ReactNativeFS.mkdir(exportDir);
+    }
+
+    const exportPath =
+      `${exportDir}/MediNova_Export_${Date.now()}.json`;
+
+    console.log("Writing to:", exportPath);
+    console.log("Size:", encrypted.length);
+
+    await ReactNativeFS.writeFile(exportPath, encrypted, "utf8");
+
+    console.log("Export completed successfully:", exportPath);
     return exportPath;
+
+  } catch (err) {
+    console.error("EXPORT FAILED FULL ERROR:", err);
+    throw err;
   }
+}
 
   private async getCurrentUserAuth(): Promise<{ users: any[]; session: any }> {
     const authDir = `${ReactNativeFS.DocumentDirectoryPath}/auth`;
@@ -221,8 +255,9 @@ class StorageService {
 
   async importAllDataLocally(filePath: string) {
     try {
-      const content = await ReactNativeFS.readFile(filePath, "utf8");
-      const data = JSON.parse(content);
+
+      const encryptedcontent = await ReactNativeFS.readFile(filePath, "utf8");
+      const data = decryptData(encryptedcontent)
       console.log("Importing data:", data);
 
       await this.init();
@@ -249,9 +284,14 @@ class StorageService {
       if (data.auth?.users) {
         await ReactNativeFS.writeFile(`${authDir}/users.json`, JSON.stringify(data.auth.users), "utf8");
       }
-      if (data.auth?.session) {
-        await ReactNativeFS.writeFile(`${authDir}/session.json`, JSON.stringify(data.auth.session), "utf8");
+
+      // Do not import session state automatically.
+      // Keep the imported user accounts, but require an explicit login.
+      const sessionPath = `${authDir}/session.json`;
+      if (await ReactNativeFS.exists(sessionPath)) {
+        await ReactNativeFS.unlink(sessionPath);
       }
+
       return true;
     } catch (e) {
       console.error("Failed to import data", e);
